@@ -49,7 +49,7 @@ router.post("/", validateWith(schema), async(req, res) => {
   if(userBool == false){
     try{
       const insertUser = await usersCollection.insertOne(user).then(result =>{
-
+        // result.status(201).send(user);
       }).catch(error => console.log(error))
       res.status(201).send(user);
     }

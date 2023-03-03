@@ -1,3 +1,4 @@
+//This is the route for CRUD on a Trick
 const express = require("express");
 const router = express.Router();
 
@@ -27,6 +28,75 @@ router.get("/", async (req, res) => {
   .catch(error => console.error(error))
 
 });
+
+router.get("/allTricks", async(req, res) =>{
+  try{
+    // const result = await trickCollection.estimatedDocumentCount();
+    // console.log(result);
+    // res.status(200).json({ result }); // send count as JSON response
+    //   console.log("There are " + result + " documents in the collection.");
+    // Define the user id for which you want to get the total count of tricks
+    // Find all the tricklists that belong to the user
+    const tricklists = await tricksCollection.find({ 'user.$id': req.query.userId }).toArray();
+    // Extract the tricks array from each tricklist and flatten it
+    const trickIds = tricklists.flatMap(tricklist => tricklist.tricks.map(trick => ObjectId(trick._id)));
+    const totalTricks = trickIds.length;
+    // Return the total count of tricks for the user
+    res.send({ totalTricks: totalTricks});
+  }
+  catch(error){
+    res.status(500).send(error);
+  }
+});
+
+
+//data for graph
+router.get("/graph", async (req, res) => {
+  try {
+    const results = await trickCollection.aggregate([
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            day: { $dayOfMonth: "$createdAt" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          date: { $dateFromParts: { 
+            year: "$_id.year", 
+            month: "$_id.month", 
+            day: "$_id.day" } },
+          count: 1
+        }
+      }
+    ]).toArray();
+    
+    const data = {
+      labels: [],
+      datasets: [{
+        data: [],
+        color: (opacity = 1) => `rgba(0, 0, 255, ${opacity})` // blue color for the line
+      }]
+    };
+
+    // Convert the results into the required format for the line chart
+    results.forEach(({ date, count }) => {
+      data.labels.push(date.toISOString().slice(0, 10));
+      data.datasets[0].data.push(count);
+    });
+
+    res.send(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: 'Error getting graph data' });
+  }
+
+})
 
 router.delete("/:id", async(req, res) => {
   const id = req.params.id;

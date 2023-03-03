@@ -1,4 +1,5 @@
 const express = require("express");
+require('dotenv').config()
 const categories = require("./routes/categories");
 const listings = require("./routes/listings");
 const listing = require("./routes/listing");
@@ -14,7 +15,7 @@ const compression = require("compression");
 const config = require("config");
 const app = express();
 const bodyParser = require('body-parser');
-require('dotenv').config()
+
 
 
 app.use(express.static("public"));

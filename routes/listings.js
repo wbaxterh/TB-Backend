@@ -1,3 +1,4 @@
+//This is the route for CRUD on a TrickList
 const express = require("express");
 const router = express.Router();
 const Joi = require("joi");
@@ -41,23 +42,58 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
   .then(client => {
     console.log('Connected to Database')
     const db = client.db('TrickList2')
-    const quotesCollection = db.collection('tricklists')
+    const tricksCollection = db.collection('tricklists')
   
+//SIMPLE GET TRICKLISTS
+// router.get("/", (req, res) => {
+//   // console.log(req.query.userId);
+//   db.collection('tricklists').find({ "user.$id": req.query.userId }).toArray()
+//   .then(results => {
+//     // console.log(results)
+//     res.send(results);
+//   })
+//   .catch(error => console.error(error))
+  
+//   //const listings = store.getListings();
+//   //const resources = listings.map(listingMapper);
+  
+// });
 
-router.get("/", (req, res) => {
-  // console.log(req.query.userId);
-  db.collection('tricklists').find({ "user.$id": req.query.userId }).toArray()
-  .then(results => {
-    // console.log(results)
-    res.send(results);
-  })
-  .catch(error => console.error(error))
-  
-  //const listings = store.getListings();
-  //const resources = listings.map(listingMapper);
-  
+//GET TRICK LISTS WITH COMPLETE STATUS
+router.get("/", async (req, res) => {
+  try {
+    const trickLists = await db.collection('tricklists').find({ "user.$id": req.query.userId }).toArray();
+    const trickIds = trickLists.flatMap(trickList => trickList.tricks.map(trick => trick._id));
+    const tricks = await db.collection('tricks').find({ _id: { $in: trickIds } }).toArray();
+    const trickMap = tricks.reduce((map, trick) => {
+      map[trick._id] = trick;
+      return map;
+    }, {});
+    const trickListsWithTricks = trickLists.map(trickList => {
+      const trickListCopy = { ...trickList };
+      trickListCopy.tricks = trickList.tricks.map(trick => ({
+        ...trick,
+        checked: trickMap[trick._id]?.checked || false
+      }));
+      return trickListCopy;
+    });
+    res.send(trickListsWithTricks);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('An error occurred while fetching tricklists.');
+  }
 });
 
+router.get("/countTrickLists", async(req, res) => {
+  try{
+    const trickLists = await db.collection('tricklists').find({ "user.$id": req.query.userId }).toArray();
+    const countTrickLists = trickLists.length;
+    res.send({totalTrickLists: countTrickLists});
+  }
+  catch(error){
+    res.status(500).send("error getting total Trick Lists");
+  }
+});
 
 router.post(
   "/",
@@ -133,6 +169,18 @@ else{
     
 
 });
+router.put("/edit", async (req, res) => {
+  const filter3 = { _id: ObjectId(req.body.trickListId)};
+      const update2 = { $set: { name: req.body.name} };
+    try{
+      const updateResult = await tricksCollection.findOneAndUpdate(filter3, update2);
+      return res.status(200).send("Success!");
+    }
+    catch(error){
+      console.log(error);
+      return res.status(400).send(error);
+    }
+  });
 })
 
 module.exports = router;
