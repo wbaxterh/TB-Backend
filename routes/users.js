@@ -8,7 +8,7 @@ const validateWith = require("../middleware/validation");
 const { MongoClient } = require("mongodb");
 const ObjectId = require('mongodb').ObjectId;
 const connectionString = process.env.ATLAS_URI;
-
+console.log("Atlas uri == ", connectionString);
 const schema = {
   name: Joi.string().required().min(2),
   email: Joi.string().email().required(),
