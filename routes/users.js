@@ -71,7 +71,21 @@ router.get("/", async (req, res) => {
     res.status(400).send("Error Getting User");
   }
 });
-
+router.delete("/:id", async(req, res) => {
+  const id = req.params.id;
+  console.log(id);
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).send({ error: 'Invalid ID' });
+  }
+  const result = await usersCollection.deleteOne({ _id: ObjectId(id) });
+    if (result.deletedCount === 0) {
+      return res.status(500).send({ error: 'Document not found' });
+    }
+    else{
+        //console.log(deleted);
+        return res.send({ message: 'Document deleted successfully' });
+      } 
+})
 }).catch(error =>{
   console.log(error)
 }); //end mongoClient
