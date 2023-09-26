@@ -29,6 +29,16 @@ router.get("/", async (req, res) => {
 
 });
 
+router.get("/allData", async(req, res) => {
+  try{
+    const allTricks = await trickCollection.find().toArray();
+    res.status(200).send(allTricks);
+  }
+  catch(error){
+    res.status(500).send(error);
+  }
+})
+
 router.get("/allTricks", async(req, res) =>{
   try{
     // const result = await trickCollection.estimatedDocumentCount();

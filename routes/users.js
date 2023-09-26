@@ -21,13 +21,13 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
     const usersCollection = db.collection('users')
 
 router.post("/", validateWith(schema), async(req, res) => {
-  console.log(req.body);
+  // console.log(req.body);
   const { name, email, password } = req.body;
   userBool = false;
   try{
     const userExists = await usersCollection.findOne({ email: email });
     if (userExists) {
-      console.log("User found:", userExists);
+      // console.log("User found:", userExists);
       userBool = true;
       return res
       .send({ error: "A user with the given email already exists." });
@@ -71,9 +71,19 @@ router.get("/", async (req, res) => {
     res.status(400).send("Error Getting User");
   }
 });
+
+router.get('/all', async (req, res) =>{
+  try {
+    const users = await usersCollection.find().toArray();
+    res.status(200).send(users);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error getting users");
+  }
+})
+
 router.delete("/:id", async(req, res) => {
   const id = req.params.id;
-  console.log(id);
   if (!ObjectId.isValid(id)) {
     return res.status(400).send({ error: 'Invalid ID' });
   }

@@ -181,6 +181,15 @@ router.put("/edit", async (req, res) => {
       return res.status(400).send(error);
     }
   });
+router.get("/all", async (req, res) =>{
+  try {
+    const allTrickLists = await tricksCollection.find().toArray();
+    res.status(200).send(allTrickLists);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error getting tricks");
+  }
+})
 })
 
 module.exports = router;
