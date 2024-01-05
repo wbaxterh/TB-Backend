@@ -1,5 +1,5 @@
 const express = require("express");
-require('dotenv').config()
+require("dotenv").config();
 const categories = require("./routes/categories");
 const listings = require("./routes/listings");
 const listing = require("./routes/listing");
@@ -14,12 +14,18 @@ const helmet = require("helmet");
 const compression = require("compression");
 const config = require("config");
 const app = express();
-const bodyParser = require('body-parser');
+const bodyParser = require("body-parser");
 
-
+// Enable CORS for all routes
+app.use(
+	cors({
+		origin: "*", // Allows all origins
+		// For development, you might use '*' to allow all origins
+	})
+);
 
 app.use(express.static("public"));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: "10mb" }));
 app.use(helmet());
 app.use(compression());
 app.use(bodyParser.json());
@@ -36,6 +42,6 @@ app.use("/api/messages", messages);
 app.use("/api/image", image);
 
 const port = process.env.PORT || config.get("port");
-app.listen(port, function() {
-  console.log(`Server started on port ${port}...`);
+app.listen(port, function () {
+	console.log(`Server started on port ${port}...`);
 });
