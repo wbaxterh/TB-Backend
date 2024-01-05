@@ -15,7 +15,7 @@ const compression = require("compression");
 const config = require("config");
 const app = express();
 const bodyParser = require("body-parser");
-
+const cors = require("cors");
 // Enable CORS for all routes
 app.use(
 	cors({
