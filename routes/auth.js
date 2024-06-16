@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
-const usersStore = require("../store/users");
+const bcrypt = require("bcrypt");
 const validateWith = require("../middleware/validation");
 
 const { MongoClient } = require("mongodb");
@@ -14,21 +14,29 @@ const schema = {
 	password: Joi.string().required().min(5),
 };
 
-MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
-	(client) => {
+MongoClient.connect(connectionString, { useUnifiedTopology: true })
+	.then((client) => {
 		const db = client.db("TrickList2");
 		const usersCollection = db.collection("users");
 
 		router.post("/", validateWith(schema), async (req, res) => {
 			const { email, password } = req.body;
 
-			//replace with get users from MongoDB
 			try {
 				const userExists = await usersCollection.findOne({ email: email });
-				if (!userExists || userExists.password !== password) {
+				if (!userExists) {
 					return res.status(400).send({ error: "Invalid email or password." });
 				}
-				console.log(userExists);
+
+				// Compare the provided password with the hashed password in the database
+				const passwordMatch = await bcrypt.compare(
+					password,
+					userExists.password
+				);
+				if (!passwordMatch) {
+					return res.status(400).send({ error: "Invalid email or password." });
+				}
+
 				const token = jwt.sign(
 					{
 						userId: userExists._id,
@@ -38,14 +46,15 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
 					},
 					"jwtPrivateKey"
 				);
-				console.log(token);
 				res.send({ token });
 			} catch (error) {
+				console.error(error);
 				return res.status(400).send({ error: "Database Error." });
 			}
-			//const user = usersStore.getUserByEmail(email);
 		});
-	}
-);
+	})
+	.catch((error) => {
+		console.error("Error connecting to MongoDB", error);
+	});
 
 module.exports = router;
