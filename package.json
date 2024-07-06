@@ -23,6 +23,7 @@
     "dotenv": "^16.0.3",
     "expo-server-sdk": "^3.5.0",
     "express": "^4.17.1",
+    "google-auth-library": "^9.11.0",
     "helmet": "^3.22.0",
     "joi": "^14.3.1",
     "jsonwebtoken": "^8.5.1",
