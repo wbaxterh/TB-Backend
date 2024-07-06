@@ -57,7 +57,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		// Google SSO auth
 		router.post("/google-auth", async (req, res) => {
 			const { tokenId } = req.body;
-
+			console.log("request body to google auth == ", req.body);
 			try {
 				// Verify the token with Google
 				const ticket = await googleClient.verifyIdToken({
