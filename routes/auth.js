@@ -45,6 +45,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						name: userExists.name,
 						email: userExists.email,
 						imageUri: userExists.imageUri,
+						role: userExists.role,
 					},
 					"jwtPrivateKey"
 				);
