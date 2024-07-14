@@ -78,8 +78,11 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						imageUri: picture,
 					};
 					const result = await usersCollection.insertOne(newUser);
-					console.log("New user inserted via google auth: ", result);
-					user = result.ops[0];
+					//console.log("New user inserted via google auth: ", result);
+					user = {
+						_id: result.insertedId,
+						...newUser,
+					};
 				} else {
 					// Update existing user with SSO data
 					await usersCollection.updateOne(
