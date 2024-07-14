@@ -42,7 +42,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		});
 
 		router.get("/:id", async (req, res) => {
-			const id = req.params.id;
+			const id = req.params;
 			if (!ObjectId.isValid(id)) {
 				return res.status(400).send({ error: "Invalid ID" });
 			}

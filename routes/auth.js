@@ -93,6 +93,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						name: user.name,
 						email: user.email,
 						imageUri: user.imageUri,
+						role: user.role ? user.role : null,
 					},
 					"jwtPrivateKey"
 				);
