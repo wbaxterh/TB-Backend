@@ -12,7 +12,9 @@ const schema = {
 	date: Joi.date().required(),
 	content: Joi.string().required(),
 };
-
+const generateUrl = (title) => {
+	return title.toLowerCase().replace(/\s+/g, "-");
+};
 MongoClient.connect(connectionString, { useUnifiedTopology: true })
 	.then((client) => {
 		const db = client.db("TrickList2");
@@ -20,7 +22,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
 		router.post("/", [authAdmin(), validateWith(schema)], async (req, res) => {
 			const { title, author, date, content } = req.body;
-			const blogPost = { title, author, date, content };
+			const url = generateUrl(title);
+			const blogPost = { title, author, date, content, url };
 
 			try {
 				await blogCollection.insertOne(blogPost);
