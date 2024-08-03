@@ -62,6 +62,21 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			}
 		});
 
+		router.get("/url/:url", async (req, res) => {
+			const url = req.params.url;
+
+			try {
+				const blogPost = await blogCollection.findOne({ url: url });
+				if (!blogPost) {
+					return res.status(404).send({ error: "Blog post not found" });
+				}
+				res.status(200).send(blogPost);
+			} catch (error) {
+				console.error("Error retrieving blog post by URL", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
 		router.delete("/:id", authAdmin(), async (req, res) => {
 			const id = req.params.id;
 			if (!ObjectId.isValid(id)) {
