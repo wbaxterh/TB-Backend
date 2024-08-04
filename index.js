@@ -44,7 +44,7 @@ app.use("/api/my", my);
 app.use("/api/expoPushTokens", expoPushTokens);
 app.use("/api/messages", messages);
 app.use("/api/image", image);
-app.use("/api/blogImage", image);
+app.use("/api/blogImage", blogImage);
 
 const port = process.env.PORT || config.get("port");
 app.listen(port, function () {
