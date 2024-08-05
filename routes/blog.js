@@ -11,23 +11,33 @@ const schema = {
 	author: Joi.string().required(),
 	date: Joi.date().required(),
 	content: Joi.string().required(),
+	images: Joi.array().items(Joi.string()).optional(), // Add images field
 };
+
 const generateUrl = (title) => {
 	return title.toLowerCase().replace(/\s+/g, "-");
 };
+
 MongoClient.connect(connectionString, { useUnifiedTopology: true })
 	.then((client) => {
 		const db = client.db("TrickList2");
 		const blogCollection = db.collection("blog");
 
 		router.post("/", [authAdmin(), validateWith(schema)], async (req, res) => {
-			const { title, author, date, content } = req.body;
+			const { title, author, date, content, images } = req.body;
 			const url = generateUrl(title);
-			const blogPost = { title, author, date, content, url };
+			const blogPost = {
+				title,
+				author,
+				date,
+				content,
+				url,
+				images: images || [],
+			};
 
 			try {
-				await blogCollection.insertOne(blogPost);
-				res.status(201).send(blogPost);
+				const result = await blogCollection.insertOne(blogPost);
+				res.status(201).send(result.ops[0]);
 			} catch (error) {
 				console.error("Error creating blog post", error);
 				res.status(500).send({ error: "Internal Server Error" });
@@ -45,7 +55,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		});
 
 		router.get("/:id", async (req, res) => {
-			const id = req.params;
+			const id = req.params.id;
 			if (!ObjectId.isValid(id)) {
 				return res.status(400).send({ error: "Invalid ID" });
 			}
