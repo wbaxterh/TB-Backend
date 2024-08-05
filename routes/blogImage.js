@@ -29,7 +29,7 @@ const upload = multer({
 			cb(null, `${blogUrl}/${fileName}`);
 		},
 	}),
-	limits: { fileSize: 25 * 1024 * 1024 },
+	limits: { fileSize: 2 * 1024 * 1024 }, // Set file size limit to 2MB
 });
 
 router.post("/upload", upload.single("file"), async (req, res) => {
