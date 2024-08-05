@@ -19,6 +19,7 @@ const upload = multer({
 			cb(null, { fieldName: file.fieldname });
 		},
 		key: function (req, file, cb) {
+			// Extract blogUrl from parsed body
 			const blogUrl = req.body.blogUrl;
 			console.log("Blog URL:", blogUrl); // Log the blog URL
 			if (!blogUrl) {
@@ -31,20 +32,22 @@ const upload = multer({
 	limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-router.post(
-	"/upload",
-	upload.fields([{ name: "file" }, { name: "blogUrl" }]),
-	async (req, res) => {
-		console.log("Request body:", req.body); // Log the request body to debug
-		if (!req.files || !req.files.file) {
+router.post("/upload", (req, res, next) => {
+	upload.single("file")(req, res, (err) => {
+		if (err) {
+			console.error("Upload error:", err);
+			return res.status(400).send("Error uploading file.");
+		}
+
+		if (!req.file) {
 			return res.status(400).send("No file uploaded.");
 		}
 
-		console.log("Uploaded file metadata:", req.files.file); // Log file metadata to debug
+		console.log("Uploaded file metadata:", req.file); // Log file metadata to debug
 
-		const imageUrl = req.files.file[0].location;
+		const imageUrl = req.file.location;
 		res.status(200).send({ imageUrl });
-	}
-);
+	});
+});
 
 module.exports = router;
