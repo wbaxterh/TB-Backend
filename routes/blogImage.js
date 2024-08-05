@@ -20,6 +20,8 @@ const upload = multer({
 		},
 		key: function (req, file, cb) {
 			const blogUrl = req.body.blogUrl;
+			console.log("request == ", req);
+			console.log("blog URL === ", blogUrl);
 			const fileName = `${Date.now().toString()}-${file.originalname}`;
 			cb(null, `${blogUrl}/${fileName}`);
 		},
