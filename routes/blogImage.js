@@ -21,7 +21,6 @@ const upload = multer({
 		key: function (req, file, cb) {
 			// Extract blogUrl from query parameters
 			const blogUrl = req.query.blogUrl;
-			console.log("Blog URL:", blogUrl); // Log the blog URL
 			if (!blogUrl) {
 				return cb(new Error("blogUrl is required"), undefined);
 			}
@@ -36,9 +35,6 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 	if (!req.file) {
 		return res.status(400).send("No file uploaded.");
 	}
-
-	console.log("Uploaded file metadata:", req.file); // Log file metadata to debug
-
 	const imageUrl = req.file.location;
 	res.status(200).send({ imageUrl });
 });
