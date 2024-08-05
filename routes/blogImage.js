@@ -10,7 +10,7 @@ const s3 = new AWS.S3({
 	region: process.env.AWS_REGION,
 });
 
-// configure multer to use S3 for file storage
+// Configure multer to use S3 for file storage
 const upload = multer({
 	storage: multerS3({
 		s3: s3,
@@ -20,22 +20,31 @@ const upload = multer({
 		},
 		key: function (req, file, cb) {
 			const blogUrl = req.body.blogUrl;
-			console.log("request == ", req);
-			console.log("blog URL === ", blogUrl);
+			console.log("Blog URL:", blogUrl); // Log the blog URL
+			if (!blogUrl) {
+				return cb(new Error("blogUrl is required"), undefined);
+			}
 			const fileName = `${Date.now().toString()}-${file.originalname}`;
 			cb(null, `${blogUrl}/${fileName}`);
 		},
-		limits: { fileSize: 25 * 1024 * 1024 },
 	}),
+	limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-router.post("/upload", upload.single("file"), async (req, res) => {
-	if (!req.file) {
-		return res.status(400).send("No file uploaded.");
+router.post(
+	"/upload",
+	upload.fields([{ name: "file" }, { name: "blogUrl" }]),
+	async (req, res) => {
+		console.log("Request body:", req.body); // Log the request body to debug
+		if (!req.files || !req.files.file) {
+			return res.status(400).send("No file uploaded.");
+		}
+
+		console.log("Uploaded file metadata:", req.files.file); // Log file metadata to debug
+
+		const imageUrl = req.files.file[0].location;
+		res.status(200).send({ imageUrl });
 	}
-
-	const imageUrl = req.file.location;
-	res.status(200).send({ imageUrl });
-});
+);
 
 module.exports = router;
