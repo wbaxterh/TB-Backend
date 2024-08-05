@@ -37,7 +37,10 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
 			try {
 				const result = await blogCollection.insertOne(blogPost);
-				res.status(201).send(result.ops[0]);
+				const insertedPost = await blogCollection.findOne({
+					_id: result.insertedId,
+				});
+				res.status(201).send(insertedPost);
 			} catch (error) {
 				console.error("Error creating blog post", error);
 				res.status(500).send({ error: "Internal Server Error" });
@@ -83,6 +86,32 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				res.status(200).send(blogPost);
 			} catch (error) {
 				console.error("Error retrieving blog post by URL", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		router.patch("/:id", authAdmin(), async (req, res) => {
+			const id = req.params.id;
+			const { images } = req.body;
+
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).send({ error: "Invalid ID" });
+			}
+
+			try {
+				const updateResult = await blogCollection.updateOne(
+					{ _id: ObjectId(id) },
+					{ $set: { images: images } }
+				);
+
+				if (updateResult.matchedCount === 0) {
+					return res.status(404).send({ error: "Blog post not found" });
+				}
+
+				const updatedPost = await blogCollection.findOne({ _id: ObjectId(id) });
+				res.status(200).send(updatedPost);
+			} catch (error) {
+				console.error("Error updating blog post with images", error);
 				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});
