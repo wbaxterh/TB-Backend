@@ -90,15 +90,17 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			}
 		});
 
-		router.patch("/:id", authAdmin(), async (req, res) => {
+		//update a blog post info
+		router.patch("/update/:id", authAdmin(), async (req, res) => {
 			const id = req.params.id;
-			const { title, author, date, content, url, images } = req.body;
+			const { title, author, date, content, url } = req.body;
 
 			if (!ObjectId.isValid(id)) {
 				return res.status(400).send({ error: "Invalid ID" });
 			}
 
 			try {
+				// Perform the update
 				const updateResult = await blogCollection.updateOne(
 					{ _id: ObjectId(id) },
 					{
@@ -108,9 +110,36 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 							date: date,
 							content: content,
 							url: url,
-							images: images,
 						},
 					}
+				);
+
+				if (updateResult.matchedCount === 0) {
+					return res.status(404).send({ error: "Blog post not found" });
+				}
+
+				// Fetch the updated post
+				const updatedPost = await blogCollection.findOne({ _id: ObjectId(id) });
+				res.status(200).send(updatedPost);
+			} catch (error) {
+				console.error("Error updating blog post content", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		// update the blog post image with the generated url
+		router.patch("/:id", authAdmin(), async (req, res) => {
+			const id = req.params.id;
+			const { images } = req.body;
+
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).send({ error: "Invalid ID" });
+			}
+
+			try {
+				const updateResult = await blogCollection.updateOne(
+					{ _id: ObjectId(id) },
+					{ $set: { images: images } }
 				);
 
 				if (updateResult.matchedCount === 0) {
@@ -120,7 +149,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				const updatedPost = await blogCollection.findOne({ _id: ObjectId(id) });
 				res.status(200).send(updatedPost);
 			} catch (error) {
-				console.error("Error updating blog post", error);
+				console.error("Error updating blog post with images", error);
 				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});
