@@ -93,8 +93,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		//update a blog post info
 		router.patch("/update/:id", authAdmin(), async (req, res) => {
 			const id = req.params.id;
-			const url = generateUrl(title);
 			const { title, author, date, content } = req.body;
+			const url = generateUrl(title);
 
 			if (!ObjectId.isValid(id)) {
 				return res.status(400).send({ error: "Invalid ID" });
