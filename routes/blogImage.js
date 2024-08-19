@@ -28,7 +28,7 @@ const upload = multer({
 			cb(null, `${blogUrl}/${fileName}`);
 		},
 	}),
-	limits: { fileSize: 2 * 1024 * 1024 }, // Set file size limit to 2MB
+	limits: { fileSize: 5 * 1024 * 1024 }, // Set file size limit to 5MB
 });
 
 router.post("/upload", upload.single("file"), async (req, res) => {
@@ -38,5 +38,48 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 	const imageUrl = req.file.location;
 	res.status(200).send({ imageUrl });
 });
+
+router.delete("/delete-folder/:slug", authAdmin(), async (req, res) => {
+	const { slug } = req.params;
+
+	// Define the S3 bucket and prefix (folder)
+	const bucketParams = {
+		Bucket: "trickbook",
+		Prefix: `${slug}/`, // The folder is named after the slug
+	};
+
+	try {
+		// List all objects in the folder
+		const listedObjects = await s3.listObjectsV2(bucketParams).promise();
+
+		if (listedObjects.Contents.length === 0) {
+			return res
+				.status(404)
+				.send({ error: "No objects found in the specified folder." });
+		}
+
+		// Create a list of keys to delete
+		const deleteParams = {
+			Bucket: "trickbook",
+			Delete: { Objects: [] },
+		};
+
+		listedObjects.Contents.forEach(({ Key }) => {
+			deleteParams.Delete.Objects.push({ Key });
+		});
+
+		// Delete the objects
+		await s3.deleteObjects(deleteParams).promise();
+
+		res
+			.status(200)
+			.send({ message: "Folder and all its contents deleted successfully." });
+	} catch (error) {
+		console.error("Error deleting folder in S3", error);
+		res.status(500).send({ error: "Internal Server Error" });
+	}
+});
+
+module.exports = router;
 
 module.exports = router;
