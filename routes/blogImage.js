@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const AWS = require("aws-sdk");
 const multer = require("multer");
-const authAdmin = require("../middleware/authAdmin");
 const multerS3 = require("multer-s3");
 
 const s3 = new AWS.S3({
@@ -40,7 +39,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 	res.status(200).send({ imageUrl });
 });
 
-router.delete("/delete-folder/:slug", authAdmin(), async (req, res) => {
+router.delete("/delete-folder/:slug", async (req, res) => {
 	const { slug } = req.params;
 
 	// Define the S3 bucket and prefix (folder)
