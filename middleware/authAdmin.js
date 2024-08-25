@@ -5,11 +5,14 @@ const connectionString = process.env.ATLAS_URI;
 const authAdmin = () => {
 	return (req, res, next) => {
 		let token = req.header("x-auth-token");
-		token = token.trim();
-		if (!token)
+		// Check if the token is undefined or empty
+		if (!token || typeof token !== "string") {
 			return res
 				.status(401)
 				.send({ error: "Access denied. No token provided." });
+		}
+
+		token = token.trim();
 
 		try {
 			const payload = jwt.verify(token, "jwtPrivateKey");

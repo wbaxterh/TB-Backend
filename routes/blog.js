@@ -120,7 +120,9 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				}
 
 				// Fetch the updated post
-				const updatedPost = await blogCollection.findOne({ _id: ObjectId(id) });
+				const updatedPost = await blogCollection.findOne({
+					_id: ObjectId(id),
+				});
 				res.status(200).send(updatedPost);
 			} catch (error) {
 				console.error("Error updating blog post content", error);
