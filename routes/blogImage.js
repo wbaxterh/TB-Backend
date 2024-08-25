@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const AWS = require("aws-sdk");
 const multer = require("multer");
+const authAdmin = require("../middleware/authAdmin");
 const multerS3 = require("multer-s3");
 
 const s3 = new AWS.S3({
@@ -79,7 +80,5 @@ router.delete("/delete-folder/:slug", authAdmin(), async (req, res) => {
 		res.status(500).send({ error: "Internal Server Error" });
 	}
 });
-
-module.exports = router;
 
 module.exports = router;
