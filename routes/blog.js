@@ -135,6 +135,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			const id = req.params.id;
 			const { images } = req.body;
 
+			console.log("Received images for update:", images);
+
 			if (!ObjectId.isValid(id)) {
 				return res.status(400).send({ error: "Invalid ID" });
 			}
@@ -150,6 +152,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				}
 
 				const updatedPost = await blogCollection.findOne({ _id: ObjectId(id) });
+				console.log("Successfully updated post:", updatedPost);
 				res.status(200).send(updatedPost);
 			} catch (error) {
 				console.error("Error updating blog post with images", error);
