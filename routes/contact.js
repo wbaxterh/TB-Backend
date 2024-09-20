@@ -16,7 +16,7 @@ router.post("/send-email", async (req, res) => {
 		from: email,
 		to: "admin@thetrickbook.com",
 		subject: `New Contact from ${name}`,
-		text: `${message} Reply to: ${email}`,
+		text: `${message} <br/> Reply to: ${email}`,
 	};
 
 	try {
