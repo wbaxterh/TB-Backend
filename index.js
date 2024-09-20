@@ -12,6 +12,7 @@ const my = require("./routes/my");
 const blog = require("./routes/blog");
 const blogImage = require("./routes/blogImage");
 const messages = require("./routes/messages");
+const contact = require("./routes/contact");
 const expoPushTokens = require("./routes/expoPushTokens");
 const helmet = require("helmet");
 const compression = require("compression");
@@ -45,6 +46,7 @@ app.use("/api/expoPushTokens", expoPushTokens);
 app.use("/api/messages", messages);
 app.use("/api/image", image);
 app.use("/api/blogImage", blogImage);
+app.use("/api/contact", contact);
 
 const port = process.env.PORT || config.get("port");
 app.listen(port, function () {
