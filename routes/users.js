@@ -4,6 +4,7 @@ const Joi = require("joi");
 const bcrypt = require("bcrypt");
 const usersStore = require("../store/users");
 const validateWith = require("../middleware/validation");
+const authAccountOrAdmin = require("../middleware/authAccountOrAdmin");
 const { MongoClient } = require("mongodb");
 const ObjectId = require("mongodb").ObjectId;
 const connectionString = process.env.ATLAS_URI;
@@ -81,18 +82,46 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			}
 		});
 
-		router.delete("/:id", async (req, res) => {
+		router.delete("/:id", authAccountOrAdmin(), async (req, res) => {
 			const id = req.params.id;
+
 			if (!ObjectId.isValid(id)) {
 				return res.status(400).send({ error: "Invalid ID" });
 			}
-			const result = await usersCollection.deleteOne({ _id: ObjectId(id) });
-			if (result.deletedCount === 0) {
-				return res.status(500).send({ error: "Document not found" });
-			} else {
-				return res.send({ message: "Document deleted successfully" });
+
+			try {
+				const userToDelete = await usersCollection.findOne({
+					_id: ObjectId(id),
+				});
+
+				if (!userToDelete) {
+					return res.status(404).send({ error: "User not found" });
+				}
+
+				const result = await usersCollection.deleteOne({ _id: ObjectId(id) });
+
+				if (result.deletedCount === 0) {
+					return res.status(500).send({ error: "Failed to delete user" });
+				}
+
+				res.send({ message: "User deleted successfully" });
+			} catch (error) {
+				console.error(error);
+				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});
+		// 	router.delete("/:id", async (req, res) => {
+		// 		const id = req.params.id;
+		// 		if (!ObjectId.isValid(id)) {
+		// 			return res.status(400).send({ error: "Invalid ID" });
+		// 		}
+		// 		const result = await usersCollection.deleteOne({ _id: ObjectId(id) });
+		// 		if (result.deletedCount === 0) {
+		// 			return res.status(500).send({ error: "Document not found" });
+		// 		} else {
+		// 			return res.send({ message: "Document deleted successfully" });
+		// 		}
+		// 	});
 	})
 	.catch((error) => {
 		console.log(error);

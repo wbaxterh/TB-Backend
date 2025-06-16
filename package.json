@@ -15,7 +15,7 @@
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.252.0",
 		"aws-sdk": "^2.1297.0",
-		"bcrypt": "^5.1.1",
+		"bcrypt": "^6.0.0",
 		"body-parser": "^1.20.1",
 		"compression": "^1.7.4",
 		"config": "^3.3.1",
@@ -28,11 +28,12 @@
 		"joi": "^14.3.1",
 		"jsonwebtoken": "8.5.1",
 		"mongodb": "^4.13.0",
+		"mongoose": "^8.15.1",
 		"multer": "^1.4.2",
 		"multer-s3": "^2.10.0",
 		"multer-s3-v2": "^2.2.1",
 		"nodemailer": "^6.9.15",
-		"sharp": "^0.25.2"
+		"sharp": "^0.25.4"
 	},
 	"devDependencies": {
 		"nodemon": "^2.0.2"

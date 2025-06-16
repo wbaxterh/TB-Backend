@@ -17,9 +17,10 @@ const expoPushTokens = require("./routes/expoPushTokens");
 const helmet = require("helmet");
 const compression = require("compression");
 const config = require("config");
-const app = express();
-const bodyParser = require("body-parser");
 const cors = require("cors");
+const path = require("path");
+const trickipedia = require("./routes/trickipedia");
+
 // Enable CORS for all routes
 app.use(
 	cors({
@@ -28,7 +29,7 @@ app.use(
 	})
 );
 
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json({ limit: "10mb" }));
 app.use(helmet());
 app.use(compression());
@@ -47,6 +48,7 @@ app.use("/api/messages", messages);
 app.use("/api/image", image);
 app.use("/api/blogImage", blogImage);
 app.use("/api/contact", contact);
+app.use("/api/trickipedia", trickipedia);
 
 const port = process.env.PORT || config.get("port");
 app.listen(port, function () {
