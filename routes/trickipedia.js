@@ -4,6 +4,13 @@ const { MongoClient, ObjectId } = require("mongodb");
 const auth = require("../middleware/auth");
 const connectionString = process.env.ATLAS_URI;
 
+// Utility function to generate a URL slug from the trick name
+const generateSlug = (name) =>
+	name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/(^-|-$)+/g, "");
+
 // Validation function for trick data
 const validateTrick = (trick) => {
 	const requiredFields = [
@@ -39,6 +46,8 @@ const validateTrick = (trick) => {
 		return { isValid: false, message: "Video URL must be a string" };
 	if (trick.source && typeof trick.source !== "string")
 		return { isValid: false, message: "Source must be a string" };
+	if (trick.url && typeof trick.url !== "string")
+		return { isValid: false, message: "URL must be a string" };
 
 	return { isValid: true };
 };
@@ -149,6 +158,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					return res.status(400).json({ message: validation.message });
 				}
 
+				const url = generateSlug(req.body.name);
 				const trick = {
 					name: req.body.name,
 					category: req.body.category,
@@ -158,6 +168,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					images: req.body.images || [],
 					videoUrl: req.body.videoUrl || null,
 					source: req.body.source || null,
+					url,
 					createdAt: new Date(),
 					updatedAt: new Date(),
 				};
@@ -189,6 +200,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					return res.status(400).json({ message: validation.message });
 				}
 
+				const url = generateSlug(req.body.name);
 				const update = {
 					name: req.body.name,
 					category: req.body.category,
@@ -198,6 +210,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					images: req.body.images || [],
 					videoUrl: req.body.videoUrl || null,
 					source: req.body.source || null,
+					url,
 					updatedAt: new Date(),
 				};
 
