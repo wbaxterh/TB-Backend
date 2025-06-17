@@ -20,6 +20,7 @@ const compression = require("compression");
 const config = require("config");
 const cors = require("cors");
 const path = require("path");
+const bodyParser = require("body-parser");
 const trickipedia = require("./routes/trickipedia");
 
 // Enable CORS for all routes
