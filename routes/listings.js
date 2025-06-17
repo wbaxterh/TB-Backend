@@ -5,7 +5,6 @@ const Joi = require("joi");
 const multer = require("multer");
 
 const store = require("../store/listings");
-const categoriesStore = require("../store/categories");
 // const validateWith = require("../middleware/validation");
 const auth = require("../middleware/auth");
 const delay = require("../middleware/delay");
@@ -28,12 +27,6 @@ const schema = {
 	}).optional(),
 };
 
-const validateCategoryId = (req, res, next) => {
-	if (!categoriesStore.getCategory(parseInt(req.body.categoryId)))
-		return res.status(400).send({ error: "Invalid categoryId." });
-
-	next();
-};
 const ObjectId = require("mongodb").ObjectId;
 const { MongoClient, DBRef } = require("mongodb");
 const connectionString = process.env.ATLAS_URI;
