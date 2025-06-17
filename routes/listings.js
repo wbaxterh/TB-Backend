@@ -6,7 +6,7 @@ const multer = require("multer");
 
 const store = require("../store/listings");
 const categoriesStore = require("../store/categories");
-const validateWith = require("../middleware/validation");
+// const validateWith = require("../middleware/validation");
 const auth = require("../middleware/auth");
 const delay = require("../middleware/delay");
 const listingMapper = require("../mappers/listings");
