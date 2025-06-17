@@ -1,4 +1,5 @@
 const express = require("express");
+const app = express();
 require("dotenv").config();
 const categories = require("./routes/categories");
 const listings = require("./routes/listings");
