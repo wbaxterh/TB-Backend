@@ -71,3 +71,18 @@ The backend is built with Node.js and Express, using MongoDB as the database. It
 ### Messages
 
 - `GET /api/messages`
+
+### Trick Images (S3 Uploads)
+
+- `POST /api/trickImage/upload` - Upload a trick image to S3 (requires `trickUrl` query param, returns S3 URL)
+- `DELETE /api/trickImage/delete-folder/:slug` - Delete all images for a trick (by URL slug)
+
+**Example Upload:**
+
+- POST `/api/trickImage/upload?trickUrl=backside-pop-shove-it`
+- Form-data body: `file` (the image file)
+- Response: `{ "imageUrl": "https://trickbook.s3.amazonaws.com/backside-pop-shove-it/1687040000000-image.jpg" }`
+
+**Example Delete:**
+
+- DELETE `/api/trickImage/delete-folder/backside-pop-shove-it`
