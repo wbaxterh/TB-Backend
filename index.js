@@ -23,6 +23,7 @@ const path = require("path");
 const bodyParser = require("body-parser");
 const trickipedia = require("./routes/trickipedia");
 const trickImage = require("./routes/trickImage");
+const spots = require("./routes/spots");
 
 // Enable CORS for all routes
 app.use(
@@ -53,6 +54,7 @@ app.use("/api/blogImage", blogImage);
 app.use("/api/contact", contact);
 app.use("/api/trickipedia", trickipedia);
 app.use("/api/trickImage", trickImage);
+app.use("/api/spots", spots);
 
 const port = process.env.PORT || config.get("port");
 app.listen(port, function () {
