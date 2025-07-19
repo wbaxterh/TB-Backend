@@ -13,6 +13,9 @@ const schema = {
 	imageURL: Joi.string().uri().optional(),
 	description: Joi.string().allow("").optional(),
 	rating: Joi.number().min(0).max(5).optional(),
+	tags: Joi.string().allow("").optional(),
+	city: Joi.string().allow("").optional(),
+	state: Joi.string().allow("").optional(),
 };
 
 MongoClient.connect(connectionString, { useUnifiedTopology: true })
@@ -22,8 +25,17 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
 		// Create a new spot
 		router.post("/", [auth, validateWith(schema)], async (req, res) => {
-			const { name, latitude, longitude, imageURL, description, rating } =
-				req.body;
+			const {
+				name,
+				latitude,
+				longitude,
+				imageURL,
+				description,
+				rating,
+				tags,
+				city,
+				state,
+			} = req.body;
 			const spot = {
 				name,
 				latitude,
@@ -31,6 +43,9 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				imageURL: imageURL || null,
 				description: description || "",
 				rating: rating || null,
+				tags: tags || "",
+				city: city || "",
+				state: state || "",
 			};
 			try {
 				const result = await spotsCollection.insertOne(spot);
