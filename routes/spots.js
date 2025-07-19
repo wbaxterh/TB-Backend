@@ -36,6 +36,17 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				city,
 				state,
 			} = req.body;
+
+			// Check if spot already exists by lat/long
+			const existingSpot = await spotsCollection.findOne({
+				latitude: latitude,
+				longitude: longitude,
+			});
+
+			if (existingSpot) {
+				return res.status(200).json(existingSpot);
+			}
+
 			const spot = {
 				name,
 				latitude,
@@ -74,13 +85,26 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				return res.status(400).json({ error: "One or more spots are invalid" });
 			}
 			try {
-				const result = await spotsCollection.insertMany(parks);
-				// Attach inserted IDs to the returned objects
-				const insertedSpots = parks.map((spot, i) => ({
-					...spot,
-					_id: result.insertedIds[i],
-				}));
-				res.status(201).json(insertedSpots);
+				const processedSpots = [];
+
+				for (const park of parks) {
+					// Check if spot already exists by lat/long
+					const existingSpot = await spotsCollection.findOne({
+						latitude: park.latitude,
+						longitude: park.longitude,
+					});
+
+					if (existingSpot) {
+						processedSpots.push(existingSpot);
+					} else {
+						// Insert new spot
+						const result = await spotsCollection.insertOne(park);
+						const newSpot = { ...park, _id: result.insertedId };
+						processedSpots.push(newSpot);
+					}
+				}
+
+				res.status(201).json(processedSpots);
 			} catch (error) {
 				console.error("Error bulk inserting spots", error);
 				res.status(500).json({ error: "Internal Server Error" });
@@ -112,6 +136,26 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				res.status(200).json(spot);
 			} catch (error) {
 				console.error("Error retrieving spot", error);
+				res.status(500).json({ error: "Internal Server Error" });
+			}
+		});
+
+		// Get lists containing a specific spot
+		router.get("/:id/lists", [auth], async (req, res) => {
+			const spotId = req.params.id;
+			if (!ObjectId.isValid(spotId)) {
+				return res.status(400).json({ error: "Invalid spot ID" });
+			}
+			try {
+				const spotLists = await spotListsCollection
+					.find({
+						spotIds: ObjectId(spotId),
+						userId: req.user.userId,
+					})
+					.toArray();
+				res.status(200).json(spotLists);
+			} catch (error) {
+				console.error("Error retrieving spot lists", error);
 				res.status(500).json({ error: "Internal Server Error" });
 			}
 		});
