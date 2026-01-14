@@ -15,7 +15,7 @@ const authAdmin = () => {
 		token = token.trim();
 
 		try {
-			const payload = jwt.verify(token, "jwtPrivateKey");
+			const payload = jwt.verify(token, process.env.JWT_SECRET);
 			req.user = payload;
 			MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				.then((client) => {

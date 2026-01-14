@@ -4,6 +4,7 @@ const Joi = require("joi");
 const { MongoClient, ObjectId } = require("mongodb");
 const validateWith = require("../middleware/validation");
 const auth = require("../middleware/auth");
+const subscriptionMiddleware = require("../middleware/subscription");
 const connectionString = process.env.ATLAS_URI;
 
 const schema = {
@@ -18,25 +19,32 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		const spotsCollection = db.collection("spots");
 
 		// Create a new spot list
-		router.post("/", [auth, validateWith(schema)], async (req, res) => {
-			const { name, description } = req.body;
-			const spotList = {
-				name,
-				description: description || "",
-				userId: req.user.userId,
-				spotIds: [],
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			};
-			try {
-				const result = await spotListsCollection.insertOne(spotList);
-				spotList._id = result.insertedId;
-				res.status(201).json(spotList);
-			} catch (error) {
-				console.error("Error creating spot list", error);
-				res.status(500).json({ error: "Internal Server Error" });
+		router.post(
+			"/",
+			[auth, subscriptionMiddleware.checkSpotListLimit, validateWith(schema)],
+			async (req, res) => {
+				const { name, description } = req.body;
+				const spotList = {
+					name,
+					description: description || "",
+					userId: req.user.userId,
+					spotIds: [],
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				};
+				try {
+					const result = await spotListsCollection.insertOne(spotList);
+					spotList._id = result.insertedId;
+					res.status(201).json(spotList);
+				} catch (error) {
+					console.error("Error creating spot list", error);
+					res.status(500).json({ error: "Internal Server Error" });
+				}
 			}
-		});
+		);
+
+		// Get user's current usage
+		router.get("/usage", [auth], subscriptionMiddleware.getUserUsage);
 
 		// Get all spot lists for the authenticated user
 		router.get("/", [auth], async (req, res) => {
@@ -125,46 +133,54 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		});
 
 		// Add a spot to a list
-		router.post("/:id/spots", [auth], async (req, res) => {
-			const listId = req.params.id;
-			const { spotId } = req.body;
+		router.post(
+			"/:id/spots",
+			[
+				auth,
+				subscriptionMiddleware.checkSpotLimit,
+				subscriptionMiddleware.checkTotalSpotsLimit,
+			],
+			async (req, res) => {
+				const listId = req.params.id;
+				const { spotId } = req.body;
 
-			if (!ObjectId.isValid(listId)) {
-				return res.status(400).json({ error: "Invalid list ID" });
-			}
-			if (!ObjectId.isValid(spotId)) {
-				return res.status(400).json({ error: "Invalid spot ID" });
-			}
-
-			try {
-				// Check if spot exists
-				const spot = await spotsCollection.findOne({ _id: ObjectId(spotId) });
-				if (!spot) {
-					return res.status(404).json({ error: "Spot not found" });
+				if (!ObjectId.isValid(listId)) {
+					return res.status(400).json({ error: "Invalid list ID" });
+				}
+				if (!ObjectId.isValid(spotId)) {
+					return res.status(400).json({ error: "Invalid spot ID" });
 				}
 
-				// Add spot to list
-				const result = await spotListsCollection.updateOne(
-					{
-						_id: ObjectId(listId),
-						userId: req.user.userId,
-					},
-					{
-						$addToSet: { spotIds: ObjectId(spotId) },
-						$set: { updatedAt: new Date() },
+				try {
+					// Check if spot exists
+					const spot = await spotsCollection.findOne({ _id: ObjectId(spotId) });
+					if (!spot) {
+						return res.status(404).json({ error: "Spot not found" });
 					}
-				);
 
-				if (result.matchedCount === 0) {
-					return res.status(404).json({ error: "Spot list not found" });
+					// Add spot to list
+					const result = await spotListsCollection.updateOne(
+						{
+							_id: ObjectId(listId),
+							userId: req.user.userId,
+						},
+						{
+							$addToSet: { spotIds: ObjectId(spotId) },
+							$set: { updatedAt: new Date() },
+						}
+					);
+
+					if (result.matchedCount === 0) {
+						return res.status(404).json({ error: "Spot list not found" });
+					}
+
+					res.status(200).json({ message: "Spot added to list successfully" });
+				} catch (error) {
+					console.error("Error adding spot to list", error);
+					res.status(500).json({ error: "Internal Server Error" });
 				}
-
-				res.status(200).json({ message: "Spot added to list successfully" });
-			} catch (error) {
-				console.error("Error adding spot to list", error);
-				res.status(500).json({ error: "Internal Server Error" });
 			}
-		});
+		);
 
 		// Remove a spot from a list
 		router.delete("/:id/spots/:spotId", [auth], async (req, res) => {

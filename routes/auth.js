@@ -47,7 +47,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						imageUri: userExists.imageUri,
 						role: userExists.role,
 					},
-					"jwtPrivateKey"
+					process.env.JWT_SECRET
 				);
 				res.send({ token });
 			} catch (error) {
@@ -99,7 +99,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						imageUri: user.imageUri,
 						role: user.role ? user.role : null,
 					},
-					"jwtPrivateKey"
+					process.env.JWT_SECRET
 				);
 				res.send({ token });
 			} catch (error) {

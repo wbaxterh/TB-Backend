@@ -25,6 +25,7 @@ const trickipedia = require("./routes/trickipedia");
 const trickImage = require("./routes/trickImage");
 const spots = require("./routes/spots");
 const spotlists = require("./routes/spotlists");
+const payments = require("./routes/payments");
 
 // Enable CORS for all routes
 app.use(
@@ -57,6 +58,7 @@ app.use("/api/trickipedia", trickipedia);
 app.use("/api/trickImage", trickImage);
 app.use("/api/spots", spots);
 app.use("/api/spotlists", spotlists);
+app.use("/api/payments", payments);
 
 const port = process.env.PORT || config.get("port");
 app.listen(port, function () {
