@@ -30,6 +30,11 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					return res.status(400).send({ error: "Invalid email or password." });
 				}
 
+				// Check if user has a password (SSO users might not have one)
+				if (!userExists.password) {
+					return res.status(400).send({ error: "This account uses Google Sign-In. Please log in with Google." });
+				}
+
 				// Compare the provided password with the hashed password in the database
 				const passwordMatch = await bcrypt.compare(
 					password,
