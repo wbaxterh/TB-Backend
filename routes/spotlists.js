@@ -52,7 +52,14 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				const spotLists = await spotListsCollection
 					.find({ userId: req.user.userId })
 					.toArray();
-				res.status(200).json(spotLists);
+
+				// Add spotCount to each list
+				const listsWithCount = spotLists.map((list) => ({
+					...list,
+					spotCount: list.spotIds ? list.spotIds.length : 0,
+				}));
+
+				res.status(200).json(listsWithCount);
 			} catch (error) {
 				console.error("Error retrieving spot lists", error);
 				res.status(500).json({ error: "Internal Server Error" });
@@ -73,7 +80,12 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				if (!spotList) {
 					return res.status(404).json({ error: "Spot list not found" });
 				}
-				res.status(200).json(spotList);
+				// Add spotCount
+				const listWithCount = {
+					...spotList,
+					spotCount: spotList.spotIds ? spotList.spotIds.length : 0,
+				};
+				res.status(200).json(listWithCount);
 			} catch (error) {
 				console.error("Error retrieving spot list", error);
 				res.status(500).json({ error: "Internal Server Error" });
