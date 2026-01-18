@@ -120,9 +120,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
 					user: new DBRef("users", req.body.userId),
 					completed: 0,
 					tricks: [],
-					// price: parseFloat(req.body.price),
-					// categoryId: parseInt(req.body.categoryId),
-					// description: req.body.description,
+					isPublic: req.body.isPublic === true,
+					createdAt: new Date(),
 				};
 				console.log(listing);
 				db.collection("tricklists")
@@ -190,6 +189,70 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
 			} catch (error) {
 				console.error(error);
 				res.status(500).send("Error getting tricks");
+			}
+		});
+
+		// Get all public trick lists (for "Homie Trick Lists")
+		router.get("/public", async (req, res) => {
+			try {
+				const publicLists = await db
+					.collection("tricklists")
+					.find({ isPublic: true })
+					.toArray();
+
+				// Fetch user info for each list
+				const userIds = publicLists
+					.filter((list) => list.user && list.user.$id)
+					.map((list) => list.user.$id);
+
+				const users = await db
+					.collection("users")
+					.find({ _id: { $in: userIds.map((id) => (typeof id === "string" ? ObjectId(id) : id)) } })
+					.toArray();
+
+				const userMap = users.reduce((map, user) => {
+					map[user._id.toString()] = { name: user.name, _id: user._id };
+					return map;
+				}, {});
+
+				const listsWithUsers = publicLists.map((list) => ({
+					...list,
+					user: list.user && list.user.$id
+						? userMap[list.user.$id.toString()] || { name: "Anonymous" }
+						: { name: "Anonymous" },
+				}));
+
+				res.status(200).send(listsWithUsers);
+			} catch (error) {
+				console.error("Error fetching public trick lists:", error);
+				res.status(500).send("Error getting public trick lists");
+			}
+		});
+
+		// Toggle trick list visibility (public/private)
+		router.put("/:id/visibility", async (req, res) => {
+			const id = req.params.id;
+			const { isPublic } = req.body;
+
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).send({ error: "Invalid ID" });
+			}
+
+			try {
+				const result = await tricksCollection.findOneAndUpdate(
+					{ _id: ObjectId(id) },
+					{ $set: { isPublic: isPublic === true } },
+					{ returnDocument: "after" }
+				);
+
+				if (!result.value) {
+					return res.status(404).send({ error: "Trick list not found" });
+				}
+
+				res.status(200).send(result.value);
+			} catch (error) {
+				console.error("Error toggling visibility:", error);
+				res.status(500).send({ error: "Error updating visibility" });
 			}
 		});
 	}
