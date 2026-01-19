@@ -103,14 +103,14 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
 			try {
 				const userToDelete = await usersCollection.findOne({
-					_id: ObjectId(id),
+					_id: new ObjectId(id),
 				});
 
 				if (!userToDelete) {
 					return res.status(404).send({ error: "User not found" });
 				}
 
-				const result = await usersCollection.deleteOne({ _id: ObjectId(id) });
+				const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
 
 				if (result.deletedCount === 0) {
 					return res.status(500).send({ error: "Failed to delete user" });
