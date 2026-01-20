@@ -26,6 +26,9 @@ const trickImage = require("./routes/trickImage");
 const spots = require("./routes/spots");
 const spotlists = require("./routes/spotlists");
 const payments = require("./routes/payments");
+const media = require("./routes/media");
+const feed = require("./routes/feed");
+const upload = require("./routes/upload");
 
 // Enable CORS for all routes
 app.use(
@@ -59,6 +62,9 @@ app.use("/api/trickImage", trickImage);
 app.use("/api/spots", spots);
 app.use("/api/spotlists", spotlists);
 app.use("/api/payments", payments);
+app.use("/api/media", media);
+app.use("/api/feed", feed);
+app.use("/api/upload", upload);
 
 const port = process.env.PORT || config.get("port");
 app.listen(port, function () {
