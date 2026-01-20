@@ -4,7 +4,10 @@
  */
 
 const AWS = require("aws-sdk");
-const { v4: uuidv4 } = require("uuid");
+const crypto = require("crypto");
+
+// Generate UUID using built-in crypto (avoids ESM compatibility issues)
+const uuidv4 = () => crypto.randomUUID();
 
 // Configure AWS
 AWS.config.update({
