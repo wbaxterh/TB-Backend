@@ -569,14 +569,27 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function initializePopup() {
 	// Load saved token
 	authToken = await getStoredToken();
+
 	if (authToken) {
 		elements.authToken.value = authToken;
-		await checkAuthentication();
-	}
+		updateAuthStatus("Checking authentication...", "checking");
 
-	// Load spot lists if authenticated
-	if (authToken) {
-		await loadSpotLists();
+		// Check if token is still valid
+		const isValid = await checkAuthentication();
+
+		if (isValid) {
+			// Hide auth section and show main content
+			hideAuthSection();
+			await loadSpotLists();
+		} else {
+			// Token is invalid, show auth section
+			showAuthSection();
+			updateAuthStatus("Token expired or invalid", "error");
+		}
+	} else {
+		// No token found, show auth section
+		showAuthSection();
+		updateAuthStatus("Please log in", "error");
 	}
 
 	// Load scraped spots from storage
@@ -608,13 +621,20 @@ async function saveToken() {
 	}
 
 	await chrome.storage.local.set({ authToken });
-	await checkAuthentication();
+	const isValid = await checkAuthentication();
+
+	if (isValid) {
+		hideAuthSection();
+		await loadSpotLists();
+		showStatus("Authentication successful!", "success");
+	} else {
+		showAuthSection();
+		showStatus("Authentication failed. Please check your token.", "error");
+	}
 }
 
 async function checkAuthentication() {
 	try {
-		updateAuthStatus("Checking...", "checking");
-
 		const response = await fetch("https://api.thetrickbook.com/api/spotlists", {
 			method: "GET",
 			headers: getHeaders(),
@@ -622,18 +642,45 @@ async function checkAuthentication() {
 
 		if (response.ok) {
 			updateAuthStatus("Authenticated", "authenticated");
-			await loadSpotLists();
+			return true;
 		} else {
 			updateAuthStatus("Authentication failed", "error");
+			return false;
 		}
 	} catch (error) {
 		updateAuthStatus("Connection error", "error");
+		return false;
 	}
 }
 
 function updateAuthStatus(text, status) {
 	elements.statusText.textContent = text;
 	elements.statusIndicator.className = `status-indicator ${status}`;
+}
+
+// UI Helper Functions
+function showAuthSection() {
+	const authSection = document.getElementById("authSection");
+	const spotListsSection = document.getElementById("spotListsSection");
+	const scrapingSection = document.getElementById("scrapingSection");
+	const spotsPreviewSection = document.getElementById("spotsPreviewSection");
+
+	authSection.style.display = "block";
+	spotListsSection.style.display = "none";
+	scrapingSection.style.display = "none";
+	spotsPreviewSection.style.display = "none";
+}
+
+function hideAuthSection() {
+	const authSection = document.getElementById("authSection");
+	const spotListsSection = document.getElementById("spotListsSection");
+	const scrapingSection = document.getElementById("scrapingSection");
+	const spotsPreviewSection = document.getElementById("spotsPreviewSection");
+
+	authSection.style.display = "none";
+	spotListsSection.style.display = "block";
+	scrapingSection.style.display = "block";
+	spotsPreviewSection.style.display = "block";
 }
 
 // Spot Lists Management
