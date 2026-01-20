@@ -1,12 +1,13 @@
 /**
- * Upload Routes - Video Upload API
- * Handles video creation and upload to Bunny.net Stream
+ * Upload Routes - Video & Image Upload API
+ * Handles video upload to Bunny.net Stream and images to S3
  */
 
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth");
 const bunnyStream = require("../services/bunnyStream");
+const s3Upload = require("../services/s3Upload");
 
 // =============================================
 // VIDEO UPLOAD ENDPOINTS
@@ -113,6 +114,91 @@ router.get("/videos", auth, async (req, res) => {
 	} catch (error) {
 		console.error("Error listing videos:", error);
 		res.status(500).send({ error: "Failed to list videos" });
+	}
+});
+
+// =============================================
+// IMAGE UPLOAD ENDPOINTS
+// =============================================
+
+/**
+ * POST /api/upload/image/presign
+ * Get a presigned URL for direct client-side upload to S3
+ */
+router.post("/image/presign", auth, async (req, res) => {
+	const { filename, contentType } = req.body;
+
+	if (!filename) {
+		return res.status(400).send({ error: "Filename is required" });
+	}
+
+	// Validate content type
+	const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+	const type = contentType || "image/jpeg";
+
+	if (!allowedTypes.includes(type)) {
+		return res.status(400).send({ error: "Invalid image type. Allowed: jpg, png, webp, gif" });
+	}
+
+	try {
+		const result = await s3Upload.getPresignedUploadUrl(filename, type);
+		res.send(result);
+	} catch (error) {
+		console.error("Error generating presigned URL:", error);
+		res.status(500).send({ error: "Failed to generate upload URL" });
+	}
+});
+
+/**
+ * POST /api/upload/image/base64
+ * Upload a base64 encoded image directly
+ */
+router.post("/image/base64", auth, async (req, res) => {
+	const { image, filename } = req.body;
+
+	if (!image) {
+		return res.status(400).send({ error: "Image data is required" });
+	}
+
+	// Check base64 size (rough limit of 10MB)
+	if (image.length > 10 * 1024 * 1024 * 1.37) { // Base64 is ~37% larger
+		return res.status(400).send({ error: "Image too large. Max 10MB" });
+	}
+
+	try {
+		const result = await s3Upload.uploadBase64Image(
+			image,
+			filename || `image-${Date.now()}.jpg`
+		);
+		res.send(result);
+	} catch (error) {
+		console.error("Error uploading image:", error);
+		res.status(500).send({ error: "Failed to upload image" });
+	}
+});
+
+/**
+ * DELETE /api/upload/image
+ * Delete an image from S3
+ */
+router.delete("/image", auth, async (req, res) => {
+	const { key } = req.body;
+
+	if (!key) {
+		return res.status(400).send({ error: "Image key is required" });
+	}
+
+	// Ensure key is in feed folder (security)
+	if (!key.startsWith("feed/")) {
+		return res.status(403).send({ error: "Cannot delete this resource" });
+	}
+
+	try {
+		await s3Upload.deleteFile(key);
+		res.send({ message: "Image deleted" });
+	} catch (error) {
+		console.error("Error deleting image:", error);
+		res.status(500).send({ error: "Failed to delete image" });
 	}
 });
 
