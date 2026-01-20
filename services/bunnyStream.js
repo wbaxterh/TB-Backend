@@ -4,6 +4,7 @@
  */
 
 const axios = require("axios");
+const crypto = require("crypto");
 
 const BUNNY_API_KEY = process.env.BUNNY_API_KEY;
 const BUNNY_LIBRARY_ID = process.env.BUNNY_LIBRARY_ID;
@@ -47,9 +48,15 @@ async function createVideo(title, collectionId = null) {
 /**
  * Generate TUS upload credentials for client-side upload
  * The client will use these to upload directly to Bunny
+ *
+ * Bunny.net TUS auth requires SHA256 hash of: library_id + api_key + expiration_time + video_id
  */
 function generateUploadCredentials(videoId) {
 	const expirationTime = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+
+	// Generate SHA256 signature
+	const signatureString = BUNNY_LIBRARY_ID + BUNNY_LIBRARY_API_KEY + expirationTime + videoId;
+	const signature = crypto.createHash("sha256").update(signatureString).digest("hex");
 
 	return {
 		videoId,
@@ -58,7 +65,7 @@ function generateUploadCredentials(videoId) {
 		expirationTime,
 		// For TUS uploads, the client needs these headers
 		headers: {
-			AuthorizationSignature: BUNNY_LIBRARY_API_KEY,
+			AuthorizationSignature: signature,
 			AuthorizationExpire: expirationTime,
 			VideoId: videoId,
 			LibraryId: BUNNY_LIBRARY_ID,
