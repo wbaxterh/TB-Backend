@@ -8,7 +8,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 	.then((client) => {
 		const db = client.db("TrickList2");
 		const usersCollection = db.collection("users");
-		const listingsCollection = db.collection("listings");
+		const tricklistsCollection = db.collection("tricklists");
 		const feedPostsCollection = db.collection("feed_posts");
 		const spotsCollection = db.collection("spots");
 		const reactionsCollection = db.collection("reactions");
@@ -110,9 +110,9 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			}
 
 			try {
-				// Count tricklists
-				const tricklistCount = await listingsCollection.countDocuments({
-					userId: id,
+				// Count tricklists - uses DBRef format "user.$id"
+				const tricklistCount = await tricklistsCollection.countDocuments({
+					"user.$id": id,
 				});
 
 				// Count posts
@@ -146,21 +146,14 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					console.log("Feed posts collection not available:", e.message);
 				}
 
-				// Count spots created by user
+				// Count spots created by user - spots use userId as ObjectId
 				let spotCount = 0;
 				try {
 					spotCount = await spotsCollection.countDocuments({
-						createdBy: new ObjectId(id),
+						userId: new ObjectId(id),
 					});
 				} catch (e) {
-					// Try with string ID
-					try {
-						spotCount = await spotsCollection.countDocuments({
-							createdBy: id,
-						});
-					} catch (e2) {
-						console.log("Spots collection query failed:", e2.message);
-					}
+					console.log("Spots collection query failed:", e.message);
 				}
 
 				// Get homies count
