@@ -10,6 +10,13 @@ const { MongoClient } = require("mongodb");
 const ObjectId = require("mongodb").ObjectId;
 const connectionString = process.env.ATLAS_URI;
 
+// Socket emit functions for real-time updates
+const {
+	emitNewComment,
+	emitCommentDeleted,
+	emitCommentLoved,
+} = require("../socket/feedSocket");
+
 // Sport types enum
 const SPORT_TYPES = [
 	"skateboarding",
@@ -739,10 +746,18 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					{ projection: { name: 1, imageUri: 1 } }
 				);
 
-				res.status(201).send({
+				const populatedComment = {
 					...comment,
 					user: user || { name: "Unknown" },
-				});
+				};
+
+				// Emit real-time event
+				const io = req.app.get("io");
+				if (io) {
+					emitNewComment(io, postId, populatedComment);
+				}
+
+				res.status(201).send(populatedComment);
 			} catch (error) {
 				console.error("Error adding comment:", error);
 				res.status(500).send({ error: "Internal Server Error" });
@@ -783,9 +798,133 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					{ $inc: { "stats.commentCount": -1 } }
 				);
 
+				// Emit real-time event
+				const io = req.app.get("io");
+				if (io) {
+					emitCommentDeleted(io, postId, commentId);
+				}
+
 				res.send({ message: "Comment deleted" });
 			} catch (error) {
 				console.error("Error deleting comment:", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		// Get replies to a comment
+		router.get("/:postId/comments/:commentId/replies", async (req, res) => {
+			const { postId, commentId } = req.params;
+			const page = parseInt(req.query.page) || 1;
+			const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+			const skip = (page - 1) * limit;
+
+			if (!ObjectId.isValid(postId) || !ObjectId.isValid(commentId)) {
+				return res.status(400).send({ error: "Invalid ID" });
+			}
+
+			try {
+				const replies = await commentsCollection
+					.find({
+						postId: postId,
+						parentCommentId: commentId,
+						status: "active",
+					})
+					.sort({ createdAt: 1 })
+					.skip(skip)
+					.limit(limit)
+					.toArray();
+
+				// Populate user data
+				const userIds = [...new Set(replies.map((c) => c.userId))];
+				const users = await usersCollection
+					.find({ _id: { $in: userIds.map((id) => new ObjectId(id)) } })
+					.project({ name: 1, imageUri: 1 })
+					.toArray();
+
+				const userMap = {};
+				users.forEach((u) => {
+					userMap[u._id.toString()] = u;
+				});
+
+				const populatedReplies = replies.map((reply) => ({
+					...reply,
+					user: userMap[reply.userId] || { name: "Unknown" },
+				}));
+
+				res.send({
+					replies: populatedReplies,
+					pagination: { page, limit, hasMore: replies.length === limit },
+				});
+			} catch (error) {
+				console.error("Error fetching replies:", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		// Love a comment
+		router.post("/:postId/comments/:commentId/love", auth, async (req, res) => {
+			const { postId, commentId } = req.params;
+			const userId = req.user.userId;
+
+			if (!ObjectId.isValid(postId) || !ObjectId.isValid(commentId)) {
+				return res.status(400).send({ error: "Invalid ID" });
+			}
+
+			try {
+				const commentLovesCollection = db.collection("comment_loves");
+
+				// Check if already loved
+				const existing = await commentLovesCollection.findOne({
+					commentId: commentId,
+					userId: userId,
+				});
+
+				if (existing) {
+					// Unlike
+					await commentLovesCollection.deleteOne({ _id: existing._id });
+					await commentsCollection.updateOne(
+						{ _id: new ObjectId(commentId) },
+						{ $inc: { loveCount: -1 } }
+					);
+
+					const comment = await commentsCollection.findOne({
+						_id: new ObjectId(commentId),
+					});
+
+					// Emit real-time event
+					const io = req.app.get("io");
+					if (io) {
+						emitCommentLoved(io, postId, commentId, comment?.loveCount || 0);
+					}
+
+					return res.send({ loved: false, loveCount: comment?.loveCount || 0 });
+				}
+
+				// Love
+				await commentLovesCollection.insertOne({
+					commentId: commentId,
+					userId: userId,
+					createdAt: new Date(),
+				});
+
+				await commentsCollection.updateOne(
+					{ _id: new ObjectId(commentId) },
+					{ $inc: { loveCount: 1 } }
+				);
+
+				const comment = await commentsCollection.findOne({
+					_id: new ObjectId(commentId),
+				});
+
+				// Emit real-time event
+				const io = req.app.get("io");
+				if (io) {
+					emitCommentLoved(io, postId, commentId, comment?.loveCount || 0);
+				}
+
+				res.send({ loved: true, loveCount: comment?.loveCount || 0 });
+			} catch (error) {
+				console.error("Error loving comment:", error);
 				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});

@@ -1,6 +1,11 @@
 const express = require("express");
+const http = require("http");
 const app = express();
 require("dotenv").config();
+
+// Socket.IO setup
+const { initializeSocket } = require("./socket");
+
 const categories = require("./routes/categories");
 const listings = require("./routes/listings");
 const listing = require("./routes/listing");
@@ -29,6 +34,14 @@ const payments = require("./routes/payments");
 const media = require("./routes/media");
 const feed = require("./routes/feed");
 const upload = require("./routes/upload");
+const dm = require("./routes/dm");
+
+// Create HTTP server for Socket.IO
+const server = http.createServer(app);
+
+// Initialize Socket.IO and attach to app for use in routes
+const io = initializeSocket(server);
+app.set("io", io);
 
 // Enable CORS for all routes
 app.use(
@@ -65,8 +78,10 @@ app.use("/api/payments", payments);
 app.use("/api/media", media);
 app.use("/api/feed", feed);
 app.use("/api/upload", upload);
+app.use("/api/dm", dm);
 
 const port = process.env.PORT || config.get("port");
-app.listen(port, function () {
+server.listen(port, function () {
 	console.log(`Server started on port ${port}...`);
+	console.log(`Socket.IO listening for connections`);
 });
