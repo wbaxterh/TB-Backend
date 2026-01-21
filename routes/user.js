@@ -121,13 +121,21 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				let totalRespect = 0;
 
 				try {
-					postCount = await feedPostsCollection.countDocuments({
-						userId: new ObjectId(id),
-					});
+					// Debug: check what format userId is stored as
+					const samplePost = await feedPostsCollection.findOne({});
+					console.log("DEBUG Stats - searching for userId:", id, "type:", typeof id);
+					console.log("DEBUG Stats - sample post userId:", samplePost?.userId, "type:", typeof samplePost?.userId);
 
-					// Sum up love and respect from user's posts
-					const postStats = await feedPostsCollection.aggregate([
-						{ $match: { userId: new ObjectId(id) } },
+					// Try both string and ObjectId formats
+					const countByString = await feedPostsCollection.countDocuments({ userId: id });
+					const countByObjectId = await feedPostsCollection.countDocuments({ userId: new ObjectId(id) });
+					console.log("DEBUG Stats - count by string:", countByString, "count by ObjectId:", countByObjectId);
+
+					postCount = countByString || countByObjectId;
+
+					// Sum up love and respect from user's posts - try string first
+					let postStats = await feedPostsCollection.aggregate([
+						{ $match: { userId: id } },
 						{
 							$group: {
 								_id: null,
@@ -137,10 +145,25 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						},
 					]).toArray();
 
+					// If no results with string, try ObjectId
+					if (postStats.length === 0) {
+						postStats = await feedPostsCollection.aggregate([
+							{ $match: { userId: new ObjectId(id) } },
+							{
+								$group: {
+									_id: null,
+									totalLove: { $sum: "$stats.loveCount" },
+									totalRespect: { $sum: "$stats.respectCount" },
+								},
+							},
+						]).toArray();
+					}
+
 					if (postStats.length > 0) {
 						totalLove = postStats[0].totalLove || 0;
 						totalRespect = postStats[0].totalRespect || 0;
 					}
+					console.log("DEBUG Stats - totalLove:", totalLove, "totalRespect:", totalRespect);
 				} catch (e) {
 					// feed_posts collection might not exist yet
 					console.log("Feed posts collection not available:", e.message);
