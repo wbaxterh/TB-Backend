@@ -25,7 +25,34 @@ const schema = {
 	name: Joi.string().required().min(2),
 	email: Joi.string().email().required(),
 	password: Joi.string().required().min(5),
-	isGoogleSSO: Joi.boolean().optional(), // Added field for Google SSO
+	isGoogleSSO: Joi.boolean().optional(),
+	// New rider profile fields
+	sports: Joi.array().items(Joi.string()).optional(),
+	riderProfile: Joi.object({
+		nickname: Joi.string().allow("").optional(),
+		age: Joi.alternatives().try(Joi.string(), Joi.number()).allow("").optional(),
+		height: Joi.string().allow("").optional(),
+		weight: Joi.string().allow("").optional(),
+		nationality: Joi.string().allow("").optional(),
+		riderStyle: Joi.string().allow("").optional(),
+		alternateSport: Joi.string().allow("").optional(),
+		motto: Joi.string().allow("").optional(),
+		dreamDate: Joi.string().allow("").optional(),
+		favoriteMovie: Joi.string().allow("").optional(),
+		favoriteReading: Joi.string().allow("").optional(),
+		favoriteMusic: Joi.string().allow("").optional(),
+		favoriteCourse: Joi.string().allow("").optional(),
+		sickestTrick: Joi.string().allow("").optional(),
+		greatestStrength: Joi.string().allow("").optional(),
+		greatestWeakness: Joi.string().allow("").optional(),
+		otherHobbies: Joi.string().allow("").optional(),
+		avatarType: Joi.string().valid("icon", "upload").optional(),
+		avatarIcon: Joi.object({
+			id: Joi.string(),
+			emoji: Joi.string(),
+			bg: Joi.string(),
+		}).optional(),
+	}).optional(),
 };
 
 MongoClient.connect(connectionString, { useUnifiedTopology: true })
@@ -34,7 +61,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		const usersCollection = db.collection("users");
 
 		router.post("/", validateWith(schema), async (req, res) => {
-			const { name, email, password, isGoogleSSO } = req.body;
+			const { name, email, password, isGoogleSSO, sports, riderProfile } = req.body;
 			let userBool = false;
 
 			try {
@@ -61,10 +88,16 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						email,
 						password: hashedPassword,
 						isGoogleSSO: isGoogleSSO || false,
+						// New rider profile fields
+						sports: sports || [],
+						riderProfile: riderProfile || {},
+						createdAt: new Date(),
 					};
 
 					await usersCollection.insertOne(user);
-					res.status(201).send(user);
+					// Don't send password back
+					const { password: _, ...userResponse } = user;
+					res.status(201).send(userResponse);
 				} catch (error) {
 					console.log(error);
 					res.status(500).send({ error: "Internal Server Error" });
@@ -570,6 +603,50 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				res.send({ message: "Homie removed" });
 			} catch (error) {
 				console.error("Error removing homie:", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		// Check homie status with another user
+		router.get("/homie-status/:targetId", auth, async (req, res) => {
+			const { targetId } = req.params;
+			const currentUserId = req.user.userId;
+
+			if (!ObjectId.isValid(targetId)) {
+				return res.status(400).send({ error: "Invalid user ID" });
+			}
+
+			try {
+				const currentUser = await usersCollection.findOne(
+					{ _id: new ObjectId(currentUserId) },
+					{ projection: { homies: 1, homieRequests: 1 } }
+				);
+
+				if (!currentUser) {
+					return res.status(404).send({ error: "User not found" });
+				}
+
+				// Check if already homies
+				if (currentUser.homies?.includes(targetId)) {
+					return res.send({ status: "homies" });
+				}
+
+				// Check if request pending (we sent to them)
+				if (currentUser.homieRequests?.sent?.includes(targetId)) {
+					return res.send({ status: "pending" });
+				}
+
+				// Check if we received a request from them
+				const receivedRequest = currentUser.homieRequests?.received?.find(
+					(r) => r.from === targetId
+				);
+				if (receivedRequest) {
+					return res.send({ status: "received" });
+				}
+
+				res.send({ status: "none" });
+			} catch (error) {
+				console.error("Error checking homie status:", error);
 				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});
