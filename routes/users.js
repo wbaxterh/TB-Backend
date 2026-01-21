@@ -91,6 +91,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 						// New rider profile fields
 						sports: sports || [],
 						riderProfile: riderProfile || {},
+						// Default to discoverable so users can find each other
+						network: true,
 						createdAt: new Date(),
 					};
 

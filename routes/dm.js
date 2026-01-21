@@ -225,7 +225,7 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 					};
 
 					const result = await messagesCollection.insertOne(message);
-					message._id = result.insertedId;
+					message._id = result.insertedId.toString(); // Convert ObjectId to string for proper socket/client handling
 
 					// Update conversation
 					const recipientId = conversation.participants.find(

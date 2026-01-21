@@ -31,14 +31,17 @@ const setupMessageSocket = (io) => {
 
 		// Auto-join user's personal room for receiving messages
 		socket.join(`user:${userId}`);
+		console.log(`[Messages] ${socket.id} joined personal room: user:${userId}`);
 
-		// Join a specific conversation room for typing indicators
+		// Join a specific conversation room for typing indicators and real-time messages
 		socket.on("join:conversation", (conversationId) => {
 			if (conversationId) {
 				socket.join(`conversation:${conversationId}`);
 				console.log(
 					`[Messages] ${socket.id} joined conversation:${conversationId}`
 				);
+				// Log all rooms this socket is now in
+				console.log(`[Messages] ${socket.id} is now in rooms:`, Array.from(socket.rooms));
 			}
 		});
 
@@ -81,17 +84,29 @@ const setupMessageSocket = (io) => {
 };
 
 /**
- * Emit a new message event to the recipient
+ * Emit a new message event to the recipient and the conversation room
  * @param {Server} io - Socket.IO server instance
  * @param {string} recipientId - The recipient user ID
  * @param {Object} message - The message data
  * @param {Object} conversation - The conversation data
  */
 const emitNewMessage = (io, recipientId, message, conversation) => {
-	io.of("/messages").to(`user:${recipientId}`).emit("message:new", {
+	const messagesNs = io.of("/messages");
+
+	// Emit to recipient's personal room (for notifications/badge updates)
+	messagesNs.to(`user:${recipientId}`).emit("message:new", {
 		message,
 		conversation,
 	});
+
+	// Also emit to the conversation room (for real-time chat updates)
+	// This ensures both users with the conversation open see the message
+	messagesNs.to(`conversation:${message.conversationId}`).emit("message:new", {
+		message,
+		conversation,
+	});
+
+	console.log(`[Messages] Emitted message:new to user:${recipientId} and conversation:${message.conversationId}`);
 };
 
 /**
