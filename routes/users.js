@@ -606,6 +606,50 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});
+
+		// Check homie status with another user
+		router.get("/homie-status/:targetId", auth, async (req, res) => {
+			const { targetId } = req.params;
+			const currentUserId = req.user.userId;
+
+			if (!ObjectId.isValid(targetId)) {
+				return res.status(400).send({ error: "Invalid user ID" });
+			}
+
+			try {
+				const currentUser = await usersCollection.findOne(
+					{ _id: new ObjectId(currentUserId) },
+					{ projection: { homies: 1, homieRequests: 1 } }
+				);
+
+				if (!currentUser) {
+					return res.status(404).send({ error: "User not found" });
+				}
+
+				// Check if already homies
+				if (currentUser.homies?.includes(targetId)) {
+					return res.send({ status: "homies" });
+				}
+
+				// Check if request pending (we sent to them)
+				if (currentUser.homieRequests?.sent?.includes(targetId)) {
+					return res.send({ status: "pending" });
+				}
+
+				// Check if we received a request from them
+				const receivedRequest = currentUser.homieRequests?.received?.find(
+					(r) => r.from === targetId
+				);
+				if (receivedRequest) {
+					return res.send({ status: "received" });
+				}
+
+				res.send({ status: "none" });
+			} catch (error) {
+				console.error("Error checking homie status:", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
 	})
 	.catch((error) => {
 		console.log(error);
