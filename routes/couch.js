@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/auth");
-const adminAuth = require("../middleware/adminAuth");
 const { google } = require("googleapis");
 const { MongoClient, ObjectId } = require("mongodb");
 const path = require("path");
