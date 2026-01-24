@@ -44,22 +44,36 @@ router.post("/create-checkout-session", [auth], async (req, res) => {
 		}
 
 		// Create checkout session
+		// Use pre-created price ID if available, otherwise create price dynamically
+		const lineItems = process.env.STRIPE_PREMIUM_PRICE_ID
+			? [{ price: process.env.STRIPE_PREMIUM_PRICE_ID, quantity: 1 }]
+			: [
+					{
+						price_data: {
+							currency: "usd",
+							product_data: {
+								name: "TrickBook Plus",
+								description:
+									"Unlimited spots, lists, and verified badge",
+							},
+							unit_amount: 1000, // $10.00 in cents
+							recurring: { interval: "month" },
+						},
+						quantity: 1,
+					},
+			  ];
+
 		const session = await stripe.checkout.sessions.create({
 			customer: customerId,
 			payment_method_types: ["card"],
-			line_items: [
-				{
-					price: process.env.STRIPE_PREMIUM_PRICE_ID, // Set this in your Stripe dashboard
-					quantity: 1,
-				},
-			],
+			line_items: lineItems,
 			mode: "subscription",
 			success_url: `${
 				process.env.FRONTEND_URL || "https://thetrickbook.com"
-			}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+			}/settings?tab=billing&success=true`,
 			cancel_url: `${
 				process.env.FRONTEND_URL || "https://thetrickbook.com"
-			}/payment/cancel`,
+			}/settings?tab=billing`,
 			metadata: {
 				userId: req.user.userId,
 			},
