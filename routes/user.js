@@ -86,6 +86,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 							riderProfile: 1,
 							createdAt: 1,
 							network: 1,
+							"subscription.plan": 1,
+							"subscription.status": 1,
 						},
 					}
 				);
@@ -236,6 +238,184 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				res.send({ message: "Profile updated", updated: updateFields });
 			} catch (error) {
 				console.error("Error updating profile:", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		// Get user activity feed (posts, reactions, comments)
+		router.get("/:id/activity", async (req, res) => {
+			const { id } = req.params;
+			const { limit = 20, skip = 0 } = req.query;
+
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).send({ error: "Invalid user ID" });
+			}
+
+			try {
+				const activities = [];
+
+				// Get user's posts
+				try {
+					const posts = await feedPostsCollection
+						.find({ userId: id })
+						.sort({ createdAt: -1 })
+						.limit(10)
+						.toArray();
+
+					posts.forEach((post) => {
+						activities.push({
+							type: "post",
+							action: "created a post",
+							data: {
+								_id: post._id,
+								caption: post.caption,
+								thumbnailUrl: post.thumbnailUrl,
+								mediaType: post.mediaType,
+								tricks: post.tricks,
+								stats: post.stats,
+							},
+							createdAt: post.createdAt,
+						});
+					});
+				} catch (e) {
+					console.log("Feed posts query failed:", e.message);
+				}
+
+				// Get user's reactions on posts
+				try {
+					const reactions = await reactionsCollection
+						.find({ userId: id })
+						.sort({ createdAt: -1 })
+						.limit(10)
+						.toArray();
+
+					// Get the posts that were reacted to
+					const postIds = reactions
+						.filter((r) => r.postId)
+						.map((r) => {
+							try {
+								return new ObjectId(r.postId);
+							} catch {
+								return r.postId;
+							}
+						});
+
+					const reactedPosts = await feedPostsCollection
+						.find({ _id: { $in: postIds } })
+						.toArray();
+
+					const postMap = {};
+					reactedPosts.forEach((p) => {
+						postMap[p._id.toString()] = p;
+					});
+
+					reactions.forEach((reaction) => {
+						const post = postMap[reaction.postId?.toString()];
+						if (post) {
+							activities.push({
+								type: "reaction",
+								action: reaction.type === "love" ? "loved a post" : "gave respect to a post",
+								reactionType: reaction.type,
+								data: {
+									_id: post._id,
+									caption: post.caption,
+									thumbnailUrl: post.thumbnailUrl,
+									userId: post.userId,
+								},
+								createdAt: reaction.createdAt,
+							});
+						}
+					});
+				} catch (e) {
+					console.log("Reactions query failed:", e.message);
+				}
+
+				// Get user's comments
+				try {
+					const commentsCollection = feedPostsCollection.s.db.collection("feed_comments");
+					const comments = await commentsCollection
+						.find({ userId: id, isDeleted: { $ne: true } })
+						.sort({ createdAt: -1 })
+						.limit(10)
+						.toArray();
+
+					// Get the posts that were commented on
+					const postIds = comments.map((c) => {
+						try {
+							return new ObjectId(c.postId);
+						} catch {
+							return c.postId;
+						}
+					});
+
+					const commentedPosts = await feedPostsCollection
+						.find({ _id: { $in: postIds } })
+						.toArray();
+
+					const postMap = {};
+					commentedPosts.forEach((p) => {
+						postMap[p._id.toString()] = p;
+					});
+
+					comments.forEach((comment) => {
+						const post = postMap[comment.postId?.toString()];
+						activities.push({
+							type: "comment",
+							action: "commented on a post",
+							data: {
+								_id: comment._id,
+								content: comment.content,
+								postId: comment.postId,
+								postCaption: post?.caption,
+								postThumbnail: post?.thumbnailUrl,
+							},
+							createdAt: comment.createdAt,
+						});
+					});
+				} catch (e) {
+					console.log("Comments query failed:", e.message);
+				}
+
+				// Get spots created by user
+				try {
+					const spots = await spotsCollection
+						.find({ userId: new ObjectId(id) })
+						.sort({ createdAt: -1 })
+						.limit(5)
+						.toArray();
+
+					spots.forEach((spot) => {
+						activities.push({
+							type: "spot",
+							action: "added a spot",
+							data: {
+								_id: spot._id,
+								name: spot.name,
+								city: spot.city,
+								state: spot.state,
+								thumbnailUrl: spot.images?.[0],
+							},
+							createdAt: spot.createdAt,
+						});
+					});
+				} catch (e) {
+					console.log("Spots query failed:", e.message);
+				}
+
+				// Sort all activities by date and paginate
+				activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+				const paginatedActivities = activities.slice(
+					parseInt(skip),
+					parseInt(skip) + parseInt(limit)
+				);
+
+				res.send({
+					activities: paginatedActivities,
+					total: activities.length,
+					hasMore: activities.length > parseInt(skip) + parseInt(limit),
+				});
+			} catch (error) {
+				console.error("Error getting user activity:", error);
 				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});
