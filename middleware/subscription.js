@@ -7,7 +7,21 @@ const FREE_TIER_LIMITS = {
 	maxTotalSpots: 15,
 };
 
+// Helper to check if user has premium access (includes admin override)
+function hasPremiumAccess(user) {
+	// Admins can override their subscription status for testing
+	if (user.role === "admin" && user.subscription?.adminOverride !== undefined) {
+		return user.subscription.adminOverride === "premium";
+	}
+	// Normal premium check
+	return (
+		user.subscription?.plan === "premium" &&
+		["active", "canceled"].includes(user.subscription?.status)
+	);
+}
+
 module.exports = {
+	hasPremiumAccess,
 	// Check if user can create more spot lists
 	async checkSpotListLimit(req, res, next) {
 		try {
@@ -26,10 +40,7 @@ module.exports = {
 			}
 
 			// Premium users have no limits
-			if (
-				user.subscription?.plan === "premium" &&
-				user.subscription?.status === "active"
-			) {
+			if (hasPremiumAccess(user)) {
 				return next();
 			}
 
@@ -72,10 +83,7 @@ module.exports = {
 			}
 
 			// Premium users have no limits
-			if (
-				user.subscription?.plan === "premium" &&
-				user.subscription?.status === "active"
-			) {
+			if (hasPremiumAccess(user)) {
 				return next();
 			}
 
@@ -127,10 +135,7 @@ module.exports = {
 			}
 
 			// Premium users have no limits
-			if (
-				user.subscription?.plan === "premium" &&
-				user.subscription?.status === "active"
-			) {
+			if (hasPremiumAccess(user)) {
 				return next();
 			}
 
@@ -191,18 +196,21 @@ module.exports = {
 				return total + (list.spotIds?.length || 0);
 			}, 0);
 
+			const isPremium = hasPremiumAccess(user);
 			const usage = {
 				spotListsCount: spotLists.length,
 				totalSpotsCount: totalSpotsCount,
 				subscription: user.subscription || { plan: "free", status: "active" },
-				limits:
-					user.subscription?.plan === "premium"
-						? {
-								maxSpotLists: "unlimited",
-								maxSpotsPerList: "unlimited",
-								maxTotalSpots: "unlimited",
-						  }
-						: FREE_TIER_LIMITS,
+				isPremium: isPremium,
+				isAdmin: user.role === "admin",
+				adminOverride: user.subscription?.adminOverride,
+				limits: isPremium
+					? {
+							maxSpotLists: "unlimited",
+							maxSpotsPerList: "unlimited",
+							maxTotalSpots: "unlimited",
+					  }
+					: FREE_TIER_LIMITS,
 			};
 
 			res.json(usage);

@@ -108,9 +108,60 @@ router.get("/subscription", [auth], async (req, res) => {
 			status: "active",
 		};
 
-		res.json({ subscription });
+		res.json({ subscription, isAdmin: user.role === "admin" });
 	} catch (error) {
 		console.error("Error getting subscription:", error);
+		res.status(500).json({ error: "Internal server error" });
+	}
+});
+
+// Admin: Toggle subscription override for testing
+router.post("/admin/toggle-subscription", [auth], async (req, res) => {
+	try {
+		const { override } = req.body; // "free", "premium", or null (to clear override)
+
+		const client = await MongoClient.connect(connectionString, {
+			useUnifiedTopology: true,
+		});
+		const db = client.db("TrickList2");
+		const usersCollection = db.collection("users");
+
+		const user = await usersCollection.findOne({
+			_id: ObjectId(req.user.userId),
+		});
+
+		if (!user) {
+			return res.status(404).json({ error: "User not found" });
+		}
+
+		// Only admins can use this endpoint
+		if (user.role !== "admin") {
+			return res.status(403).json({ error: "Admin access required" });
+		}
+
+		// Update or clear the admin override
+		if (override === null || override === undefined) {
+			await usersCollection.updateOne(
+				{ _id: ObjectId(req.user.userId) },
+				{ $unset: { "subscription.adminOverride": "" } }
+			);
+		} else {
+			await usersCollection.updateOne(
+				{ _id: ObjectId(req.user.userId) },
+				{ $set: { "subscription.adminOverride": override } }
+			);
+		}
+
+		const updatedUser = await usersCollection.findOne({
+			_id: ObjectId(req.user.userId),
+		});
+
+		res.json({
+			message: `Admin override ${override ? "set to " + override : "cleared"}`,
+			subscription: updatedUser.subscription,
+		});
+	} catch (error) {
+		console.error("Error toggling admin subscription:", error);
 		res.status(500).json({ error: "Internal server error" });
 	}
 });
