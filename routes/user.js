@@ -36,6 +36,17 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			}
 		});
 
+		// Get total user count (public - for welcome screen)
+		router.get("/count", async (req, res) => {
+			try {
+				const count = await usersCollection.countDocuments();
+				res.send({ count });
+			} catch (error) {
+				console.error("Error getting user count:", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
 		// Get user by ID (for settings page - requires auth)
 		router.get("/:id", auth, async (req, res) => {
 			const { id } = req.params;
