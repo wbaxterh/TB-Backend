@@ -158,28 +158,30 @@ router.put("/update", async (req, res) => {
   }
 })
 router.put("/", async (req, res) => {
-  try{
-   
-    //update trickList
-    const filter = { _id: ObjectId(req.body.list_id)};
-    
-     //insert trick
-     const insertResult = await trickCollection.insertOne(req.body).then(result =>{
-      // console.log(result + "result id == " + result.insertedId);
-    trick_id = result.insertedId;
+  try {
+    // Build trick document with createdAt timestamp
+    const trickDocument = {
+      ...req.body,
+      createdAt: new Date(),
+    };
+
+    // Insert trick into tricks collection
+    const insertResult = await trickCollection.insertOne(trickDocument);
+    const trickId = insertResult.insertedId;
+
+    // Link trick to the tricklist (MUST await this!)
+    const filter = { _id: ObjectId(req.body.list_id) };
     const updateDoc = {
       $push: {
-        tricks: {_id: ObjectId(trick_id)}
+        tricks: { _id: ObjectId(trickId) }
       },
     };
-      tricksCollection.findOneAndUpdate(filter, updateDoc);
+    await tricksCollection.findOneAndUpdate(filter, updateDoc);
 
-     }).catch(error => console.log(error))
-     
-    // console.log(insertResult);
+    console.log(`[listing] Trick "${req.body.name}" added to list ${req.body.list_id}`);
     res.status(200).send("Success!");
-  }
-  catch (error){
+  } catch (error) {
+    console.error("[listing] Error inserting trick:", error);
     res.status(400).send("Error inserting trick!");
   }
 

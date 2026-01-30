@@ -626,7 +626,8 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 					return res.status(403).send({ error: "Admin access required" });
 				}
 
-				const { url } = req.body;
+				// Accept both 'url' and 'youtubeUrl' for flexibility
+				const url = req.body.url || req.body.youtubeUrl;
 				if (!url) {
 					return res.status(400).send({ error: "YouTube URL required" });
 				}
@@ -705,6 +706,12 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 				const bunnyVideo = response.data;
 
 				res.send({
+					// Fields expected by frontend
+					guid: bunnyVideo.guid,
+					libraryId: BUNNY_LIBRARY_ID,
+					uploadKey: BUNNY_LIBRARY_API_KEY,
+					cdnHostname: BUNNY_CDN_HOSTNAME,
+					// Additional info
 					bunnyVideoId: bunnyVideo.guid,
 					uploadUrl: `https://video.bunnycdn.com/library/${BUNNY_LIBRARY_ID}/videos/${bunnyVideo.guid}`,
 					title: bunnyVideo.title,

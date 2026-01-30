@@ -65,16 +65,29 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
 					.collection("tricks")
 					.find({ _id: { $in: trickIds } })
 					.toArray();
+
+				// Build map using string keys for reliable lookup
+				// ObjectIds don't work properly as JS object keys
 				const trickMap = tricks.reduce((map, trick) => {
-					map[trick._id] = trick;
+					const idStr = trick._id.toString();
+					map[idStr] = trick;
 					return map;
 				}, {});
+
 				const trickListsWithTricks = trickLists.map((trickList) => {
 					const trickListCopy = { ...trickList };
-					trickListCopy.tricks = trickList.tricks.map((trick) => ({
-						...trick,
-						checked: trickMap[trick._id]?.checked || false,
-					}));
+					trickListCopy.tricks = trickList.tricks.map((trick) => {
+						// Convert to string for consistent lookup
+						const trickIdStr = trick._id ? trick._id.toString() : null;
+						const foundTrick = trickIdStr ? trickMap[trickIdStr] : null;
+						return {
+							...trick,
+							name: foundTrick?.name || trick.name || 'Unknown Trick',
+							checked: foundTrick?.checked || trick.checked || 'To Do',
+							link: foundTrick?.link || trick.link || '',
+							notes: foundTrick?.notes || trick.notes || '',
+						};
+					});
 					return trickListCopy;
 				});
 				res.send(trickListsWithTricks);

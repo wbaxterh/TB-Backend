@@ -4,7 +4,8 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"start": "node index.js"
+		"start": "node index.js",
+		"dev": "nodemon index.js"
 	},
 	"engines": {
 		"node": "12.6.x"
@@ -15,6 +16,7 @@
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.252.0",
 		"aws-sdk": "^2.1297.0",
+		"axios": "^1.13.4",
 		"bcrypt": "^6.0.0",
 		"body-parser": "^1.20.1",
 		"compression": "^1.7.4",
