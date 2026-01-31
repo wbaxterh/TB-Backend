@@ -5,7 +5,36 @@ const { MongoClient, ObjectId } = require("mongodb");
 const validateWith = require("../middleware/validation");
 const auth = require("../middleware/auth");
 const authAdmin = require("../middleware/authAdmin");
+const multer = require("multer");
+const googlePlaces = require("../services/googlePlaces");
+const s3Upload = require("../services/s3Upload");
 const connectionString = process.env.ATLAS_URI;
+
+// Configure multer for memory storage (for S3 upload)
+const upload = multer({
+	storage: multer.memoryStorage(),
+	limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+	fileFilter: (req, file, cb) => {
+		if (file.mimetype.startsWith("image/")) {
+			cb(null, true);
+		} else {
+			cb(new Error("Only image files are allowed"), false);
+		}
+	},
+});
+
+// Sport types for filtering
+const SPORT_TYPES = [
+	"skateboarding",
+	"snowboarding",
+	"skiing",
+	"bmx",
+	"mtb",
+	"scooter",
+	"rollerblading",
+	"surfing",
+	"wakeboarding",
+];
 
 const schema = {
 	name: Joi.string().required(),
@@ -18,6 +47,8 @@ const schema = {
 	city: Joi.string().allow("").optional(),
 	state: Joi.string().allow("").optional(),
 	isPublic: Joi.boolean().optional(),
+	sportTypes: Joi.array().items(Joi.string().valid(...SPORT_TYPES)).optional(),
+	category: Joi.string().valid("park", "street", "indoor", "diy", "other").optional(),
 };
 
 const updateSchema = {
@@ -31,12 +62,24 @@ const updateSchema = {
 	city: Joi.string().allow("").optional(),
 	state: Joi.string().allow("").optional(),
 	isPublic: Joi.boolean().optional(),
+	sportTypes: Joi.array().items(Joi.string().valid(...SPORT_TYPES)).optional(),
+	category: Joi.string().valid("park", "street", "indoor", "diy", "other").optional(),
 };
 
 const approvalSchema = {
 	status: Joi.string().valid("approved", "rejected").required(),
 	rejectionReason: Joi.string().allow("").optional(),
 };
+
+// Get available sport types - defined outside MongoDB callback since it doesn't need DB
+router.get("/sport-types", (req, res) => {
+	res.json({
+		sportTypes: SPORT_TYPES.map((sport) => ({
+			value: sport,
+			label: sport.charAt(0).toUpperCase() + sport.slice(1),
+		})),
+	});
+});
 
 MongoClient.connect(connectionString, { useUnifiedTopology: true })
 	.then((client) => {
@@ -57,6 +100,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				city,
 				state,
 				isPublic,
+				sportTypes,
+				category,
 			} = req.body;
 
 			// Check if spot already exists by lat/long
@@ -86,6 +131,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				city: city || "",
 				state: state || "",
 				isPublic: isPublic || false,
+				sportTypes: sportTypes || [],
+				category: category || "other",
 				approvalStatus,
 				userId: ObjectId(req.user.userId),
 				createdAt: new Date(),
@@ -149,7 +196,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			}
 		});
 
-		// Get all approved public spots with pagination
+		// Get all approved public spots with pagination and filtering
 		router.get("/", async (req, res) => {
 			try {
 				const page = parseInt(req.query.page) || 1;
@@ -157,9 +204,25 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				const skip = (page - 1) * limit;
 				const sort = req.query.sort || "name";
 				const order = req.query.order === "desc" ? -1 : 1;
+				const { sportType, category, q } = req.query;
 
 				// Only return approved public spots for public API
 				const query = { approvalStatus: "approved" };
+
+				// Filter by sport type
+				if (sportType && sportType !== "all") {
+					query.sportTypes = sportType;
+				}
+
+				// Filter by category (park, street, indoor, diy)
+				if (category && category !== "all") {
+					query.category = category;
+				}
+
+				// Search by name
+				if (q) {
+					query.name = { $regex: q, $options: "i" };
+				}
 
 				const totalCount = await spotsCollection.countDocuments(query);
 				const spots = await spotsCollection
@@ -381,6 +444,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					tags,
 					city,
 					state,
+					sportTypes,
+					category,
 				} = req.body;
 
 				// Build update object with only provided fields
@@ -394,6 +459,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				if (tags !== undefined) updateFields.tags = tags;
 				if (city !== undefined) updateFields.city = city;
 				if (state !== undefined) updateFields.state = state;
+				if (sportTypes !== undefined) updateFields.sportTypes = sportTypes;
+				if (category !== undefined) updateFields.category = category;
 				updateFields.updatedAt = new Date();
 
 				try {
@@ -528,6 +595,200 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				res.status(200).json(spotLists);
 			} catch (error) {
 				console.error("Error retrieving spot lists", error);
+				res.status(500).json({ error: "Internal Server Error" });
+			}
+		});
+
+		/**
+		 * GET /api/spots/:id/places-info
+		 * Fetch and cache Google Places data for a spot
+		 */
+		router.get("/:id/places-info", async (req, res) => {
+			const id = req.params.id;
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).json({ error: "Invalid ID" });
+			}
+
+			try {
+				const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+				if (!spot) {
+					return res.status(404).json({ error: "Spot not found" });
+				}
+
+				// Check if we already have cached Google Places data (cache for 30 days)
+				const cacheAge = spot.googlePlacesCachedAt
+					? Date.now() - new Date(spot.googlePlacesCachedAt).getTime()
+					: Infinity;
+				const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+
+				if (spot.googlePlaceId && spot.googlePhotos && cacheAge < thirtyDays) {
+					return res.json({
+						cached: true,
+						placeId: spot.googlePlaceId,
+						googlePhotos: spot.googlePhotos,
+						placeData: spot.googlePlaceData,
+					});
+				}
+
+				// Fetch from Google Places API
+				const placeData = await googlePlaces.fetchAndCachePlaceData(
+					spot.name,
+					spot.latitude,
+					spot.longitude,
+					id.toString(),
+					5 // max 5 photos
+				);
+
+				if (!placeData.found) {
+					return res.json({ found: false, message: "No matching place found on Google" });
+				}
+
+				// Update spot with cached data
+				await spotsCollection.updateOne(
+					{ _id: ObjectId(id) },
+					{
+						$set: {
+							googlePlaceId: placeData.placeId,
+							googlePhotos: placeData.googlePhotos,
+							googlePlaceData: placeData.placeData,
+							googlePlacesCachedAt: new Date(),
+						},
+					}
+				);
+
+				res.json({
+					cached: false,
+					placeId: placeData.placeId,
+					googlePhotos: placeData.googlePhotos,
+					placeData: placeData.placeData,
+				});
+			} catch (error) {
+				console.error("Error fetching places info:", error);
+				res.status(500).json({ error: "Internal Server Error" });
+			}
+		});
+
+		/**
+		 * GET /api/spots/:id/photos
+		 * Get all photos for a spot (Google + user uploaded)
+		 */
+		router.get("/:id/photos", async (req, res) => {
+			const id = req.params.id;
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).json({ error: "Invalid ID" });
+			}
+
+			try {
+				const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+				if (!spot) {
+					return res.status(404).json({ error: "Spot not found" });
+				}
+
+				const photos = {
+					googlePhotos: spot.googlePhotos || [],
+					userPhotos: spot.userPhotos || [],
+					mainImage: spot.imageURL,
+				};
+
+				res.json(photos);
+			} catch (error) {
+				console.error("Error fetching photos:", error);
+				res.status(500).json({ error: "Internal Server Error" });
+			}
+		});
+
+		/**
+		 * POST /api/spots/:id/photos
+		 * Upload a user photo for a spot
+		 */
+		router.post("/:id/photos", [auth, upload.single("photo")], async (req, res) => {
+			const id = req.params.id;
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).json({ error: "Invalid ID" });
+			}
+
+			if (!req.file) {
+				return res.status(400).json({ error: "No photo provided" });
+			}
+
+			try {
+				const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+				if (!spot) {
+					return res.status(404).json({ error: "Spot not found" });
+				}
+
+				// Upload to S3
+				const fileName = `${id}-user-${Date.now()}.${req.file.mimetype.split("/")[1]}`;
+				const result = await s3Upload.uploadFile(
+					req.file.buffer,
+					fileName,
+					req.file.mimetype,
+					"spots"
+				);
+
+				const newPhoto = {
+					url: result.fileUrl,
+					key: result.fileKey,
+					userId: req.user.userId,
+					uploadedAt: new Date(),
+				};
+
+				// Add to userPhotos array
+				await spotsCollection.updateOne(
+					{ _id: ObjectId(id) },
+					{ $push: { userPhotos: newPhoto } }
+				);
+
+				console.log(`[Spots] User ${req.user.userId} uploaded photo for spot ${id}`);
+
+				res.status(201).json(newPhoto);
+			} catch (error) {
+				console.error("Error uploading photo:", error);
+				res.status(500).json({ error: "Internal Server Error" });
+			}
+		});
+
+		/**
+		 * DELETE /api/spots/:id/photos/:photoKey
+		 * Delete a user-uploaded photo (only owner or admin)
+		 */
+		router.delete("/:id/photos/:photoKey", [auth], async (req, res) => {
+			const { id, photoKey } = req.params;
+			if (!ObjectId.isValid(id)) {
+				return res.status(400).json({ error: "Invalid ID" });
+			}
+
+			try {
+				const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+				if (!spot) {
+					return res.status(404).json({ error: "Spot not found" });
+				}
+
+				// Find the photo
+				const photo = (spot.userPhotos || []).find((p) => p.key === photoKey);
+				if (!photo) {
+					return res.status(404).json({ error: "Photo not found" });
+				}
+
+				// Check authorization (owner or admin)
+				if (photo.userId !== req.user.userId && req.user.role !== "admin") {
+					return res.status(403).json({ error: "Not authorized to delete this photo" });
+				}
+
+				// Delete from S3
+				await s3Upload.deleteFile(photoKey);
+
+				// Remove from userPhotos array
+				await spotsCollection.updateOne(
+					{ _id: ObjectId(id) },
+					{ $pull: { userPhotos: { key: photoKey } } }
+				);
+
+				console.log(`[Spots] Photo ${photoKey} deleted from spot ${id}`);
+
+				res.json({ message: "Photo deleted successfully" });
+			} catch (error) {
+				console.error("Error deleting photo:", error);
 				res.status(500).json({ error: "Internal Server Error" });
 			}
 		});
