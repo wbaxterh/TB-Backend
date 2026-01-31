@@ -3,8 +3,8 @@ const http = require("http");
 const app = express();
 require("dotenv").config();
 
-// Socket.IO setup
-const { initializeSocket } = require("./socket");
+// Socket.IO setup - use socket/index.js which has namespaces for feed and messages
+const { initializeSocket } = require("./socket/index");
 
 const categories = require("./routes/categories");
 const listings = require("./routes/listings");
@@ -36,6 +36,7 @@ const feed = require("./routes/feed");
 const upload = require("./routes/upload");
 const dm = require("./routes/dm");
 const couch = require("./routes/couch");
+const spotReviews = require("./routes/spotReviews");
 
 // Create HTTP server for Socket.IO
 const server = http.createServer(app);
@@ -81,6 +82,7 @@ app.use("/api/feed", feed);
 app.use("/api/upload", upload);
 app.use("/api/dm", dm);
 app.use("/api/couch", couch);
+app.use("/api/spot-reviews", spotReviews);
 
 const port = process.env.PORT || config.get("port");
 server.listen(port, function () {
