@@ -660,16 +660,28 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 				const yearMatch = oembed.title.match(/\((\d{4})\)|\b(19\d{2}|20\d{2})\b/);
 				const releaseYear = yearMatch ? parseInt(yearMatch[1] || yearMatch[2]) : null;
 
-				// Get higher quality thumbnail
-				const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-				const thumbnailHQ = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+				// Check if maxresdefault thumbnail exists (not all videos have it)
+				const maxresThumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+				const hqThumbnail = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+
+				let thumbnail = hqThumbnail; // Default to HQ (always available)
+				try {
+					// Check if maxres exists with a HEAD request
+					const maxresCheck = await axios.head(maxresThumbnail);
+					if (maxresCheck.status === 200) {
+						thumbnail = maxresThumbnail;
+					}
+				} catch (err) {
+					// maxresdefault doesn't exist, use hqdefault
+					console.log(`No maxres thumbnail for ${videoId}, using hqdefault`);
+				}
 
 				res.send({
 					videoId,
 					title: oembed.title,
 					author: oembed.author_name,
 					thumbnail,
-					thumbnailHQ,
+					thumbnailHQ: hqThumbnail,
 					releaseYear,
 					youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
 				});
