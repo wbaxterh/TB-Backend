@@ -157,14 +157,56 @@ async function createCollection(name) {
 }
 
 /**
- * Get CDN URLs for a video
+ * Generate a signed URL for Bunny Stream video playback
+ * Required when URL Token Authentication is enabled in Bunny dashboard
+ *
+ * Token format: Base64URL(SHA256(security_key + path + expiration_timestamp))
+ *
+ * NOTE: The security key should be BUNNY_STREAM_TOKEN_KEY from your Bunny dashboard
+ * (Stream Library → Security → Token Authentication Key)
  */
-function getVideoUrls(videoId) {
+function generateSignedUrl(videoId, filename, expiresInSeconds = 3600) {
+	const securityKey = process.env.BUNNY_STREAM_TOKEN_KEY || BUNNY_LIBRARY_API_KEY;
+
+	if (!process.env.BUNNY_STREAM_TOKEN_KEY) {
+		console.warn("WARNING: BUNNY_STREAM_TOKEN_KEY not set, using BUNNY_LIBRARY_API_KEY as fallback. This may not work for signed URLs.");
+	}
+	const expiration = Math.floor(Date.now() / 1000) + expiresInSeconds;
+	const path = `/${videoId}/${filename}`;
+
+	// Create the signature: SHA256(security_key + path + expiration)
+	const signatureString = securityKey + path + expiration;
+	const hash = crypto.createHash("sha256").update(signatureString).digest();
+
+	// Convert to Base64URL (replace + with -, / with _, remove =)
+	const token = hash.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+	return `https://${BUNNY_CDN_HOSTNAME}${path}?token=${token}&expires=${expiration}`;
+}
+
+/**
+ * Get CDN URLs for a video (with signing for protected libraries)
+ */
+function getVideoUrls(videoId, signed = true) {
+	if (signed) {
+		// Return signed URLs (valid for 1 hour)
+		return {
+			hlsUrl: generateSignedUrl(videoId, "playlist.m3u8"),
+			thumbnailUrl: generateSignedUrl(videoId, "thumbnail.jpg"),
+			previewUrl: generateSignedUrl(videoId, "preview.webp"),
+			// Individual quality streams
+			quality360p: generateSignedUrl(videoId, "play_360p.mp4"),
+			quality480p: generateSignedUrl(videoId, "play_480p.mp4"),
+			quality720p: generateSignedUrl(videoId, "play_720p.mp4"),
+			quality1080p: generateSignedUrl(videoId, "play_1080p.mp4"),
+		};
+	}
+
+	// Unsigned URLs (only work if token auth is disabled)
 	return {
 		hlsUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/playlist.m3u8`,
 		thumbnailUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/thumbnail.jpg`,
 		previewUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/preview.webp`,
-		// Individual quality streams
 		quality360p: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/play_360p.mp4`,
 		quality480p: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/play_480p.mp4`,
 		quality720p: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/play_720p.mp4`,
@@ -195,6 +237,7 @@ module.exports = {
 	listVideos,
 	createCollection,
 	getVideoUrls,
+	generateSignedUrl,
 	setThumbnailTime,
 	// Export config for reference
 	config: {

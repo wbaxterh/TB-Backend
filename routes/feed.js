@@ -17,6 +17,9 @@ const {
 	emitCommentLoved,
 } = require("../socket/feedSocket");
 
+// Bunny Stream for signed video URLs
+const { getVideoUrls, generateSignedUrl } = require("../services/bunnyStream");
+
 // Sport types enum
 const SPORT_TYPES = [
 	"skateboarding",
@@ -87,7 +90,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			return user?.homies || [];
 		};
 
-		// Helper: Populate user data for posts
+		// Helper: Populate user data and signed video URLs for posts
 		const populatePostUsers = async (posts) => {
 			const userIds = [...new Set(posts.map((p) => p.userId))];
 			const users = await usersCollection
@@ -100,10 +103,26 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				userMap[u._id.toString()] = u;
 			});
 
-			return posts.map((post) => ({
-				...post,
-				user: userMap[post.userId] || { name: "Unknown" },
-			}));
+			return posts.map((post) => {
+				const enrichedPost = {
+					...post,
+					user: userMap[post.userId] || { name: "Unknown" },
+				};
+
+				// Add signed video URLs for video posts
+				if (post.mediaType === "video" && post.bunnyVideoId) {
+					try {
+						const urls = getVideoUrls(post.bunnyVideoId, true);
+						enrichedPost.signedHlsUrl = urls.hlsUrl;
+						enrichedPost.signedMp4Url = urls.quality720p;
+						enrichedPost.signedThumbnailUrl = urls.thumbnailUrl;
+					} catch (err) {
+						console.error("Error generating signed URLs:", err);
+					}
+				}
+
+				return enrichedPost;
+			});
 		};
 
 		// =============================================
@@ -134,10 +153,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					}
 				}
 
-				// Get candidate posts (last 7 days)
-				const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+				// Get candidate posts
 				const query = {
-					createdAt: { $gte: sevenDaysAgo },
 					status: "published",
 				};
 
@@ -369,6 +386,41 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				res.send(populatedPosts[0]);
 			} catch (error) {
 				console.error("Error fetching post:", error);
+				res.status(500).send({ error: "Internal Server Error" });
+			}
+		});
+
+		// Get signed stream URL for a post's video
+		router.get("/:postId/stream", async (req, res) => {
+			const { postId } = req.params;
+
+			if (!ObjectId.isValid(postId)) {
+				return res.status(400).send({ error: "Invalid post ID" });
+			}
+
+			try {
+				const post = await feedCollection.findOne({ _id: new ObjectId(postId) });
+
+				if (!post) {
+					return res.status(404).send({ error: "Post not found" });
+				}
+
+				if (post.mediaType !== "video" || !post.bunnyVideoId) {
+					return res.status(400).send({ error: "Post does not have a video" });
+				}
+
+				// Get signed URLs (valid for 1 hour)
+				const urls = getVideoUrls(post.bunnyVideoId, true);
+
+				res.send({
+					type: "bunny",
+					videoId: post.bunnyVideoId,
+					hlsUrl: urls.hlsUrl,
+					mp4Url: urls.quality720p,
+					thumbnailUrl: urls.thumbnailUrl,
+				});
+			} catch (error) {
+				console.error("Error getting stream URL:", error);
 				res.status(500).send({ error: "Internal Server Error" });
 			}
 		});

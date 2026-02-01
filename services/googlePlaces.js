@@ -40,6 +40,36 @@ async function findPlaceByNameAndLocation(name, latitude, longitude, radius = 50
 }
 
 /**
+ * Search for a place using text search (more flexible)
+ * Uses Places API Text Search
+ */
+async function findPlaceByTextSearch(query, latitude, longitude, radius = 5000) {
+	if (!PLACES_API_KEY) {
+		console.warn("Google Places API key not configured");
+		return null;
+	}
+
+	try {
+		const response = await axios.get(`${PLACES_BASE_URL}/textsearch/json`, {
+			params: {
+				query: query,
+				location: `${latitude},${longitude}`,
+				radius: radius,
+				key: PLACES_API_KEY,
+			},
+		});
+
+		if (response.data.results && response.data.results.length > 0) {
+			return response.data.results[0]; // Best match
+		}
+		return null;
+	} catch (error) {
+		console.error("Google Places text search error:", error.message);
+		return null;
+	}
+}
+
+/**
  * Get place details including photos
  */
 async function getPlaceDetails(placeId) {
@@ -106,8 +136,14 @@ async function fetchAndCachePhoto(photoReference, spotId) {
  * Returns cached photo URLs and place ID
  */
 async function fetchAndCachePlaceData(spotName, latitude, longitude, spotId, maxPhotos = 5) {
-	// Find the place
-	const place = await findPlaceByNameAndLocation(spotName, latitude, longitude);
+	// Try nearby search first
+	let place = await findPlaceByNameAndLocation(spotName, latitude, longitude);
+
+	// Fall back to text search if nearby search fails
+	if (!place) {
+		place = await findPlaceByTextSearch(spotName, latitude, longitude);
+	}
+
 	if (!place) {
 		return { found: false };
 	}
@@ -152,6 +188,7 @@ async function fetchAndCachePlaceData(spotName, latitude, longitude, spotId, max
 
 module.exports = {
 	findPlaceByNameAndLocation,
+	findPlaceByTextSearch,
 	getPlaceDetails,
 	getPlacePhotoUrl,
 	fetchAndCachePhoto,
