@@ -112,7 +112,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				// Add signed video URLs for video posts
 				if (post.mediaType === "video" && post.bunnyVideoId) {
 					try {
-						const urls = getVideoUrls(post.bunnyVideoId, true);
+						const urls = getVideoUrls(post.bunnyVideoId);
 						enrichedPost.signedHlsUrl = urls.hlsUrl;
 						enrichedPost.signedMp4Url = urls.quality720p;
 						enrichedPost.signedThumbnailUrl = urls.thumbnailUrl;
@@ -410,7 +410,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 				}
 
 				// Get signed URLs (valid for 1 hour)
-				const urls = getVideoUrls(post.bunnyVideoId, true);
+				const urls = getVideoUrls(post.bunnyVideoId);
 
 				res.send({
 					type: "bunny",
