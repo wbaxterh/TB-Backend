@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Joi = require("joi");
+const axios = require("axios");
 const { MongoClient, ObjectId } = require("mongodb");
 const validateWith = require("../middleware/validation");
 const auth = require("../middleware/auth");
@@ -79,6 +80,158 @@ router.get("/sport-types", (req, res) => {
 			label: sport.charAt(0).toUpperCase() + sport.slice(1),
 		})),
 	});
+});
+
+// Search Google Places for autocomplete/location finding
+// GET /api/spots/places-search?query=skatepark&lat=40.7&lng=-74
+router.get("/places-search", auth, async (req, res) => {
+	const { query, lat, lng } = req.query;
+
+	if (!query) {
+		return res.status(400).json({ error: "Query parameter is required" });
+	}
+
+	try {
+		const latitude = lat ? parseFloat(lat) : null;
+		const longitude = lng ? parseFloat(lng) : null;
+
+		// Use the Google Places text search
+		let results = [];
+
+		if (latitude && longitude) {
+			// Search near the provided location
+			const place = await googlePlaces.findPlaceByTextSearch(query, latitude, longitude, 50000);
+			if (place) {
+				// Get full details for the place
+				const details = await googlePlaces.getPlaceDetails(place.place_id);
+				results.push({
+					placeId: place.place_id,
+					name: place.name,
+					address: place.formatted_address || place.vicinity,
+					latitude: place.geometry?.location?.lat,
+					longitude: place.geometry?.location?.lng,
+					rating: details?.rating,
+					types: place.types,
+					photos: details?.photos?.slice(0, 3).map(p => ({
+						reference: p.photo_reference,
+					})) || [],
+				});
+			}
+		} else {
+			// General text search without location bias
+			const response = await axios.get(`https://maps.googleapis.com/maps/api/place/textsearch/json`, {
+				params: {
+					query: query,
+					key: process.env.GOOGLE_PLACES_API_KEY,
+				},
+			});
+
+			if (response.data.results) {
+				results = response.data.results.slice(0, 10).map(place => ({
+					placeId: place.place_id,
+					name: place.name,
+					address: place.formatted_address,
+					latitude: place.geometry?.location?.lat,
+					longitude: place.geometry?.location?.lng,
+					rating: place.rating,
+					types: place.types,
+				}));
+			}
+		}
+
+		res.json({ results });
+	} catch (error) {
+		console.error("Places search error:", error.message);
+		res.status(500).json({ error: "Failed to search places" });
+	}
+});
+
+// Get place details by placeId
+// GET /api/spots/places/:placeId
+router.get("/places/:placeId", auth, async (req, res) => {
+	const { placeId } = req.params;
+
+	if (!placeId) {
+		return res.status(400).json({ error: "Place ID is required" });
+	}
+
+	try {
+		const details = await googlePlaces.getPlaceDetails(placeId);
+
+		if (!details) {
+			return res.status(404).json({ error: "Place not found" });
+		}
+
+		res.json({
+			placeId: placeId,
+			name: details.name,
+			address: details.formatted_address,
+			latitude: details.geometry?.location?.lat,
+			longitude: details.geometry?.location?.lng,
+			rating: details.rating,
+			reviewCount: details.user_ratings_total,
+			types: details.types,
+			openingHours: details.opening_hours,
+			photos: details.photos?.slice(0, 5).map(p => ({
+				reference: p.photo_reference,
+				attribution: p.html_attributions?.[0],
+			})) || [],
+		});
+	} catch (error) {
+		console.error("Place details error:", error.message);
+		res.status(500).json({ error: "Failed to get place details" });
+	}
+});
+
+// Reverse geocode coordinates to get address
+// GET /api/spots/reverse-geocode?lat=40.7&lng=-74
+router.get("/reverse-geocode", auth, async (req, res) => {
+	const { lat, lng } = req.query;
+
+	if (!lat || !lng) {
+		return res.status(400).json({ error: "lat and lng parameters are required" });
+	}
+
+	try {
+		const response = await axios.get(`https://maps.googleapis.com/maps/api/geocode/json`, {
+			params: {
+				latlng: `${lat},${lng}`,
+				key: process.env.GOOGLE_PLACES_API_KEY,
+			},
+		});
+
+		if (response.data.results && response.data.results.length > 0) {
+			const result = response.data.results[0];
+
+			// Extract city and state from address components
+			let city = "";
+			let state = "";
+			let country = "";
+
+			for (const component of result.address_components || []) {
+				if (component.types.includes("locality")) {
+					city = component.long_name;
+				} else if (component.types.includes("administrative_area_level_1")) {
+					state = component.short_name;
+				} else if (component.types.includes("country")) {
+					country = component.short_name;
+				}
+			}
+
+			res.json({
+				address: result.formatted_address,
+				city,
+				state,
+				country,
+				placeId: result.place_id,
+			});
+		} else {
+			res.json({ address: null, city: "", state: "", country: "" });
+		}
+	} catch (error) {
+		console.error("Reverse geocode error:", error.message);
+		res.status(500).json({ error: "Failed to reverse geocode" });
+	}
 });
 
 MongoClient.connect(connectionString, { useUnifiedTopology: true })

@@ -157,14 +157,78 @@ async function createCollection(name) {
 }
 
 /**
- * Get CDN URLs for a video
+ * Generate a signed URL for Bunny Stream video playback
+ * Required when URL Token Authentication is enabled in Bunny dashboard
+ *
+ * For Bunny Stream CDN, there are TWO possible keys:
+ * 1. BUNNY_STREAM_TOKEN_KEY - from Stream Library → Security → Token authentication key
+ * 2. The Pull Zone's token key - from CDN → Pull Zones → [your stream pullzone] → Security
+ *
+ * We try BUNNY_STREAM_TOKEN_KEY first, fall back to BUNNY_LIBRARY_API_KEY if not set.
  */
-function getVideoUrls(videoId) {
+function generateSignedUrl(videoId, filename, expiresInSeconds = 3600) {
+	// Try dedicated token key first, then fall back to library API key
+	const securityKey = process.env.BUNNY_STREAM_TOKEN_KEY || BUNNY_LIBRARY_API_KEY;
+	const keySource = process.env.BUNNY_STREAM_TOKEN_KEY ? "BUNNY_STREAM_TOKEN_KEY" : "BUNNY_LIBRARY_API_KEY (fallback)";
+
+	if (!securityKey) {
+		console.error("ERROR: No security key available for token signing!");
+		return `https://${BUNNY_CDN_HOSTNAME}/${videoId}/${filename}`;
+	}
+
+	const expiration = Math.floor(Date.now() / 1000) + expiresInSeconds;
+	const path = `/${videoId}/${filename}`;
+
+	// Create the signature: SHA256(security_key + path + expiration)
+	// This is the standard Bunny CDN Token Authentication format
+	const signatureString = securityKey + path + expiration;
+	const hash = crypto.createHash("sha256").update(signatureString).digest();
+
+	// Convert to Base64URL (replace + with -, / with _, remove =)
+	const token = hash.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+	const signedUrl = `https://${BUNNY_CDN_HOSTNAME}${path}?token=${token}&expires=${expiration}`;
+
+	// Debug logging (only first call per video to avoid spam)
+	if (filename === "play_720p.mp4") {
+		console.log("=== Bunny Token Generation ===");
+		console.log("Key source:", keySource);
+		console.log("Security Key (first 8 chars):", securityKey.substring(0, 8) + "...");
+		console.log("Video ID:", videoId);
+		console.log("Path:", path);
+		console.log("Expiration:", expiration, `(${new Date(expiration * 1000).toISOString()})`);
+		console.log("Hash input format: key + path + expiration");
+		console.log("Generated token:", token.substring(0, 20) + "...");
+		console.log("Full URL:", signedUrl);
+		console.log("==============================");
+	}
+
+	return signedUrl;
+}
+
+/**
+ * Get CDN URLs for a video (with signing for protected libraries)
+ */
+function getVideoUrls(videoId, signed = true) {
+	if (signed) {
+		// Return signed URLs (valid for 1 hour)
+		return {
+			hlsUrl: generateSignedUrl(videoId, "playlist.m3u8"),
+			thumbnailUrl: generateSignedUrl(videoId, "thumbnail.jpg"),
+			previewUrl: generateSignedUrl(videoId, "preview.webp"),
+			// Individual quality streams
+			quality360p: generateSignedUrl(videoId, "play_360p.mp4"),
+			quality480p: generateSignedUrl(videoId, "play_480p.mp4"),
+			quality720p: generateSignedUrl(videoId, "play_720p.mp4"),
+			quality1080p: generateSignedUrl(videoId, "play_1080p.mp4"),
+		};
+	}
+
+	// Unsigned URLs (only work if token auth is disabled)
 	return {
 		hlsUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/playlist.m3u8`,
 		thumbnailUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/thumbnail.jpg`,
 		previewUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/preview.webp`,
-		// Individual quality streams
 		quality360p: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/play_360p.mp4`,
 		quality480p: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/play_480p.mp4`,
 		quality720p: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/play_720p.mp4`,
@@ -195,6 +259,7 @@ module.exports = {
 	listVideos,
 	createCollection,
 	getVideoUrls,
+	generateSignedUrl,
 	setThumbnailTime,
 	// Export config for reference
 	config: {
