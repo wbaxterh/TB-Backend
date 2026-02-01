@@ -14,6 +14,9 @@ const BUNNY_LIBRARY_ID = process.env.BUNNY_LIBRARY_ID;
 const BUNNY_LIBRARY_API_KEY = process.env.BUNNY_LIBRARY_API_KEY;
 const BUNNY_CDN_HOSTNAME = process.env.BUNNY_CDN_HOSTNAME;
 
+// Import Bunny Stream service for signed URLs
+const { getVideoUrls, generateSignedUrl } = require("../services/bunnyStream");
+
 // Initialize Google Drive API
 const credentials = require(path.resolve(process.env.GOOGLE_DRIVE_CREDENTIALS_PATH || "./config/google-drive-credentials.json"));
 const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
@@ -147,11 +150,23 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 				}
 
 				// Prefer Bunny.net HLS if available (adaptive streaming)
-				if (video.hlsUrl) {
+				if (video.bunnyVideoId || video.hlsUrl) {
+					// Get signed URLs for token-authenticated CDN
+					const videoId = video.bunnyVideoId || video.hlsUrl.split('/').slice(-2)[0];
+					const urls = getVideoUrls(videoId, true);
+
 					return res.send({
 						type: "hls",
-						hlsUrl: video.hlsUrl,
-						thumbnailUrl: video.thumbnails?.poster || `https://${BUNNY_CDN_HOSTNAME}/${video.bunnyVideoId}/thumbnail.jpg`,
+						hlsUrl: urls.hlsUrl,
+						mp4Url: urls.quality720p,
+						thumbnailUrl: video.thumbnails?.poster || urls.thumbnailUrl,
+						// Include all quality options
+						qualities: {
+							"360p": urls.quality360p,
+							"480p": urls.quality480p,
+							"720p": urls.quality720p,
+							"1080p": urls.quality1080p,
+						},
 					});
 				}
 

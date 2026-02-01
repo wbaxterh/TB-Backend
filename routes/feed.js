@@ -425,6 +425,57 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			}
 		});
 
+		// DEBUG: Test token generation for a video
+		// Access via: GET /api/feed/debug-token/:videoId
+		router.get("/debug-token/:videoId", async (req, res) => {
+			const { videoId } = req.params;
+			const crypto = require("crypto");
+
+			const tokenKey = process.env.BUNNY_STREAM_TOKEN_KEY;
+			const libraryApiKey = process.env.BUNNY_LIBRARY_API_KEY;
+			const cdnHostname = process.env.BUNNY_CDN_HOSTNAME;
+
+			const expiration = Math.floor(Date.now() / 1000) + 3600;
+			const filename = "play_720p.mp4";
+			const path = `/${videoId}/${filename}`;
+
+			// Generate token with BUNNY_STREAM_TOKEN_KEY
+			const signatureString1 = tokenKey + path + expiration;
+			const hash1 = crypto.createHash("sha256").update(signatureString1).digest();
+			const token1 = hash1.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+			// Generate token with BUNNY_LIBRARY_API_KEY (fallback)
+			const signatureString2 = libraryApiKey + path + expiration;
+			const hash2 = crypto.createHash("sha256").update(signatureString2).digest();
+			const token2 = hash2.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+			res.json({
+				debug: {
+					message: "Token generation debug info",
+					tokenKeySet: !!tokenKey,
+					tokenKeyPreview: tokenKey ? tokenKey.substring(0, 8) + "..." : "NOT SET",
+					libraryApiKeyPreview: libraryApiKey ? libraryApiKey.substring(0, 8) + "..." : "NOT SET",
+					cdnHostname,
+					videoId,
+					path,
+					expiration,
+					expirationDate: new Date(expiration * 1000).toISOString(),
+				},
+				urls: {
+					withTokenKey: `https://${cdnHostname}${path}?token=${token1}&expires=${expiration}`,
+					withLibraryKey: `https://${cdnHostname}${path}?token=${token2}&expires=${expiration}`,
+					unsigned: `https://${cdnHostname}${path}`,
+				},
+				instructions: [
+					"1. Copy each URL and test in browser",
+					"2. If 'withTokenKey' works, BUNNY_STREAM_TOKEN_KEY is correct",
+					"3. If 'withLibraryKey' works, use that instead",
+					"4. If 'unsigned' works, token auth might be disabled",
+					"5. If none work, check Bunny dashboard for correct token key",
+				],
+			});
+		});
+
 		// =============================================
 		// POST CRUD ENDPOINTS
 		// =============================================
