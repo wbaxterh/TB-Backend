@@ -158,18 +158,16 @@ async function createCollection(name) {
 
 /**
  * Generate a signed URL for Bunny Stream video playback
- * Required when URL Token Authentication is enabled in Bunny dashboard
+ * Required when CDN Token Authentication is enabled in Bunny dashboard
  *
- * For Bunny Stream CDN, there are TWO possible keys:
- * 1. BUNNY_STREAM_TOKEN_KEY - from Stream Library → Security → Token authentication key
- * 2. The Pull Zone's token key - from CDN → Pull Zones → [your stream pullzone] → Security
+ * Bunny CDN Token Authentication:
+ * - Basic: Base64URL(MD5(key + path + expires))
+ * - Advanced: Base64URL(SHA256(key + path + expires))
  *
- * We try BUNNY_STREAM_TOKEN_KEY first, fall back to BUNNY_LIBRARY_API_KEY if not set.
+ * Path should include leading slash: /videoId/filename
  */
 function generateSignedUrl(videoId, filename, expiresInSeconds = 3600) {
-	// Try dedicated token key first, then fall back to library API key
 	const securityKey = process.env.BUNNY_STREAM_TOKEN_KEY || BUNNY_LIBRARY_API_KEY;
-	const keySource = process.env.BUNNY_STREAM_TOKEN_KEY ? "BUNNY_STREAM_TOKEN_KEY" : "BUNNY_LIBRARY_API_KEY (fallback)";
 
 	if (!securityKey) {
 		console.error("ERROR: No security key available for token signing!");
@@ -179,27 +177,27 @@ function generateSignedUrl(videoId, filename, expiresInSeconds = 3600) {
 	const expiration = Math.floor(Date.now() / 1000) + expiresInSeconds;
 	const path = `/${videoId}/${filename}`;
 
-	// Create the signature: SHA256(security_key + path + expiration)
-	// This is the standard Bunny CDN Token Authentication format
-	const signatureString = securityKey + path + expiration;
-	const hash = crypto.createHash("sha256").update(signatureString).digest();
+	// Try BASIC (MD5) - this is what many Bunny setups use by default
+	const hashMD5 = crypto.createHash("md5").update(securityKey + path + expiration).digest();
+	const tokenMD5 = hashMD5.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
-	// Convert to Base64URL (replace + with -, / with _, remove =)
-	const token = hash.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+	// Also generate SHA256 for comparison
+	const hashSHA256 = crypto.createHash("sha256").update(securityKey + path + expiration).digest();
+	const tokenSHA256 = hashSHA256.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 
-	const signedUrl = `https://${BUNNY_CDN_HOSTNAME}${path}?token=${token}&expires=${expiration}`;
+	// Use MD5 token (Basic authentication - more commonly used)
+	const signedUrl = `https://${BUNNY_CDN_HOSTNAME}${path}?token=${tokenMD5}&expires=${expiration}`;
 
-	// Debug logging (only first call per video to avoid spam)
+	// Debug logging
 	if (filename === "play_720p.mp4") {
 		console.log("=== Bunny Token Generation ===");
-		console.log("Key source:", keySource);
-		console.log("Security Key (first 8 chars):", securityKey.substring(0, 8) + "...");
-		console.log("Video ID:", videoId);
+		console.log("Key (first 8):", securityKey.substring(0, 8) + "...");
 		console.log("Path:", path);
-		console.log("Expiration:", expiration, `(${new Date(expiration * 1000).toISOString()})`);
-		console.log("Hash input format: key + path + expiration");
-		console.log("Generated token:", token.substring(0, 20) + "...");
-		console.log("Full URL:", signedUrl);
+		console.log("Expires:", expiration);
+		console.log("MD5 Token:", tokenMD5);
+		console.log("SHA256 Token:", tokenSHA256);
+		console.log("Using: MD5 (Basic)");
+		console.log("URL:", signedUrl);
 		console.log("==============================");
 	}
 
@@ -207,11 +205,14 @@ function generateSignedUrl(videoId, filename, expiresInSeconds = 3600) {
 }
 
 /**
- * Get CDN URLs for a video (with signing for protected libraries)
+ * Get CDN URLs for a video
+ *
+ * Option B (current): signed = false - Uses referrer protection in Bunny dashboard
+ * Option A (future): signed = true - Uses token authentication
  */
-function getVideoUrls(videoId, signed = true) {
+function getVideoUrls(videoId, signed = false) {
 	if (signed) {
-		// Return signed URLs (valid for 1 hour)
+		// Return signed URLs (valid for 1 hour) - Option A
 		return {
 			hlsUrl: generateSignedUrl(videoId, "playlist.m3u8"),
 			thumbnailUrl: generateSignedUrl(videoId, "thumbnail.jpg"),
@@ -224,7 +225,8 @@ function getVideoUrls(videoId, signed = true) {
 		};
 	}
 
-	// Unsigned URLs (only work if token auth is disabled)
+	// Unsigned URLs - Option B (current production setup)
+	// Protected via referrer restrictions in Bunny dashboard
 	return {
 		hlsUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/playlist.m3u8`,
 		thumbnailUrl: `https://${BUNNY_CDN_HOSTNAME}/${videoId}/thumbnail.jpg`,
