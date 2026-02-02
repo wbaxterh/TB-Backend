@@ -1,6 +1,11 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 
-const ATLAS_URI = "mongodb+srv://wes:majorasmask@cluster0.v1sxt.gcp.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
+if (!process.env.ATLAS_URI) {
+  console.error('ERROR: ATLAS_URI environment variable is not set. Run with: node -r dotenv/config delete_users.js');
+  process.exit(1);
+}
+const ATLAS_URI = process.env.ATLAS_URI;
 
 const emailsToDelete = [
   'westest69@mail.com',
