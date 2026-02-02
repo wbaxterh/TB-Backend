@@ -129,12 +129,14 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 		// FEED ENDPOINTS
 		// =============================================
 
-		// Get algorithmic feed (homies prioritized)
+		// Get algorithmic feed (homies prioritized, supports sort modes)
 		router.get("/", async (req, res) => {
 			try {
 				const page = parseInt(req.query.page) || 1;
 				const limit = Math.min(parseInt(req.query.limit) || 20, 50);
 				const offset = (page - 1) * limit;
+				const sortMode = req.query.sort || "recent"; // 'recent', 'trending', 'algorithmic'
+				const prioritizeHomies = req.query.prioritizeHomies !== "false"; // default true
 
 				// Get user's homies if authenticated
 				let userHomies = [];
@@ -169,27 +171,102 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					query.visibility = "public";
 				}
 
-				let posts = await feedCollection.find(query).limit(500).toArray();
+				let posts;
+				let totalCount;
 
-				// Score and sort posts
-				const now = Date.now();
-				const scoredPosts = posts.map((post) => {
-					const hoursOld = (now - new Date(post.createdAt).getTime()) / 3600000;
-					return {
-						post,
-						score: calculateFeedScore(post, userHomies, hoursOld),
-					};
-				});
+				if (sortMode === "recent") {
+					// Recent mode: Sort by createdAt, but boost homies to top
+					// First, get homies' recent posts
+					let homiePosts = [];
+					let otherPosts = [];
 
-				scoredPosts.sort((a, b) => b.score - a.score);
+					if (prioritizeHomies && userId && userHomies.length > 0) {
+						// Get homies' posts (including own posts)
+						const homieQuery = {
+							...query,
+							userId: { $in: [userId, ...userHomies.map(id => id.toString())] },
+						};
+						homiePosts = await feedCollection
+							.find(homieQuery)
+							.sort({ createdAt: -1 })
+							.limit(200)
+							.toArray();
 
-				// Paginate
-				const paginatedPosts = scoredPosts
-					.slice(offset, offset + limit)
-					.map((s) => s.post);
+						// Get other public posts
+						const otherQuery = {
+							status: "published",
+							visibility: "public",
+							userId: { $nin: [userId, ...userHomies.map(id => id.toString())] },
+						};
+						otherPosts = await feedCollection
+							.find(otherQuery)
+							.sort({ createdAt: -1 })
+							.limit(300)
+							.toArray();
+
+						// Interleave: Show homies posts first in each batch, then others
+						// Ratio: ~60% homies, ~40% others when both available
+						const homieRatio = 0.6;
+						const homiesPerPage = Math.ceil(limit * homieRatio);
+						const othersPerPage = limit - homiesPerPage;
+
+						const homieOffset = Math.floor(offset * homieRatio);
+						const otherOffset = offset - homieOffset;
+
+						const pagedHomies = homiePosts.slice(homieOffset, homieOffset + homiesPerPage);
+						const pagedOthers = otherPosts.slice(otherOffset, otherOffset + othersPerPage);
+
+						// Combine and sort by date (homies will naturally be mixed in by recency)
+						posts = [...pagedHomies, ...pagedOthers].sort(
+							(a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+						);
+						totalCount = homiePosts.length + otherPosts.length;
+					} else {
+						// No homies or not authenticated - just sort by recency
+						posts = await feedCollection
+							.find(query)
+							.sort({ createdAt: -1 })
+							.skip(offset)
+							.limit(limit)
+							.toArray();
+						totalCount = await feedCollection.countDocuments(query);
+					}
+				} else if (sortMode === "trending") {
+					// Trending mode: Sort by engagement in last 7 days
+					query.createdAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+					posts = await feedCollection
+						.find(query)
+						.sort({
+							"stats.loveCount": -1,
+							"stats.respectCount": -1,
+							"stats.commentCount": -1,
+							createdAt: -1,
+						})
+						.skip(offset)
+						.limit(limit)
+						.toArray();
+					totalCount = await feedCollection.countDocuments(query);
+				} else {
+					// Algorithmic mode: Use scoring function (original behavior)
+					let allPosts = await feedCollection.find(query).limit(500).toArray();
+
+					// Score and sort posts
+					const now = Date.now();
+					const scoredPosts = allPosts.map((post) => {
+						const hoursOld = (now - new Date(post.createdAt).getTime()) / 3600000;
+						return {
+							post,
+							score: calculateFeedScore(post, userHomies, hoursOld),
+						};
+					});
+
+					scoredPosts.sort((a, b) => b.score - a.score);
+					posts = scoredPosts.slice(offset, offset + limit).map((s) => s.post);
+					totalCount = scoredPosts.length;
+				}
 
 				// Populate user data
-				const populatedPosts = await populatePostUsers(paginatedPosts);
+				const populatedPosts = await populatePostUsers(posts);
 
 				// Add user's reactions if authenticated
 				if (userId) {
@@ -217,7 +294,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 					pagination: {
 						page,
 						limit,
-						hasMore: offset + limit < scoredPosts.length,
+						hasMore: offset + limit < totalCount,
 					},
 				});
 			} catch (error) {
