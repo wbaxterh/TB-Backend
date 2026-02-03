@@ -191,18 +191,30 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 			}
 		});
 
-		// Send a message
+		// Send a message (supports text and shared content)
 		router.post(
 			"/conversations/:conversationId/messages",
 			auth,
 			async (req, res) => {
 				try {
 					const { conversationId } = req.params;
-					const { content } = req.body;
+					const { content, sharedContent } = req.body;
 					const senderId = req.user.userId;
 
-					if (!content || !content.trim()) {
-						return res.status(400).send({ error: "Message content required" });
+					// Validate: either content or sharedContent required
+					if ((!content || !content.trim()) && !sharedContent) {
+						return res.status(400).send({ error: "Message content or shared content required" });
+					}
+
+					// Validate shared content structure
+					if (sharedContent) {
+						const validTypes = ['tricklist', 'trick', 'spot', 'spotlist', 'video'];
+						if (!validTypes.includes(sharedContent.contentType)) {
+							return res.status(400).send({ error: "Invalid shared content type" });
+						}
+						if (!sharedContent.contentId) {
+							return res.status(400).send({ error: "Shared content ID required" });
+						}
 					}
 
 					// Verify user is part of conversation
@@ -218,7 +230,9 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 					const message = {
 						conversationId,
 						senderId,
-						content: content.trim(),
+						content: content ? content.trim() : null,
+						type: sharedContent ? "shared" : "text",
+						sharedContent: sharedContent || null,
 						status: "sent",
 						readAt: null,
 						createdAt: new Date(),
@@ -227,16 +241,34 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 					const result = await messagesCollection.insertOne(message);
 					message._id = result.insertedId.toString(); // Convert ObjectId to string for proper socket/client handling
 
-					// Update conversation
+					// Update conversation with appropriate preview text
 					const recipientId = conversation.participants.find(
 						(p) => p !== senderId
 					);
+
+					// Generate preview text for shared content
+					let previewContent = message.content;
+					if (sharedContent) {
+						const contentTypeLabels = {
+							tricklist: '📋 Shared a TrickList',
+							trick: '🎯 Shared a trick',
+							spot: '📍 Shared a spot',
+							spotlist: '📍 Shared a SpotList',
+							video: '🎬 Shared a video',
+						};
+						previewContent = contentTypeLabels[sharedContent.contentType] || '📎 Shared content';
+						if (sharedContent.preview?.title) {
+							previewContent = `${contentTypeLabels[sharedContent.contentType]}: ${sharedContent.preview.title}`;
+						}
+					}
+
 					await conversationsCollection.updateOne(
 						{ _id: new ObjectId(conversationId) },
 						{
 							$set: {
 								lastMessage: {
-									content: message.content,
+									content: previewContent,
+									type: message.type,
 									senderId,
 									createdAt: message.createdAt,
 								},
