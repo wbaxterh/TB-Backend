@@ -3,6 +3,7 @@ const router = express.Router();
 const Joi = require("joi");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
+const appleSignin = require("apple-signin-auth");
 const bcrypt = require("bcrypt");
 const validateWith = require("../middleware/validation");
 
@@ -66,10 +67,15 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			console.log("request body to google auth == ", req.body);
 			try {
 				// Verify the token with Google
-				const ticket = await googleClient.verifyIdToken({
-					idToken: tokenId,
-					audience: process.env.GOOGLE_CLIENT_ID,
-				});
+			// Accept tokens from web, iOS, and Android clients
+			const ticket = await googleClient.verifyIdToken({
+				idToken: tokenId,
+				audience: [
+					process.env.GOOGLE_CLIENT_ID, // Web
+					process.env.GOOGLE_IOS_CLIENT_ID, // iOS
+					process.env.GOOGLE_ANDROID_CLIENT_ID, // Android
+				].filter(Boolean),
+			});
 
 				const payload = ticket.getPayload();
 				const { email, name, picture } = payload;
@@ -110,6 +116,65 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 			} catch (error) {
 				console.error("Error during Google authentication:", error);
 				return res.status(400).send({ error: "Invalid Google ID token." });
+			}
+		});
+
+		// Apple SSO auth
+		router.post("/apple-auth", async (req, res) => {
+			const { identityToken, fullName, email } = req.body;
+			console.log("request body to apple auth == ", req.body);
+			try {
+				// Verify the token with Apple
+				const applePayload = await appleSignin.verifyIdToken(identityToken, {
+					audience: process.env.APPLE_CLIENT_ID, // Your app's bundle identifier
+					ignoreExpiration: false,
+				});
+
+				const appleUserId = applePayload.sub;
+				// Apple only provides email on first sign-in, use from token if available
+				const userEmail = email || applePayload.email;
+
+				let user = await usersCollection.findOne({
+					$or: [
+						{ appleUserId: appleUserId },
+						{ email: userEmail }
+					]
+				});
+
+				if (!user) {
+					// Create new user if they don't exist
+					const newUser = {
+						name: fullName || "Apple User",
+						email: userEmail,
+						appleUserId: appleUserId,
+					};
+					const result = await usersCollection.insertOne(newUser);
+					user = {
+						_id: result.insertedId,
+						...newUser,
+					};
+				} else if (!user.appleUserId) {
+					// Link existing email account with Apple ID
+					await usersCollection.updateOne(
+						{ _id: user._id },
+						{ $set: { appleUserId: appleUserId } }
+					);
+				}
+
+				const token = jwt.sign(
+					{
+						userId: user._id,
+						name: user.name,
+						email: user.email,
+						imageUri: user.imageUri,
+						role: user.role ? user.role : null,
+					},
+					process.env.JWT_SECRET
+				);
+				res.send({ token });
+			} catch (error) {
+				console.error("Error during Apple authentication:", error);
+				return res.status(400).send({ error: "Invalid Apple identity token." });
 			}
 		});
 	})
