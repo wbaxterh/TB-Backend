@@ -135,7 +135,7 @@ router.delete("/:id", async(req, res) => {
 })
 router.put("/edit", async (req, res) => {
   const filter3 = { _id: ObjectId(req.body.trickId)};
-    const update2 = { $set: { name: req.body.name, link: req.body.link, notes: req.body.notes } };
+    const update2 = { $set: { name: req.body.name, link: req.body.link, notes: req.body.notes, updatedAt: new Date() } };
   try{
     const updateResult = await trickCollection.findOneAndUpdate(filter3, update2);
     return res.status(200).send("Success!");
@@ -147,7 +147,7 @@ router.put("/edit", async (req, res) => {
 });
 router.put("/update", async (req, res) => {
     const filter2 = { _id: ObjectId(req.body._id)};
-    const update = { $set: { checked: req.body.checked } };
+    const update = { $set: { checked: req.body.checked, updatedAt: new Date() } };
     try{
     const updateResult = await trickCollection.findOneAndUpdate(filter2, update);
     return res.status(200).send("Success!");

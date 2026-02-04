@@ -86,6 +86,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
 							checked: foundTrick?.checked || trick.checked || 'To Do',
 							link: foundTrick?.link || trick.link || '',
 							notes: foundTrick?.notes || trick.notes || '',
+							createdAt: foundTrick?.createdAt || trick.createdAt,
+							updatedAt: foundTrick?.updatedAt || trick.updatedAt,
 						};
 					});
 					return trickListCopy;
