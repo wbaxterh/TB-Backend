@@ -89,6 +89,12 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
 							createdAt: foundTrick?.createdAt || trick.createdAt,
 							updatedAt: foundTrick?.updatedAt || trick.updatedAt,
 						};
+					})
+					// Sort tricks by most recent activity (updatedAt or createdAt), newest first
+					.sort((a, b) => {
+						const timeA = a.updatedAt || a.createdAt ? new Date(a.updatedAt || a.createdAt).getTime() : 0;
+						const timeB = b.updatedAt || b.createdAt ? new Date(b.updatedAt || b.createdAt).getTime() : 0;
+						return timeB - timeA;
 					});
 					return trickListCopy;
 				});
