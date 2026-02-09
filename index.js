@@ -37,6 +37,7 @@ const upload = require("./routes/upload");
 const dm = require("./routes/dm");
 const couch = require("./routes/couch");
 const spotReviews = require("./routes/spotReviews");
+const newsletter = require("./routes/newsletter");
 
 // Create HTTP server for Socket.IO
 const server = http.createServer(app);
@@ -83,6 +84,7 @@ app.use("/api/upload", upload);
 app.use("/api/dm", dm);
 app.use("/api/couch", couch);
 app.use("/api/spot-reviews", spotReviews);
+app.use("/api/newsletter", newsletter);
 
 const port = process.env.PORT || config.get("port");
 server.listen(port, function () {
