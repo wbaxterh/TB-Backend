@@ -3,8 +3,8 @@
  * Run with: node scripts/checkSpotImages.js
  */
 
-require("dotenv").config();
-const { MongoClient } = require("mongodb");
+require('dotenv').config();
+const { MongoClient } = require('mongodb');
 
 const connectionString = process.env.ATLAS_URI;
 
@@ -12,13 +12,13 @@ async function checkSpotImages() {
   let client;
 
   try {
-    console.log("Connecting to MongoDB...");
+    console.log('Connecting to MongoDB...');
     client = await MongoClient.connect(connectionString, {
       useUnifiedTopology: true,
     });
 
-    const db = client.db("TrickList2");
-    const spotsCollection = db.collection("spots");
+    const db = client.db('TrickList2');
+    const spotsCollection = db.collection('spots');
 
     const spots = await spotsCollection.find({}).toArray();
     console.log(`\nTotal spots: ${spots.length}\n`);
@@ -28,7 +28,7 @@ async function checkSpotImages() {
     let withBoth = 0;
     let withNeither = 0;
 
-    spots.forEach(spot => {
+    spots.forEach((spot) => {
       const hasImage = !!spot.imageURL;
       const hasGooglePhotos = spot.googlePhotos && spot.googlePhotos.length > 0;
 
@@ -50,9 +50,8 @@ async function checkSpotImages() {
     console.log(`  With only googlePhotos: ${withGooglePhotos}`);
     console.log(`  With neither: ${withNeither}`);
     console.log(`========================================\n`);
-
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     process.exit(1);
   } finally {
     if (client) {

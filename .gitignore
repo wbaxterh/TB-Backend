@@ -1,6 +1,14 @@
 node_modules/
 .env
+.env.*
+!.env.example
 .cursorrules
 .mcp.json
 config/google-drive-credentials.json
 *-credentials.json
+
+# Uploads (user-generated content)
+uploads/
+
+# OS files
+.DS_Store

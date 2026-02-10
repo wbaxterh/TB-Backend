@@ -1,21 +1,21 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const Joi = require("joi");
-const { Expo } = require("expo-server-sdk");
+const Joi = require('joi');
+const { Expo } = require('expo-server-sdk');
 
-const usersStore = require("../store/users");
-const listingsStore = require("../store/listings");
-const messagesStore = require("../store/messages");
-const sendPushNotification = require("../utilities/pushNotifications");
-const auth = require("../middleware/auth");
-const validateWith = require("../middleware/validation");
+const usersStore = require('../store/users');
+const listingsStore = require('../store/listings');
+const messagesStore = require('../store/messages');
+const sendPushNotification = require('../utilities/pushNotifications');
+const auth = require('../middleware/auth');
+const validateWith = require('../middleware/validation');
 
 const schema = {
   listingId: Joi.number().required(),
   message: Joi.string().required(),
 };
 
-router.get("/", auth, (req, res) => {
+router.get('/', auth, (req, res) => {
   const messages = messagesStore.getMessagesForUser(req.user.userId);
 
   const mapUser = (userId) => {
@@ -35,14 +35,14 @@ router.get("/", auth, (req, res) => {
   res.send(resources);
 });
 
-router.post("/", [auth, validateWith(schema)], async (req, res) => {
+router.post('/', [auth, validateWith(schema)], async (req, res) => {
   const { listingId, message } = req.body;
 
   const listing = listingsStore.getListing(listingId);
-  if (!listing) return res.status(400).send({ error: "Invalid listingId." });
+  if (!listing) return res.status(400).send({ error: 'Invalid listingId.' });
 
-  const targetUser = usersStore.getUserById(parseInt(listing.userId));
-  if (!targetUser) return res.status(400).send({ error: "Invalid userId." });
+  const targetUser = usersStore.getUserById(parseInt(listing.userId, 10));
+  if (!targetUser) return res.status(400).send({ error: 'Invalid userId.' });
 
   messagesStore.add({
     fromUserId: req.user.userId,
@@ -53,8 +53,7 @@ router.post("/", [auth, validateWith(schema)], async (req, res) => {
 
   const { expoPushToken } = targetUser;
 
-  if (Expo.isExpoPushToken(expoPushToken))
-    await sendPushNotification(expoPushToken, message);
+  if (Expo.isExpoPushToken(expoPushToken)) await sendPushNotification(expoPushToken, message);
 
   res.status(201).send();
 });
