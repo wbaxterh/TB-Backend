@@ -4,8 +4,8 @@
  * Run with: node scripts/fixSpotImages.js
  */
 
-require("dotenv").config();
-const { MongoClient } = require("mongodb");
+require('dotenv').config();
+const { MongoClient } = require('mongodb');
 
 const connectionString = process.env.ATLAS_URI;
 
@@ -35,13 +35,13 @@ async function fixSpotImages() {
   let client;
 
   try {
-    console.log("Connecting to MongoDB...");
+    console.log('Connecting to MongoDB...');
     client = await MongoClient.connect(connectionString, {
       useUnifiedTopology: true,
     });
 
-    const db = client.db("TrickList2");
-    const spotsCollection = db.collection("spots");
+    const db = client.db('TrickList2');
+    const spotsCollection = db.collection('spots');
 
     // Get all spots
     const spots = await spotsCollection.find({}).toArray();
@@ -56,8 +56,10 @@ async function fixSpotImages() {
       const hasGooglePhotosArray = spot.googlePhotos && spot.googlePhotos.length > 0;
 
       console.log(`\n${spot.name}:`);
-      console.log(`  imageURL: ${currentURL ? currentURL.substring(0, 70) + '...' : 'null'}`);
-      console.log(`  googlePhotos array: ${hasGooglePhotosArray ? spot.googlePhotos.length + ' photos' : 'none'}`);
+      console.log(`  imageURL: ${currentURL ? `${currentURL.substring(0, 70)}...` : 'null'}`);
+      console.log(
+        `  googlePhotos array: ${hasGooglePhotosArray ? `${spot.googlePhotos.length} photos` : 'none'}`,
+      );
 
       // Determine the best photo to use
       let bestPhoto = null;
@@ -81,17 +83,13 @@ async function fixSpotImages() {
       else if (currentURL) {
         bestPhoto = null; // For now, remove unknown sources
         console.log(`  -> Removing unknown source image`);
-      }
-      else {
+      } else {
         console.log(`  -> No image available`);
       }
 
       // Update if needed
       if (currentURL !== bestPhoto) {
-        await spotsCollection.updateOne(
-          { _id: spot._id },
-          { $set: { imageURL: bestPhoto } }
-        );
+        await spotsCollection.updateOne({ _id: spot._id }, { $set: { imageURL: bestPhoto } });
         console.log(`  => Updated imageURL`);
         fixed++;
       }
@@ -109,9 +107,8 @@ async function fixSpotImages() {
     console.log(`  Without photos: ${withoutPhotos}`);
     console.log(`  Fixed: ${fixed}`);
     console.log(`========================================\n`);
-
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     process.exit(1);
   } finally {
     if (client) {

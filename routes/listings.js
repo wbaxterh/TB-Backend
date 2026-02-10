@@ -1,282 +1,271 @@
 //This is the route for CRUD on a TrickList
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const Joi = require("joi");
-const multer = require("multer");
+const Joi = require('joi');
+const multer = require('multer');
 
-const store = require("../store/listings");
+const _store = require('../store/listings');
 // const validateWith = require("../middleware/validation");
-const auth = require("../middleware/auth");
-const delay = require("../middleware/delay");
-const listingMapper = require("../mappers/listings");
-const config = require("config");
+const _auth = require('../middleware/auth');
+const _delay = require('../middleware/delay');
+const _listingMapper = require('../mappers/listings');
+const _config = require('config');
 
-const upload = multer({
-	dest: "uploads/",
-	limits: { fieldSize: 25 * 1024 * 1024 },
+const _upload = multer({
+  dest: 'uploads/',
+  limits: { fieldSize: 25 * 1024 * 1024 },
 });
 
-const schema = {
-	title: Joi.string().required(),
-	description: Joi.string().allow(""),
-	price: Joi.number().required().min(1),
-	categoryId: Joi.number().required().min(1),
-	location: Joi.object({
-		latitude: Joi.number().required(),
-		longitude: Joi.number().required(),
-	}).optional(),
+const _schema = {
+  title: Joi.string().required(),
+  description: Joi.string().allow(''),
+  price: Joi.number().required().min(1),
+  categoryId: Joi.number().required().min(1),
+  location: Joi.object({
+    latitude: Joi.number().required(),
+    longitude: Joi.number().required(),
+  }).optional(),
 };
 
-const ObjectId = require("mongodb").ObjectId;
-const { MongoClient, DBRef } = require("mongodb");
+const ObjectId = require('mongodb').ObjectId;
+const { MongoClient, DBRef } = require('mongodb');
 const connectionString = process.env.ATLAS_URI;
-MongoClient.connect(connectionString, { useUnifiedTopology: true }).then(
-	(client) => {
-		console.log("Connected to Database");
-		const db = client.db("TrickList2");
-		const tricksCollection = db.collection("tricklists");
+MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client) => {
+  console.log('Connected to Database');
+  const db = client.db('TrickList2');
+  const tricksCollection = db.collection('tricklists');
 
-		//SIMPLE GET TRICKLISTS
-		// router.get("/", (req, res) => {
-		//   // console.log(req.query.userId);
-		//   db.collection('tricklists').find({ "user.$id": req.query.userId }).toArray()
-		//   .then(results => {
-		//     // console.log(results)
-		//     res.send(results);
-		//   })
-		//   .catch(error => console.error(error))
+  //SIMPLE GET TRICKLISTS
+  // router.get("/", (req, res) => {
+  //   // console.log(req.query.userId);
+  //   db.collection('tricklists').find({ "user.$id": req.query.userId }).toArray()
+  //   .then(results => {
+  //     // console.log(results)
+  //     res.send(results);
+  //   })
+  //   .catch(error => console.error(error))
 
-		//   //const listings = store.getListings();
-		//   //const resources = listings.map(listingMapper);
+  //   //const listings = store.getListings();
+  //   //const resources = listings.map(listingMapper);
 
-		// });
+  // });
 
-		//GET TRICK LISTS WITH COMPLETE STATUS
-		router.get("/", async (req, res) => {
-			try {
-				const trickLists = await db
-					.collection("tricklists")
-					.find({ "user.$id": req.query.userId })
-					.toArray();
-				const trickIds = trickLists.flatMap((trickList) =>
-					trickList.tricks.map((trick) => trick._id)
-				);
-				const tricks = await db
-					.collection("tricks")
-					.find({ _id: { $in: trickIds } })
-					.toArray();
+  //GET TRICK LISTS WITH COMPLETE STATUS
+  router.get('/', async (req, res) => {
+    try {
+      const trickLists = await db
+        .collection('tricklists')
+        .find({ 'user.$id': req.query.userId })
+        .toArray();
+      const trickIds = trickLists.flatMap((trickList) =>
+        trickList.tricks.map((trick) => trick._id),
+      );
+      const tricks = await db
+        .collection('tricks')
+        .find({ _id: { $in: trickIds } })
+        .toArray();
 
-				// Build map using string keys for reliable lookup
-				// ObjectIds don't work properly as JS object keys
-				const trickMap = tricks.reduce((map, trick) => {
-					const idStr = trick._id.toString();
-					map[idStr] = trick;
-					return map;
-				}, {});
+      // Build map using string keys for reliable lookup
+      // ObjectIds don't work properly as JS object keys
+      const trickMap = tricks.reduce((map, trick) => {
+        const idStr = trick._id.toString();
+        map[idStr] = trick;
+        return map;
+      }, {});
 
-				const trickListsWithTricks = trickLists.map((trickList) => {
-					const trickListCopy = { ...trickList };
-					trickListCopy.tricks = trickList.tricks.map((trick) => {
-						// Convert to string for consistent lookup
-						const trickIdStr = trick._id ? trick._id.toString() : null;
-						const foundTrick = trickIdStr ? trickMap[trickIdStr] : null;
-						return {
-							...trick,
-							name: foundTrick?.name || trick.name || 'Unknown Trick',
-							checked: foundTrick?.checked || trick.checked || 'To Do',
-							link: foundTrick?.link || trick.link || '',
-							notes: foundTrick?.notes || trick.notes || '',
-							createdAt: foundTrick?.createdAt || trick.createdAt,
-							updatedAt: foundTrick?.updatedAt || trick.updatedAt,
-						};
-					})
-					// Sort tricks by most recent activity (updatedAt or createdAt), newest first
-					.sort((a, b) => {
-						const timeA = a.updatedAt || a.createdAt ? new Date(a.updatedAt || a.createdAt).getTime() : 0;
-						const timeB = b.updatedAt || b.createdAt ? new Date(b.updatedAt || b.createdAt).getTime() : 0;
-						return timeB - timeA;
-					});
-					return trickListCopy;
-				});
-				res.send(trickListsWithTricks);
-			} catch (error) {
-				console.error(error);
-				res.status(500).send("An error occurred while fetching tricklists.");
-			}
-		});
+      const trickListsWithTricks = trickLists.map((trickList) => {
+        const trickListCopy = { ...trickList };
+        trickListCopy.tricks = trickList.tricks
+          .map((trick) => {
+            // Convert to string for consistent lookup
+            const trickIdStr = trick._id ? trick._id.toString() : null;
+            const foundTrick = trickIdStr ? trickMap[trickIdStr] : null;
+            return {
+              ...trick,
+              name: foundTrick?.name || trick.name || 'Unknown Trick',
+              checked: foundTrick?.checked || trick.checked || 'To Do',
+              link: foundTrick?.link || trick.link || '',
+              notes: foundTrick?.notes || trick.notes || '',
+              createdAt: foundTrick?.createdAt || trick.createdAt,
+              updatedAt: foundTrick?.updatedAt || trick.updatedAt,
+            };
+          })
+          // Sort tricks by most recent activity (updatedAt or createdAt), newest first
+          .sort((a, b) => {
+            const timeA =
+              a.updatedAt || a.createdAt ? new Date(a.updatedAt || a.createdAt).getTime() : 0;
+            const timeB =
+              b.updatedAt || b.createdAt ? new Date(b.updatedAt || b.createdAt).getTime() : 0;
+            return timeB - timeA;
+          });
+        return trickListCopy;
+      });
+      res.send(trickListsWithTricks);
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('An error occurred while fetching tricklists.');
+    }
+  });
 
-		router.get("/countTrickLists", async (req, res) => {
-			try {
-				const trickLists = await db
-					.collection("tricklists")
-					.find({ "user.$id": req.query.userId })
-					.toArray();
-				const countTrickLists = trickLists.length;
-				res.send({ totalTrickLists: countTrickLists });
-			} catch (error) {
-				res.status(500).send("error getting total Trick Lists");
-			}
-		});
+  router.get('/countTrickLists', async (req, res) => {
+    try {
+      const trickLists = await db
+        .collection('tricklists')
+        .find({ 'user.$id': req.query.userId })
+        .toArray();
+      const countTrickLists = trickLists.length;
+      res.send({ totalTrickLists: countTrickLists });
+    } catch (_error) {
+      res.status(500).send('error getting total Trick Lists');
+    }
+  });
 
-		router.post(
-			"/",
-			// [
-			//   // Order of these middleware matters.
-			//   // "upload" should come before other "validate" because we have to handle
-			//   // multi-part form data. Once the upload middleware from multer applied,
-			//   // request.body will be populated and we can validate it. This means
-			//   // if the request is invalid, we'll end up with one or more image files
-			//   // stored in the uploads folder. We'll need to clean up this folder
-			//   // using a separate process.
-			//   // auth,
-			//   upload.array("images", config.get("maxImageCount")),
-			//   validateWith(schema),
-			//   validateCategoryId,
-			//   imageResize,
-			// ],
+  router.post(
+    '/',
+    // [
+    //   // Order of these middleware matters.
+    //   // "upload" should come before other "validate" because we have to handle
+    //   // multi-part form data. Once the upload middleware from multer applied,
+    //   // request.body will be populated and we can validate it. This means
+    //   // if the request is invalid, we'll end up with one or more image files
+    //   // stored in the uploads folder. We'll need to clean up this folder
+    //   // using a separate process.
+    //   // auth,
+    //   upload.array("images", config.get("maxImageCount")),
+    //   validateWith(schema),
+    //   validateCategoryId,
+    //   imageResize,
+    // ],
 
-			async (req, res) => {
-				const listing = {
-					name: req.body.title,
-					user: new DBRef("users", req.body.userId),
-					completed: 0,
-					tricks: [],
-					isPublic: req.body.isPublic === true,
-					createdAt: new Date(),
-				};
-				console.log(listing);
-				db.collection("tricklists")
-					.insertOne(listing)
-					.then((results) => {
-						console.log(results);
-						res.status(201).send(listing);
-					})
-					.catch((error) => {
-						console.error(error);
-						res.status(400).send("Error inserting trick list!");
-					});
-				// listing.images = req.images.map((fileName) => ({ fileName: fileName }));
-				// if (req.body.location) listing.location = JSON.parse(req.body.location);
-				// if (req.user) listing.userId = req.user.userId;
+    async (req, res) => {
+      const listing = {
+        name: req.body.title,
+        user: new DBRef('users', req.body.userId),
+        completed: 0,
+        tricks: [],
+        isPublic: req.body.isPublic === true,
+        createdAt: new Date(),
+      };
+      console.log(listing);
+      db.collection('tricklists')
+        .insertOne(listing)
+        .then((results) => {
+          console.log(results);
+          res.status(201).send(listing);
+        })
+        .catch((error) => {
+          console.error(error);
+          res.status(400).send('Error inserting trick list!');
+        });
+      // listing.images = req.images.map((fileName) => ({ fileName: fileName }));
+      // if (req.body.location) listing.location = JSON.parse(req.body.location);
+      // if (req.user) listing.userId = req.user.userId;
 
-				//add trick list to the DB
+      //add trick list to the DB
 
-				// store.addListing(listing);
+      // store.addListing(listing);
 
-				// res.status(201).send(listing);
-			}
-		);
-		router.delete("/:id", async (req, res) => {
-			const id = req.params.id;
+      // res.status(201).send(listing);
+    },
+  );
+  router.delete('/:id', async (req, res) => {
+    const id = req.params.id;
 
-			if (!ObjectId.isValid(id)) {
-				return res.status(400).send({ error: "Invalid ID" });
-			}
-			const result = await db
-				.collection("tricklists")
-				.deleteOne({ _id: ObjectId(id) });
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: 'Invalid ID' });
+    }
+    const result = await db.collection('tricklists').deleteOne({ _id: ObjectId(id) });
 
-			if (result.deletedCount === 0) {
-				return res.status(500).send({ error: "Error deleting document" });
-			} else {
-				const result2 = await db
-					.collection("tricks")
-					.deleteMany({ list_id: id });
-				if (result2.deletedCount === 0) {
-					return res.send({ error: "No documents deleted" });
-				} else {
-					return res.send({ message: "Document deleted successfully" });
-				}
-			}
-		});
-		router.put("/edit", async (req, res) => {
-			const filter3 = { _id: ObjectId(req.body.trickListId) };
-			const update2 = { $set: { name: req.body.name } };
-			try {
-				const updateResult = await tricksCollection.findOneAndUpdate(
-					filter3,
-					update2
-				);
-				return res.status(200).send("Success!");
-			} catch (error) {
-				console.log(error);
-				return res.status(400).send(error);
-			}
-		});
-		router.get("/all", async (req, res) => {
-			try {
-				const allTrickLists = await tricksCollection.find().toArray();
-				res.status(200).send(allTrickLists);
-			} catch (error) {
-				console.error(error);
-				res.status(500).send("Error getting tricks");
-			}
-		});
+    if (result.deletedCount === 0) {
+      return res.status(500).send({ error: 'Error deleting document' });
+    } else {
+      const result2 = await db.collection('tricks').deleteMany({ list_id: id });
+      if (result2.deletedCount === 0) {
+        return res.send({ error: 'No documents deleted' });
+      } else {
+        return res.send({ message: 'Document deleted successfully' });
+      }
+    }
+  });
+  router.put('/edit', async (req, res) => {
+    const filter3 = { _id: ObjectId(req.body.trickListId) };
+    const update2 = { $set: { name: req.body.name } };
+    try {
+      const _updateResult = await tricksCollection.findOneAndUpdate(filter3, update2);
+      return res.status(200).send('Success!');
+    } catch (error) {
+      console.log(error);
+      return res.status(400).send(error);
+    }
+  });
+  router.get('/all', async (_req, res) => {
+    try {
+      const allTrickLists = await tricksCollection.find().toArray();
+      res.status(200).send(allTrickLists);
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Error getting tricks');
+    }
+  });
 
-		// Get all public trick lists (for "Homie Trick Lists")
-		router.get("/public", async (req, res) => {
-			try {
-				const publicLists = await db
-					.collection("tricklists")
-					.find({ isPublic: true })
-					.toArray();
+  // Get all public trick lists (for "Homie Trick Lists")
+  router.get('/public', async (_req, res) => {
+    try {
+      const publicLists = await db.collection('tricklists').find({ isPublic: true }).toArray();
 
-				// Fetch user info for each list
-				const userIds = publicLists
-					.filter((list) => list.user && list.user.$id)
-					.map((list) => list.user.$id);
+      // Fetch user info for each list
+      const userIds = publicLists.filter((list) => list.user?.$id).map((list) => list.user.$id);
 
-				const users = await db
-					.collection("users")
-					.find({ _id: { $in: userIds.map((id) => (typeof id === "string" ? ObjectId(id) : id)) } })
-					.toArray();
+      const users = await db
+        .collection('users')
+        .find({ _id: { $in: userIds.map((id) => (typeof id === 'string' ? ObjectId(id) : id)) } })
+        .toArray();
 
-				const userMap = users.reduce((map, user) => {
-					map[user._id.toString()] = { name: user.name, _id: user._id };
-					return map;
-				}, {});
+      const userMap = users.reduce((map, user) => {
+        map[user._id.toString()] = { name: user.name, _id: user._id };
+        return map;
+      }, {});
 
-				const listsWithUsers = publicLists.map((list) => ({
-					...list,
-					user: list.user && list.user.$id
-						? userMap[list.user.$id.toString()] || { name: "Anonymous" }
-						: { name: "Anonymous" },
-				}));
+      const listsWithUsers = publicLists.map((list) => ({
+        ...list,
+        user: list.user?.$id
+          ? userMap[list.user.$id.toString()] || { name: 'Anonymous' }
+          : { name: 'Anonymous' },
+      }));
 
-				res.status(200).send(listsWithUsers);
-			} catch (error) {
-				console.error("Error fetching public trick lists:", error);
-				res.status(500).send("Error getting public trick lists");
-			}
-		});
+      res.status(200).send(listsWithUsers);
+    } catch (error) {
+      console.error('Error fetching public trick lists:', error);
+      res.status(500).send('Error getting public trick lists');
+    }
+  });
 
-		// Toggle trick list visibility (public/private)
-		router.put("/:id/visibility", async (req, res) => {
-			const id = req.params.id;
-			const { isPublic } = req.body;
+  // Toggle trick list visibility (public/private)
+  router.put('/:id/visibility', async (req, res) => {
+    const id = req.params.id;
+    const { isPublic } = req.body;
 
-			if (!ObjectId.isValid(id)) {
-				return res.status(400).send({ error: "Invalid ID" });
-			}
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: 'Invalid ID' });
+    }
 
-			try {
-				const result = await tricksCollection.findOneAndUpdate(
-					{ _id: ObjectId(id) },
-					{ $set: { isPublic: isPublic === true } },
-					{ returnDocument: "after" }
-				);
+    try {
+      const result = await tricksCollection.findOneAndUpdate(
+        { _id: ObjectId(id) },
+        { $set: { isPublic: isPublic === true } },
+        { returnDocument: 'after' },
+      );
 
-				if (!result.value) {
-					return res.status(404).send({ error: "Trick list not found" });
-				}
+      if (!result.value) {
+        return res.status(404).send({ error: 'Trick list not found' });
+      }
 
-				res.status(200).send(result.value);
-			} catch (error) {
-				console.error("Error toggling visibility:", error);
-				res.status(500).send({ error: "Error updating visibility" });
-			}
-		});
-	}
-);
+      res.status(200).send(result.value);
+    } catch (error) {
+      console.error('Error toggling visibility:', error);
+      res.status(500).send({ error: 'Error updating visibility' });
+    }
+  });
+});
 
 module.exports = router;

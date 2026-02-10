@@ -3,22 +3,22 @@
  * Run with: node scripts/fetchMissingPhotos.js
  */
 
-require("dotenv").config();
-const { MongoClient, ObjectId } = require("mongodb");
-const googlePlaces = require("../services/googlePlaces");
+require('dotenv').config();
+const { MongoClient } = require('mongodb');
+const googlePlaces = require('../services/googlePlaces');
 
 const connectionString = process.env.ATLAS_URI;
 
 // Custom search terms for spots that didn't match
 const customSearches = [
   {
-    name: "Thunder Ridge Ski Area",
-    searchTerms: ["Thunder Ridge", "Thunder Ridge Ski"],
+    name: 'Thunder Ridge Ski Area',
+    searchTerms: ['Thunder Ridge', 'Thunder Ridge Ski'],
     radius: 1000,
   },
   {
-    name: "Powder Ridge Mountain Park",
-    searchTerms: ["Powder Ridge", "Powder Ridge Mountain", "Powder Ridge Park"],
+    name: 'Powder Ridge Mountain Park',
+    searchTerms: ['Powder Ridge', 'Powder Ridge Mountain', 'Powder Ridge Park'],
     radius: 1000,
   },
 ];
@@ -27,13 +27,13 @@ async function fetchMissingPhotos() {
   let client;
 
   try {
-    console.log("Connecting to MongoDB...");
+    console.log('Connecting to MongoDB...');
     client = await MongoClient.connect(connectionString, {
       useUnifiedTopology: true,
     });
 
-    const db = client.db("TrickList2");
-    const spotsCollection = db.collection("spots");
+    const db = client.db('TrickList2');
+    const spotsCollection = db.collection('spots');
 
     for (const search of customSearches) {
       const spot = await spotsCollection.findOne({ name: search.name });
@@ -57,7 +57,7 @@ async function fetchMissingPhotos() {
           term,
           spot.latitude,
           spot.longitude,
-          search.radius
+          search.radius,
         );
 
         if (place) {
@@ -68,7 +68,7 @@ async function fetchMissingPhotos() {
             spot.latitude,
             spot.longitude,
             spot._id.toString(),
-            5
+            5,
           );
 
           if (placeData.found && placeData.googlePhotos.length > 0) {
@@ -82,7 +82,7 @@ async function fetchMissingPhotos() {
                   googlePlacesCachedAt: new Date(),
                   imageURL: placeData.googlePhotos[0].url,
                 },
-              }
+              },
             );
 
             console.log(`  ✓ Found ${placeData.googlePhotos.length} photos!`);
@@ -96,10 +96,9 @@ async function fetchMissingPhotos() {
       }
     }
 
-    console.log("\nDone!");
-
+    console.log('\nDone!');
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     process.exit(1);
   } finally {
     if (client) {
