@@ -47,6 +47,7 @@ const schema = {
   tags: Joi.string().allow('').optional(),
   city: Joi.string().allow('').optional(),
   state: Joi.string().allow('').optional(),
+  country: Joi.string().allow('').optional(),
   isPublic: Joi.boolean().optional(),
   sportTypes: Joi.array()
     .items(Joi.string().valid(...SPORT_TYPES))
@@ -64,6 +65,7 @@ const updateSchema = {
   tags: Joi.string().allow('').optional(),
   city: Joi.string().allow('').optional(),
   state: Joi.string().allow('').optional(),
+  country: Joi.string().allow('').optional(),
   isPublic: Joi.boolean().optional(),
   sportTypes: Joi.array()
     .items(Joi.string().valid(...SPORT_TYPES))
@@ -364,10 +366,15 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const skip = (page - 1) * limit;
         const sort = req.query.sort || 'name';
         const order = req.query.order === 'desc' ? -1 : 1;
-        const { sportType, category, q } = req.query;
+        const { sportType, category, q, country } = req.query;
 
         // Only return approved public spots for public API
         const query = { approvalStatus: 'approved' };
+
+        // Filter by country
+        if (country && country !== 'all') {
+          query.country = country;
+        }
 
         // Filter by sport type
         if (sportType && sportType !== 'all') {
