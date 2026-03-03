@@ -1,48 +1,66 @@
 {
-	"name": "done-with-it-backend",
-	"version": "1.0.0",
-	"description": "",
-	"main": "index.js",
-	"scripts": {
-		"start": "node index.js",
-		"dev": "nodemon index.js"
-	},
-	"engines": {
-		"node": "12.6.x"
-	},
-	"keywords": [],
-	"author": "Wes Huber",
-	"license": "ISC",
-	"dependencies": {
-		"@aws-sdk/client-s3": "^3.252.0",
-		"apple-signin-auth": "^2.0.0",
-		"aws-sdk": "^2.1297.0",
-		"axios": "^1.13.4",
-		"bcrypt": "^6.0.0",
-		"body-parser": "^1.20.1",
-		"compression": "^1.7.4",
-		"config": "^3.3.1",
-		"cors": "^2.8.5",
-		"dotenv": "^16.0.3",
-		"expo-server-sdk": "^3.5.0",
-		"express": "^4.17.1",
-		"google-auth-library": "^9.11.0",
-		"googleapis": "^170.1.0",
-		"helmet": "^3.22.0",
-		"joi": "^14.3.1",
-		"jsonwebtoken": "8.5.1",
-		"mongodb": "^4.13.0",
-		"mongoose": "^8.15.1",
-		"multer": "^1.4.2",
-		"multer-s3": "^2.10.0",
-		"multer-s3-v2": "^2.2.1",
-		"nodemailer": "^6.9.15",
-		"sharp": "^0.25.4",
-		"socket.io": "^4.8.3",
-		"stripe": "^18.3.0",
-		"uuid": "^13.0.0"
-	},
-	"devDependencies": {
-		"nodemon": "^2.0.2"
-	}
+  "name": "done-with-it-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "validate": "biome check .",
+    "prepare": "husky"
+  },
+  "engines": {
+    "node": ">=20.0"
+  },
+  "keywords": [],
+  "author": "Wes Huber",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.252.0",
+    "apple-signin-auth": "^2.0.0",
+    "aws-sdk": "^2.1297.0",
+    "axios": "^1.13.4",
+    "bcrypt": "^6.0.0",
+    "body-parser": "^1.20.1",
+    "compression": "^1.7.4",
+    "config": "^3.3.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "expo-server-sdk": "^3.5.0",
+    "express": "^4.17.1",
+    "google-auth-library": "^9.11.0",
+    "googleapis": "^170.1.0",
+    "helmet": "^3.22.0",
+    "joi": "^14.3.1",
+    "jsonwebtoken": "8.5.1",
+    "mongodb": "^4.13.0",
+    "mongoose": "^8.15.1",
+    "multer": "^1.4.2",
+    "multer-s3": "^2.10.0",
+    "multer-s3-v2": "^2.2.1",
+    "nodemailer": "^6.9.15",
+    "sharp": "^0.25.4",
+    "socket.io": "^4.8.3",
+    "stripe": "^18.3.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.14",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "nodemon": "^2.0.2"
+  },
+  "lint-staged": {
+    "*.js": [
+      "biome check --write",
+      "biome format --write"
+    ],
+    "*.json": [
+      "biome format --write"
+    ]
+  }
 }

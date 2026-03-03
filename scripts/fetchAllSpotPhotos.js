@@ -3,9 +3,9 @@
  * Run with: node scripts/fetchAllSpotPhotos.js
  */
 
-require("dotenv").config();
-const { MongoClient } = require("mongodb");
-const googlePlaces = require("../services/googlePlaces");
+require('dotenv').config();
+const { MongoClient } = require('mongodb');
+const googlePlaces = require('../services/googlePlaces');
 
 const connectionString = process.env.ATLAS_URI;
 
@@ -13,13 +13,13 @@ async function fetchAllSpotPhotos() {
   let client;
 
   try {
-    console.log("Connecting to MongoDB...");
+    console.log('Connecting to MongoDB...');
     client = await MongoClient.connect(connectionString, {
       useUnifiedTopology: true,
     });
 
-    const db = client.db("TrickList2");
-    const spotsCollection = db.collection("spots");
+    const db = client.db('TrickList2');
+    const spotsCollection = db.collection('spots');
 
     // Get ALL spots that don't have Google photos
     const spots = await spotsCollection
@@ -38,7 +38,9 @@ async function fetchAllSpotPhotos() {
     let failCount = 0;
 
     for (const spot of spots) {
-      console.log(`Processing: "${spot.name}" (${spot.city || 'unknown'}, ${spot.state || 'unknown'})`);
+      console.log(
+        `Processing: "${spot.name}" (${spot.city || 'unknown'}, ${spot.state || 'unknown'})`,
+      );
 
       if (!spot.latitude || !spot.longitude) {
         console.log(`  ! Skipping - no coordinates`);
@@ -52,7 +54,7 @@ async function fetchAllSpotPhotos() {
           spot.latitude,
           spot.longitude,
           spot._id.toString(),
-          5 // max 5 photos
+          5, // max 5 photos
         );
 
         if (placeData.found && placeData.googlePhotos.length > 0) {
@@ -67,7 +69,7 @@ async function fetchAllSpotPhotos() {
                 googlePlacesCachedAt: new Date(),
                 imageURL: placeData.googlePhotos[0].url,
               },
-            }
+            },
           );
 
           console.log(`  + Found ${placeData.googlePhotos.length} photos`);
@@ -90,9 +92,8 @@ async function fetchAllSpotPhotos() {
     console.log(`  Success: ${successCount}`);
     console.log(`  Failed/Not found: ${failCount}`);
     console.log(`========================================\n`);
-
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     process.exit(1);
   } finally {
     if (client) {

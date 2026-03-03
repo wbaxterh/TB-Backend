@@ -3,8 +3,8 @@
  * Run with: node scripts/cleanSpotImages.js
  */
 
-require("dotenv").config();
-const { MongoClient } = require("mongodb");
+require('dotenv').config();
+const { MongoClient } = require('mongodb');
 
 const connectionString = process.env.ATLAS_URI;
 
@@ -12,13 +12,13 @@ async function cleanSpotImages() {
   let client;
 
   try {
-    console.log("Connecting to MongoDB...");
+    console.log('Connecting to MongoDB...');
     client = await MongoClient.connect(connectionString, {
       useUnifiedTopology: true,
     });
 
-    const db = client.db("TrickList2");
-    const spotsCollection = db.collection("spots");
+    const db = client.db('TrickList2');
+    const spotsCollection = db.collection('spots');
 
     // Get all spots
     const spots = await spotsCollection.find({}).toArray();
@@ -33,11 +33,13 @@ async function cleanSpotImages() {
       const currentImageURL = spot.imageURL || '';
 
       // Check if current image is NOT from Google (S3 bucket with google in filename)
-      const isGooglePhoto = currentImageURL.includes('trickbook-media') &&
-                            currentImageURL.includes('-google-');
+      const isGooglePhoto =
+        currentImageURL.includes('trickbook-media') && currentImageURL.includes('-google-');
 
       console.log(`\n${spot.name}:`);
-      console.log(`  Current imageURL: ${currentImageURL ? currentImageURL.substring(0, 60) + '...' : 'none'}`);
+      console.log(
+        `  Current imageURL: ${currentImageURL ? `${currentImageURL.substring(0, 60)}...` : 'none'}`,
+      );
       console.log(`  Has Google Photos: ${hasGooglePhotos} (${spot.googlePhotos?.length || 0})`);
       console.log(`  Current image is Google: ${isGooglePhoto}`);
 
@@ -46,10 +48,7 @@ async function cleanSpotImages() {
         const newImageURL = spot.googlePhotos[0].url;
 
         if (currentImageURL !== newImageURL) {
-          await spotsCollection.updateOne(
-            { _id: spot._id },
-            { $set: { imageURL: newImageURL } }
-          );
+          await spotsCollection.updateOne({ _id: spot._id }, { $set: { imageURL: newImageURL } });
           console.log(`  -> Updated to Google photo`);
           updatedCount++;
         } else {
@@ -59,10 +58,7 @@ async function cleanSpotImages() {
       } else {
         // No Google photos - remove any placeholder/AI image
         if (currentImageURL && !isGooglePhoto) {
-          await spotsCollection.updateOne(
-            { _id: spot._id },
-            { $set: { imageURL: null } }
-          );
+          await spotsCollection.updateOne({ _id: spot._id }, { $set: { imageURL: null } });
           console.log(`  -> Removed non-Google image`);
           updatedCount++;
         } else {
@@ -78,9 +74,8 @@ async function cleanSpotImages() {
     console.log(`  Spots without Google photos: ${noPhotoCount}`);
     console.log(`  Updated: ${updatedCount}`);
     console.log(`========================================\n`);
-
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     process.exit(1);
   } finally {
     if (client) {
