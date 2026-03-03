@@ -298,7 +298,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         sportTypes: sportTypes || [],
         category: category || 'other',
         approvalStatus,
-        userId: ObjectId(req.user.userId),
+        userId: new ObjectId(req.user.userId),
         createdAt: new Date(),
       };
 
@@ -547,7 +547,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const limit = parseInt(req.query.limit, 10) || 50;
         const skip = (page - 1) * limit;
 
-        const query = { userId: ObjectId(req.user.userId) };
+        const query = { userId: new ObjectId(req.user.userId) };
 
         const totalCount = await spotsCollection.countDocuments(query);
         const spots = await spotsCollection
@@ -580,7 +580,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         return res.status(400).json({ error: 'Invalid ID' });
       }
       try {
-        const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+        const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
         if (!spot) {
           return res.status(404).json({ error: 'Spot not found' });
         }
@@ -629,7 +629,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
       try {
         const result = await spotsCollection.updateOne(
-          { _id: ObjectId(id) },
+          { _id: new ObjectId(id) },
           { $set: updateFields },
         );
 
@@ -638,7 +638,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         const updatedSpot = await spotsCollection.findOne({
-          _id: ObjectId(id),
+          _id: new ObjectId(id),
         });
         res.status(200).json(updatedSpot);
       } catch (error) {
@@ -658,12 +658,12 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const updateFields = {
           approvalStatus: 'approved',
           reviewedAt: new Date(),
-          reviewedBy: ObjectId(req.user.userId),
+          reviewedBy: new ObjectId(req.user.userId),
           updatedAt: new Date(),
         };
 
         const result = await spotsCollection.updateOne(
-          { _id: ObjectId(id) },
+          { _id: new ObjectId(id) },
           { $set: updateFields },
         );
 
@@ -671,7 +671,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           return res.status(404).json({ error: 'Spot not found' });
         }
 
-        const updatedSpot = await spotsCollection.findOne({ _id: ObjectId(id) });
+        const updatedSpot = await spotsCollection.findOne({ _id: new ObjectId(id) });
         res.status(200).json(updatedSpot);
       } catch (error) {
         console.error('Error approving spot', error);
@@ -693,12 +693,12 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           approvalStatus: 'rejected',
           rejectionReason: rejectionReason || '',
           reviewedAt: new Date(),
-          reviewedBy: ObjectId(req.user.userId),
+          reviewedBy: new ObjectId(req.user.userId),
           updatedAt: new Date(),
         };
 
         const result = await spotsCollection.updateOne(
-          { _id: ObjectId(id) },
+          { _id: new ObjectId(id) },
           { $set: updateFields },
         );
 
@@ -706,7 +706,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           return res.status(404).json({ error: 'Spot not found' });
         }
 
-        const updatedSpot = await spotsCollection.findOne({ _id: ObjectId(id) });
+        const updatedSpot = await spotsCollection.findOne({ _id: new ObjectId(id) });
         res.status(200).json(updatedSpot);
       } catch (error) {
         console.error('Error rejecting spot', error);
@@ -724,12 +724,12 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       try {
         // First, remove the spot from all spot lists
         await spotListsCollection.updateMany(
-          { spotIds: ObjectId(id) },
-          { $pull: { spotIds: ObjectId(id) } },
+          { spotIds: new ObjectId(id) },
+          { $pull: { spotIds: new ObjectId(id) } },
         );
 
         // Then delete the spot
-        const result = await spotsCollection.deleteOne({ _id: ObjectId(id) });
+        const result = await spotsCollection.deleteOne({ _id: new ObjectId(id) });
 
         if (result.deletedCount === 0) {
           return res.status(404).json({ error: 'Spot not found' });
@@ -751,7 +751,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       try {
         const spotLists = await spotListsCollection
           .find({
-            spotIds: ObjectId(spotId),
+            spotIds: new ObjectId(spotId),
             userId: req.user.userId,
           })
           .toArray();
@@ -773,7 +773,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
 
       try {
-        const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+        const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
         if (!spot) {
           return res.status(404).json({ error: 'Spot not found' });
         }
@@ -808,7 +808,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
         // Update spot with cached data
         await spotsCollection.updateOne(
-          { _id: ObjectId(id) },
+          { _id: new ObjectId(id) },
           {
             $set: {
               googlePlaceId: placeData.placeId,
@@ -842,7 +842,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
 
       try {
-        const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+        const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
         if (!spot) {
           return res.status(404).json({ error: 'Spot not found' });
         }
@@ -875,7 +875,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
 
       try {
-        const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+        const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
         if (!spot) {
           return res.status(404).json({ error: 'Spot not found' });
         }
@@ -897,7 +897,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         };
 
         // Add to userPhotos array
-        await spotsCollection.updateOne({ _id: ObjectId(id) }, { $push: { userPhotos: newPhoto } });
+        await spotsCollection.updateOne({ _id: new ObjectId(id) }, { $push: { userPhotos: newPhoto } });
 
         console.log(`[Spots] User ${req.user.userId} uploaded photo for spot ${id}`);
 
@@ -919,7 +919,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
 
       try {
-        const spot = await spotsCollection.findOne({ _id: ObjectId(id) });
+        const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
         if (!spot) {
           return res.status(404).json({ error: 'Spot not found' });
         }
@@ -940,7 +940,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
         // Remove from userPhotos array
         await spotsCollection.updateOne(
-          { _id: ObjectId(id) },
+          { _id: new ObjectId(id) },
           { $pull: { userPhotos: { key: photoKey } } },
         );
 
