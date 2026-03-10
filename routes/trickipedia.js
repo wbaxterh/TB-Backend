@@ -36,6 +36,8 @@ const validateTrick = (trick) => {
     return { isValid: false, message: 'Images must be an array' };
   if (trick.videoUrl && typeof trick.videoUrl !== 'string')
     return { isValid: false, message: 'Video URL must be a string' };
+  if (trick.videos && !Array.isArray(trick.videos))
+    return { isValid: false, message: 'Videos must be an array' };
   if (trick.source && typeof trick.source !== 'string')
     return { isValid: false, message: 'Source must be a string' };
   if (trick.url && typeof trick.url !== 'string')
@@ -117,7 +119,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         const trick = await trickipediaCollection.findOne({
-          _id: ObjectId(req.params.id),
+          _id: new ObjectId(req.params.id),
         });
 
         if (!trick) {
@@ -153,6 +155,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           steps: req.body.steps,
           images: req.body.images || [],
           videoUrl: req.body.videoUrl || null,
+          videos: req.body.videos || [],
           source: req.body.source || null,
           url,
           createdAt: new Date(),
@@ -195,13 +198,14 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           steps: req.body.steps,
           images: req.body.images || [],
           videoUrl: req.body.videoUrl || null,
+          videos: req.body.videos || [],
           source: req.body.source || null,
           url,
           updatedAt: new Date(),
         };
 
         const result = await trickipediaCollection.findOneAndUpdate(
-          { _id: ObjectId(req.params.id) },
+          { _id: new ObjectId(req.params.id) },
           { $set: update },
           { returnDocument: 'after' },
         );
@@ -230,7 +234,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         const result = await trickipediaCollection.deleteOne({
-          _id: ObjectId(req.params.id),
+          _id: new ObjectId(req.params.id),
         });
 
         if (result.deletedCount === 0) {
