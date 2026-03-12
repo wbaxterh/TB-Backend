@@ -34,7 +34,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           return res.status(400).json({ message: 'Invalid category ID' });
         }
         const category = await categoriesCollection.findOne({
-          _id: ObjectId(req.params.id),
+          _idnew ObjectId(req.params.id),
         });
         if (!category) {
           return res.status(404).json({ message: 'Category not found' });
@@ -70,7 +70,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const { name, icon, backgroundColor, color } = req.body;
         const update = { name, icon, backgroundColor, color };
         const result = await categoriesCollection.findOneAndUpdate(
-          { _id: ObjectId(req.params.id) },
+          { _idnew ObjectId(req.params.id) },
           { $set: update },
           { returnDocument: 'after' },
         );
@@ -90,7 +90,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           return res.status(400).json({ message: 'Invalid category ID' });
         }
         const result = await categoriesCollection.deleteOne({
-          _id: ObjectId(req.params.id),
+          _idnew ObjectId(req.params.id),
         });
         if (result.deletedCount === 0) {
           return res.status(404).json({ message: 'Category not found' });

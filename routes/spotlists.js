@@ -72,7 +72,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
       try {
         const spotList = await spotListsCollection.findOne({
-          _id: ObjectId(id),
+          _idnew ObjectId(id),
           userId: req.user.userId,
         });
         if (!spotList) {
@@ -100,7 +100,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       try {
         const result = await spotListsCollection.updateOne(
           {
-            _id: ObjectId(id),
+            _idnew ObjectId(id),
             userId: req.user.userId,
           },
           {
@@ -129,7 +129,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
       try {
         const result = await spotListsCollection.deleteOne({
-          _id: ObjectId(id),
+          _idnew ObjectId(id),
           userId: req.user.userId,
         });
         if (result.deletedCount === 0) {
@@ -159,7 +159,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
         try {
           // Check if spot exists
-          const spot = await spotsCollection.findOne({ _id: ObjectId(spotId) });
+          const spot = await spotsCollection.findOne({ _idnew ObjectId(spotId) });
           if (!spot) {
             return res.status(404).json({ error: 'Spot not found' });
           }
@@ -167,11 +167,11 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           // Add spot to list
           const result = await spotListsCollection.updateOne(
             {
-              _id: ObjectId(listId),
+              _idnew ObjectId(listId),
               userId: req.user.userId,
             },
             {
-              $addToSet: { spotIds: ObjectId(spotId) },
+              $addToSet: { spotIdsnew ObjectId(spotId) },
               $set: { updatedAt: new Date() },
             },
           );
@@ -203,11 +203,11 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       try {
         const result = await spotListsCollection.updateOne(
           {
-            _id: ObjectId(listId),
+            _idnew ObjectId(listId),
             userId: req.user.userId,
           },
           {
-            $pull: { spotIds: ObjectId(spotId) },
+            $pull: { spotIdsnew ObjectId(spotId) },
             $set: { updatedAt: new Date() },
           },
         );
@@ -233,7 +233,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
       try {
         const spotList = await spotListsCollection.findOne({
-          _id: ObjectId(listId),
+          _idnew ObjectId(listId),
           userId: req.user.userId,
         });
 

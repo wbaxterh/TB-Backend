@@ -64,7 +64,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
 
       try {
-        const blogPost = await blogCollection.findOne({ _id: ObjectId(id) });
+        const blogPost = await blogCollection.findOne({ _idnew ObjectId(id) });
         if (!blogPost) {
           return res.status(404).send({ error: 'Blog post not found' });
         }
@@ -103,7 +103,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       try {
         // Perform the update
         const updateResult = await blogCollection.updateOne(
-          { _id: ObjectId(id) },
+          { _idnew ObjectId(id) },
           {
             $set: {
               title: title,
@@ -121,7 +121,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
         // Fetch the updated post
         const updatedPost = await blogCollection.findOne({
-          _id: ObjectId(id),
+          _idnew ObjectId(id),
         });
         res.status(200).send(updatedPost);
       } catch (error) {
@@ -143,7 +143,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
       try {
         const updateResult = await blogCollection.updateOne(
-          { _id: ObjectId(id) },
+          { _idnew ObjectId(id) },
           { $set: { images: images } },
         );
 
@@ -151,7 +151,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           return res.status(404).send({ error: 'Blog post not found' });
         }
 
-        const updatedPost = await blogCollection.findOne({ _id: ObjectId(id) });
+        const updatedPost = await blogCollection.findOne({ _idnew ObjectId(id) });
         console.log('Successfully updated post:', updatedPost);
         res.status(200).send(updatedPost);
       } catch (error) {
@@ -167,7 +167,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
 
       try {
-        const result = await blogCollection.deleteOne({ _id: ObjectId(id) });
+        const result = await blogCollection.deleteOne({ _idnew ObjectId(id) });
         if (result.deletedCount === 0) {
           return res.status(404).send({ error: 'Blog post not found' });
         }

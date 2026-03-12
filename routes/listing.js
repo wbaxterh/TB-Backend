@@ -48,7 +48,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const tricklists = await tricksCollection.find({ 'user.$id': req.query.userId }).toArray();
         // Extract the tricks array from each tricklist and flatten it
         const trickIds = tricklists.flatMap((tricklist) =>
-          tricklist.tricks.map((trick) => ObjectId(trick._id)),
+          tricklist.tricks.map((trick) => new ObjectId(trick._id)),
         );
         const totalTricks = trickIds.length;
         // Return the total count of tricks for the user
@@ -118,7 +118,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       if (!ObjectId.isValid(id)) {
         return res.status(400).send({ error: 'Invalid ID' });
       }
-      const result = await db.collection('tricks').deleteOne({ _id: ObjectId(id) });
+      const result = await db.collection('tricks').deleteOne({ _id: new ObjectId(id) });
       if (result.deletedCount === 0) {
         return res.status(404).send({ error: 'Document not found' });
       } else {
@@ -126,7 +126,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           {},
           {
             $pull: {
-              tricks: { _id: ObjectId(id) },
+              tricks: { _id: new ObjectId(id) },
             },
           },
         );
@@ -135,7 +135,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
     });
     router.put('/edit', async (req, res) => {
-      const filter3 = { _id: ObjectId(req.body.trickId) };
+      const filter3 = { _id: new ObjectId(req.body.trickId) };
       const update2 = {
         $set: {
           name: req.body.name,
@@ -153,7 +153,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
     });
     router.put('/update', async (req, res) => {
-      const filter2 = { _id: ObjectId(req.body._id) };
+      const filter2 = { _id: new ObjectId(req.body._id) };
       const update = { $set: { checked: req.body.checked, updatedAt: new Date() } };
       try {
         const _updateResult = await trickCollection.findOneAndUpdate(filter2, update);
@@ -176,10 +176,10 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const trickId = insertResult.insertedId;
 
         // Link trick to the tricklist (MUST await this!)
-        const filter = { _id: ObjectId(req.body.list_id) };
+        const filter = { _id: new ObjectId(req.body.list_id) };
         const updateDoc = {
           $push: {
-            tricks: { _id: ObjectId(trickId) },
+            tricks: { _id: new ObjectId(trickId) },
           },
         };
         await tricksCollection.findOneAndUpdate(filter, updateDoc);
