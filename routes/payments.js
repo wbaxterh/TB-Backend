@@ -15,7 +15,7 @@ router.post('/create-checkout-session', [auth], async (req, res) => {
     const usersCollection = db.collection('users');
 
     const user = await usersCollection.findOne({
-      _idnew ObjectId(req.user.userId),
+      _id: new ObjectId(req.user.userId),
     });
 
     if (!user) {
@@ -38,7 +38,7 @@ router.post('/create-checkout-session', [auth], async (req, res) => {
 
       // Update user with customer ID
       await usersCollection.updateOne(
-        { _idnew ObjectId(req.user.userId) },
+        { _id: new ObjectId(req.user.userId) },
         { $set: { 'subscription.stripeCustomerId': customerId } },
       );
     }
@@ -93,7 +93,7 @@ router.get('/subscription', [auth], async (req, res) => {
     const usersCollection = db.collection('users');
 
     const user = await usersCollection.findOne({
-      _idnew ObjectId(req.user.userId),
+      _id: new ObjectId(req.user.userId),
     });
 
     if (!user) {
@@ -124,7 +124,7 @@ router.post('/admin/toggle-subscription', [auth], async (req, res) => {
     const usersCollection = db.collection('users');
 
     const user = await usersCollection.findOne({
-      _idnew ObjectId(req.user.userId),
+      _id: new ObjectId(req.user.userId),
     });
 
     if (!user) {
@@ -139,18 +139,18 @@ router.post('/admin/toggle-subscription', [auth], async (req, res) => {
     // Update or clear the admin override
     if (override === null || override === undefined) {
       await usersCollection.updateOne(
-        { _idnew ObjectId(req.user.userId) },
+        { _id: new ObjectId(req.user.userId) },
         { $unset: { 'subscription.adminOverride': '' } },
       );
     } else {
       await usersCollection.updateOne(
-        { _idnew ObjectId(req.user.userId) },
+        { _id: new ObjectId(req.user.userId) },
         { $set: { 'subscription.adminOverride': override } },
       );
     }
 
     const updatedUser = await usersCollection.findOne({
-      _idnew ObjectId(req.user.userId),
+      _id: new ObjectId(req.user.userId),
     });
 
     res.json({
@@ -173,7 +173,7 @@ router.post('/cancel-subscription', [auth], async (req, res) => {
     const usersCollection = db.collection('users');
 
     const user = await usersCollection.findOne({
-      _idnew ObjectId(req.user.userId),
+      _id: new ObjectId(req.user.userId),
     });
 
     if (!user) {
@@ -191,7 +191,7 @@ router.post('/cancel-subscription', [auth], async (req, res) => {
 
     // Update user subscription status
     await usersCollection.updateOne(
-      { _idnew ObjectId(req.user.userId) },
+      { _id: new ObjectId(req.user.userId) },
       { $set: { 'subscription.status': 'canceled' } },
     );
 
@@ -214,7 +214,7 @@ router.post('/reactivate-subscription', [auth], async (req, res) => {
     const usersCollection = db.collection('users');
 
     const user = await usersCollection.findOne({
-      _idnew ObjectId(req.user.userId),
+      _id: new ObjectId(req.user.userId),
     });
 
     if (!user) {
@@ -232,7 +232,7 @@ router.post('/reactivate-subscription', [auth], async (req, res) => {
 
     // Update user subscription status
     await usersCollection.updateOne(
-      { _idnew ObjectId(req.user.userId) },
+      { _id: new ObjectId(req.user.userId) },
       { $set: { 'subscription.status': 'active' } },
     );
 
@@ -305,7 +305,7 @@ async function handleCheckoutCompleted(session, _db, usersCollection) {
   const userId = session.metadata.userId;
 
   await usersCollection.updateOne(
-    { _idnew ObjectId(userId) },
+    { _id: new ObjectId(userId) },
     {
       $set: {
         'subscription.status': 'active',

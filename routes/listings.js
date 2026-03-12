@@ -174,7 +174,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: 'Invalid ID' });
     }
-    const result = await db.collection('tricklists').deleteOne({ _idnew ObjectId(id) });
+    const result = await db.collection('tricklists').deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount === 0) {
       return res.status(500).send({ error: 'Error deleting document' });
@@ -188,7 +188,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
     }
   });
   router.put('/edit', async (req, res) => {
-    const filter3 = { _idnew ObjectId(req.body.trickListId) };
+    const filter3 = { _id: new ObjectId(req.body.trickListId) };
     const update2 = { $set: { name: req.body.name } };
     try {
       const _updateResult = await tricksCollection.findOneAndUpdate(filter3, update2);
@@ -218,7 +218,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
 
       const users = await db
         .collection('users')
-        .find({ _id: { $in: userIds.map((id) => (typeof id === 'string' new ObjectId(id) : id)) } })
+        .find({ _id: { $in: userIds.map((id) => (typeof id === 'string' ? new ObjectId(id) : id)) } })
         .toArray();
 
       const userMap = users.reduce((map, user) => {
@@ -251,7 +251,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
 
     try {
       const result = await tricksCollection.findOneAndUpdate(
-        { _idnew ObjectId(id) },
+        { _id: new ObjectId(id) },
         { $set: { isPublic: isPublic === true } },
         { returnDocument: 'after' },
       );
