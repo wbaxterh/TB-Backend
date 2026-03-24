@@ -12,3 +12,23 @@ uploads/
 
 # OS files
 .DS_Store
+# Temp scripts
+check-db*.js
+count-emails.js
+create-kaori-*.js
+fix-*.js
+find-feed.js
+get-*.js
+insert-*.js
+patch-*.js
+scrape-*.js
+seed-*.js
+send-*.js
+set-avatar.js
+setup-kaori-homie.js
+update-*.js
+spider-*.js
+spider-*.txt
+*.bak.*
+config/default-0.json
+public/ck-uploads/

@@ -44,6 +44,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
     const commentsCollection = db.collection('comments');
     const usersCollection = db.collection('users');
     const savedPostsCollection = db.collection('saved_posts');
+    const spotsCollection = db.collection('spots');
+    const trickCollection = db.collection('tricks');
 
     // Helper: Calculate feed score for ranking
     const calculateFeedScore = (post, userHomies, hoursOld) => {
@@ -450,8 +452,32 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         const populatedPosts = await populatePostUsers([post]);
+        const enrichedPost = populatedPosts[0];
 
-        res.send(populatedPosts[0]);
+        // Populate spot data if spotId exists
+        if (post.spotId) {
+          try {
+            const spot = await spotsCollection.findOne(
+              { _id: new ObjectId(post.spotId) },
+              { projection: { name: 1, city: 1, state: 1 } }
+            );
+            if (spot) enrichedPost.spot = spot;
+          } catch (_e) {}
+        }
+
+        // Populate trick names if trickIds exist
+        if (post.trickIds && post.trickIds.length > 0) {
+          try {
+            const trickObjIds = post.trickIds.map(id => new ObjectId(id));
+            const trickDocs = await trickCollection
+              .find({ _id: { $in: trickObjIds } })
+              .project({ name: 1 })
+              .toArray();
+            enrichedPost.linkedTricks = trickDocs;
+          } catch (_e) {}
+        }
+
+        res.send(enrichedPost);
       } catch (error) {
         console.error('Error fetching post:', error);
         res.status(500).send({ error: 'Internal Server Error' });
@@ -572,6 +598,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         duration,
         aspectRatio,
         visibility,
+        spotId,
+        trickIds,
       } = req.body;
 
       if (!mediaType || !['video', 'image', 'carousel'].includes(mediaType)) {
@@ -610,6 +638,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
             rewatchRate: 0,
             skipRate: 0,
           },
+          spotId: spotId || null,
+          trickIds: trickIds || [],
           visibility: visibility || 'public',
           status: hlsUrl || imageUrls?.length > 0 ? 'published' : 'processing',
           createdAt: new Date(),
@@ -650,7 +680,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         // Only allow updating certain fields
-        const allowedUpdates = ['caption', 'visibility', 'sportTypes', 'tricks'];
+        const allowedUpdates = ['caption', 'visibility', 'sportTypes', 'tricks', 'spotId', 'trickIds'];
         const updates = { updatedAt: new Date() };
 
         allowedUpdates.forEach((field) => {
@@ -705,6 +735,87 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         res.send({ message: 'Post deleted' });
       } catch (error) {
         console.error('Error deleting post:', error);
+        res.status(500).send({ error: 'Internal Server Error' });
+      }
+    });
+
+    // =============================================
+    // LINK ENDPOINTS (tricks + spots to posts)
+    // =============================================
+
+    // POST /feed/:postId/link-tricks — link tricks to a feed post
+    router.post('/:postId/link-tricks', auth, async (req, res) => {
+      const { postId } = req.params;
+      const { trickIds } = req.body;
+      const userId = req.user.userId;
+
+      if (!ObjectId.isValid(postId)) {
+        return res.status(400).send({ error: 'Invalid post ID' });
+      }
+      if (!Array.isArray(trickIds)) {
+        return res.status(400).send({ error: 'trickIds must be an array' });
+      }
+
+      try {
+        const post = await feedCollection.findOne({ _id: new ObjectId(postId) });
+        if (!post) return res.status(404).send({ error: 'Post not found' });
+        if (post.userId !== userId) return res.status(403).send({ error: 'Access denied' });
+
+        await feedCollection.updateOne(
+          { _id: new ObjectId(postId) },
+          { $set: { trickIds: trickIds, updatedAt: new Date() } }
+        );
+
+        // Update linked tricks to reference this feed post
+        for (const trickId of trickIds) {
+          if (ObjectId.isValid(trickId)) {
+            await trickCollection.updateOne(
+              { _id: new ObjectId(trickId) },
+              { $set: { feedPostId: postId, updatedAt: new Date() } }
+            );
+          }
+        }
+
+        res.send({ message: 'Tricks linked', trickIds });
+      } catch (error) {
+        console.error('Error linking tricks:', error);
+        res.status(500).send({ error: 'Internal Server Error' });
+      }
+    });
+
+    // POST /feed/:postId/link-spot — link a spot to a feed post
+    router.post('/:postId/link-spot', auth, async (req, res) => {
+      const { postId } = req.params;
+      const { spotId } = req.body;
+      const userId = req.user.userId;
+
+      if (!ObjectId.isValid(postId)) {
+        return res.status(400).send({ error: 'Invalid post ID' });
+      }
+
+      try {
+        const post = await feedCollection.findOne({ _id: new ObjectId(postId) });
+        if (!post) return res.status(404).send({ error: 'Post not found' });
+        if (post.userId !== userId) return res.status(403).send({ error: 'Access denied' });
+
+        if (spotId && !ObjectId.isValid(spotId)) {
+          return res.status(400).send({ error: 'Invalid spot ID' });
+        }
+
+        // Validate spot exists
+        if (spotId) {
+          const spot = await spotsCollection.findOne({ _id: new ObjectId(spotId) });
+          if (!spot) return res.status(404).send({ error: 'Spot not found' });
+        }
+
+        await feedCollection.updateOne(
+          { _id: new ObjectId(postId) },
+          { $set: { spotId: spotId || null, updatedAt: new Date() } }
+        );
+
+        res.send({ message: spotId ? 'Spot linked' : 'Spot unlinked', spotId });
+      } catch (error) {
+        console.error('Error linking spot:', error);
         res.status(500).send({ error: 'Internal Server Error' });
       }
     });

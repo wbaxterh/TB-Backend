@@ -95,6 +95,22 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           await usersCollection.insertOne(user);
           // Don't send password back
           const { password: _, ...userResponse } = user;
+        // Auto-add Kaori as homie for new users
+        try {
+          const KAORI_BOT_ID = '69c15e55c7ebe2c6884f1267';
+          const newUserId = result.insertedId.toString();
+          await usersCollection.updateOne(
+            { _id: result.insertedId },
+            { $addToSet: { homies: KAORI_BOT_ID } }
+          );
+          await usersCollection.updateOne(
+            { _id: new ObjectId(KAORI_BOT_ID) },
+            { $addToSet: { homies: newUserId } }
+          );
+        } catch (kaoriErr) {
+          console.error('Auto-add Kaori error (non-fatal):', kaoriErr.message);
+        }
+
           res.status(201).send(userResponse);
         } catch (error) {
           console.log(error);
@@ -389,7 +405,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           return res.status(404).send({ error: 'User not found' });
         }
 
-        if (!targetUser.network) {
+        // Skip network check for bots
+        if (!targetUser.network && !targetUser.isBot) {
           return res.status(400).send({ error: 'User is not accepting homie requests' });
         }
 
@@ -425,6 +442,27 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
             },
           },
         );
+
+        // Auto-accept for bot users
+        if (targetUser.isBot) {
+          const targetUserId = targetId;
+          // Add each other as homies immediately
+          await usersCollection.updateOne(
+            { _id: new ObjectId(targetUserId) },
+            { 
+              $addToSet: { homies: senderId },
+              $pull: { 'homieRequests.received': { from: senderId } }
+            }
+          );
+          await usersCollection.updateOne(
+            { _id: new ObjectId(senderId) },
+            { 
+              $addToSet: { homies: targetUserId },
+              $pull: { 'homieRequests.sent': targetUserId }
+            }
+          );
+          return res.send({ message: 'You are now homies!', autoAccepted: true });
+        }
 
         res.send({ message: 'Homie request sent' });
       } catch (error) {

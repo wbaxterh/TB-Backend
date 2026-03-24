@@ -92,9 +92,12 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           {
             projection: {
               name: 1,
+              bio: 1,
               imageUri: 1,
               sports: 1,
               riderProfile: 1,
+              location: 1,
+              isBot: 1,
               createdAt: 1,
               network: 1,
               'subscription.plan': 1,
