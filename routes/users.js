@@ -389,7 +389,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const [discoverableUsers, totalCount] = await Promise.all([
           usersCollection
             .find(filter)
-            .project({ name: 1, email: 1, imageUri: 1, bio: 1, sports: 1 })
+            .project({ name: 1, imageUri: 1, bio: 1, sports: 1 })
             .skip(skip)
             .limit(limit)
             .toArray(),
@@ -591,7 +591,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         const homieIds = currentUser.homies.map((id) => new ObjectId(id));
         const homies = await usersCollection
           .find({ _id: { $in: homieIds } })
-          .project({ name: 1, email: 1, imageUri: 1 })
+          .project({ name: 1, imageUri: 1 })
           .toArray();
 
         res.send(homies);
@@ -622,7 +622,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           const receivedIds = received.map((r) => new ObjectId(r.from));
           const receivedUsers = await usersCollection
             .find({ _id: { $in: receivedIds } })
-            .project({ name: 1, email: 1, imageUri: 1 })
+            .project({ name: 1, imageUri: 1 })
             .toArray();
 
           receivedDetails = received.map((r) => {
@@ -640,7 +640,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           const sentIds = sent.map((id) => new ObjectId(id));
           sentDetails = await usersCollection
             .find({ _id: { $in: sentIds } })
-            .project({ name: 1, email: 1, imageUri: 1 })
+            .project({ name: 1, imageUri: 1 })
             .toArray();
         }
 
