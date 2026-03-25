@@ -396,16 +396,21 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           usersCollection.countDocuments(filter)
         ]);
 
-        res.send({
-          users: discoverableUsers,
-          pagination: {
-            page,
-            limit,
-            total: totalCount,
-            pages: Math.ceil(totalCount / limit),
-            hasMore: page * limit < totalCount,
-          }
-        });
+        // Backwards compatible: return flat array if no pagination params sent
+        if (!req.query.page && !req.query.limit) {
+          res.send(discoverableUsers);
+        } else {
+          res.send({
+            users: discoverableUsers,
+            pagination: {
+              page,
+              limit,
+              total: totalCount,
+              pages: Math.ceil(totalCount / limit),
+              hasMore: page * limit < totalCount,
+            }
+          });
+        }
       } catch (error) {
         console.error('Error fetching discoverable users:', error);
         res.status(500).send({ error: 'Internal Server Error' });
