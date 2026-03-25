@@ -381,13 +381,31 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           filter.name = { $regex: searchQuery, $options: 'i' };
         }
 
-        const discoverableUsers = await usersCollection
-          .find(filter)
-          .project({ name: 1, email: 1, imageUri: 1, bio: 1, sports: 1 })
-          .limit(searchQuery ? 20 : 50)
-          .toArray();
+        // Pagination: ?page=1&limit=20 (defaults: page 1, limit 20)
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+        const skip = (page - 1) * limit;
 
-        res.send(discoverableUsers);
+        const [discoverableUsers, totalCount] = await Promise.all([
+          usersCollection
+            .find(filter)
+            .project({ name: 1, email: 1, imageUri: 1, bio: 1, sports: 1 })
+            .skip(skip)
+            .limit(limit)
+            .toArray(),
+          usersCollection.countDocuments(filter)
+        ]);
+
+        res.send({
+          users: discoverableUsers,
+          pagination: {
+            page,
+            limit,
+            total: totalCount,
+            pages: Math.ceil(totalCount / limit),
+            hasMore: page * limit < totalCount,
+          }
+        });
       } catch (error) {
         console.error('Error fetching discoverable users:', error);
         res.status(500).send({ error: 'Internal Server Error' });
