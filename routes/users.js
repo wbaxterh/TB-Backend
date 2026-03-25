@@ -342,10 +342,11 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
     });
 
-    // Get discoverable users (users with network: true)
+    // Get discoverable users — supports ?q= for name search
     router.get('/discoverable', auth, async (req, res) => {
       try {
         const currentUserId = new ObjectId(req.user.userId);
+        const searchQuery = req.query.q ? req.query.q.trim() : '';
 
         // Get current user's homies and sent requests to exclude them
         const currentUser = await usersCollection.findOne(
@@ -369,13 +370,21 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           }
         }
 
+        // Build query filter
+        const filter = {
+          _id: { $nin: excludeIds },
+          isBot: { $ne: true },
+        };
+
+        if (searchQuery) {
+          // When searching, search ALL users by name (case-insensitive, partial match)
+          filter.name = { $regex: searchQuery, $options: 'i' };
+        }
+
         const discoverableUsers = await usersCollection
-          .find({
-            network: true,
-            _id: { $nin: excludeIds },
-          })
-          .project({ name: 1, email: 1, imageUri: 1 })
-          .limit(50)
+          .find(filter)
+          .project({ name: 1, email: 1, imageUri: 1, bio: 1, sports: 1 })
+          .limit(searchQuery ? 20 : 50)
           .toArray();
 
         res.send(discoverableUsers);
