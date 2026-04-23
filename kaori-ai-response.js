@@ -88,7 +88,9 @@ async function callOpenAI(messages, ragContext) {
       },
       (res) => {
         let data = '';
-        res.on('data', (chunk) => (data += chunk));
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
         res.on('end', () => {
           try {
             const parsed = JSON.parse(data);

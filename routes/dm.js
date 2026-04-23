@@ -12,7 +12,9 @@ async function _generateKaoriResponse(content, _db, _conversationId, senderId) {
       },
       (res) => {
         let data = '';
-        res.on('data', (chunk) => (data += chunk));
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
         res.on('end', () => {
           try {
             const parsed = JSON.parse(data);
@@ -385,7 +387,9 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                       },
                       (res) => {
                         let data = '';
-                        res.on('data', (chunk) => (data += chunk));
+                        res.on('data', (chunk) => {
+                          data += chunk;
+                        });
                         res.on('end', () => {
                           try {
                             const parsed = JSON.parse(data);
