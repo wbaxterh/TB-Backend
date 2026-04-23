@@ -11,22 +11,22 @@
  * over the WebSocket.
  */
 
-import path from "node:path";
-import type { KithEvent } from "@kith/core";
-import { PipecatRuntime } from "@kith/runtime-pipecat";
-import { InMemoryObservability, consoleExporter } from "@kith/observability";
+import path from 'node:path';
+import type { KithEvent } from '@kith/core';
+import { consoleExporter, InMemoryObservability } from '@kith/observability';
+import { PipecatRuntime } from '@kith/runtime-pipecat';
 import {
   DEFAULT_BOARD_SPORTS_SLANG,
   DEFAULT_ENGLISH_SLANG,
   DEFAULT_GENZ_SLANG,
   DEFAULT_LAUGH_TAGS,
+  type VoiceCharacter,
   VoiceRouter,
   voiceCharacterToRuntimeConfig,
-  type VoiceCharacter,
-} from "@kith/voice-router";
-import type { ServerWebSocket } from "bun";
+} from '@kith/voice-router';
+import type { ServerWebSocket } from 'bun';
 
-import kaoriProfile from "./kaori-character.json" with { type: "json" };
+import kaoriProfile from './kaori-character.json' with { type: 'json' };
 
 const character = kaoriProfile as VoiceCharacter;
 
@@ -34,21 +34,16 @@ const PORT = Number(process.env.PORT ?? 3040);
 const ROOT = path.dirname(Bun.fileURLToPath(import.meta.url));
 const PYTHON_VENV = path.resolve(
   ROOT,
-  "../../../../kith/packages/runtime-pipecat/python/.venv/bin/python",
+  '../../../../kith/packages/runtime-pipecat/python/.venv/bin/python',
 );
-const PYTHON_CWD = path.resolve(
-  ROOT,
-  "../../../../kith/packages/runtime-pipecat/python",
-);
+const PYTHON_CWD = path.resolve(ROOT, '../../../../kith/packages/runtime-pipecat/python');
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
-const voiceId = process.env.ELEVENLABS_VOICE_ID ?? "klHOJHbGA89BjwulA7MN";
-const modelId = process.env.ELEVENLABS_MODEL_ID ?? "eleven_v3";
+const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'klHOJHbGA89BjwulA7MN';
+const modelId = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_v3';
 
 if (!apiKey) {
-  console.error(
-    "ELEVENLABS_API_KEY must be set. See kith-voice/.env.example",
-  );
+  console.error('ELEVENLABS_API_KEY must be set. See kith-voice/.env.example');
   process.exit(2);
 }
 
@@ -74,10 +69,7 @@ interface WsData {
 
 const sessions = new Map<string, Session>();
 
-async function createSession(
-  sessionId: string,
-  ws: ServerWebSocket<WsData>,
-): Promise<Session> {
+async function createSession(sessionId: string, ws: ServerWebSocket<WsData>): Promise<Session> {
   const obs = new InMemoryObservability();
   obs.onRecord(consoleExporter);
 
@@ -86,12 +78,12 @@ async function createSession(
     cwd: PYTHON_CWD,
     observability: obs,
     config: {
-      pipeline: "elevenlabs",
+      pipeline: 'elevenlabs',
       apiKey,
       voiceId,
       modelId,
       ...voiceCharacterToRuntimeConfig(character),
-      outputFormat: "mp3_44100_128",
+      outputFormat: 'mp3_44100_128',
     },
   });
 
@@ -134,28 +126,25 @@ const server = Bun.serve<WsData>({
     const url = new URL(req.url);
 
     // WebSocket upgrade for browser clients
-    if (url.pathname === "/ws") {
+    if (url.pathname === '/ws') {
       const sessionId = crypto.randomUUID();
       const ok = server.upgrade(req, { data: { sessionId } });
       if (ok) return undefined;
-      return new Response("WebSocket upgrade failed", { status: 500 });
+      return new Response('WebSocket upgrade failed', { status: 500 });
     }
 
     // HTTP endpoint for Backend to trigger speech
-    if (url.pathname.startsWith("/speak/") && req.method === "POST") {
-      const sessionId = url.pathname.slice("/speak/".length);
+    if (url.pathname.startsWith('/speak/') && req.method === 'POST') {
+      const sessionId = url.pathname.slice('/speak/'.length);
       const session = sessions.get(sessionId);
       if (!session) {
-        return Response.json(
-          { error: "session not found", sessionId },
-          { status: 404 },
-        );
+        return Response.json({ error: 'session not found', sessionId }, { status: 404 });
       }
 
       try {
         const body = (await req.json()) as { text: string };
-        if (!body.text || typeof body.text !== "string") {
-          return Response.json({ error: "text is required" }, { status: 400 });
+        if (!body.text || typeof body.text !== 'string') {
+          return Response.json({ error: 'text is required' }, { status: 400 });
         }
         // Fire-and-forget: speak runs async, we respond immediately
         session.voice.speak(body.text).catch((err) => {
@@ -164,12 +153,12 @@ const server = Bun.serve<WsData>({
         return Response.json({ ok: true, sessionId });
       } catch (err) {
         console.error(`[kith] /speak error:`, err);
-        return Response.json({ error: "internal error" }, { status: 500 });
+        return Response.json({ error: 'internal error' }, { status: 500 });
       }
     }
 
     // Health check
-    if (url.pathname === "/health") {
+    if (url.pathname === '/health') {
       return Response.json({
         ok: true,
         sessions: sessions.size,
@@ -177,7 +166,7 @@ const server = Bun.serve<WsData>({
       });
     }
 
-    return new Response("Kith voice service for Kaori", { status: 200 });
+    return new Response('Kith voice service for Kaori', { status: 200 });
   },
   websocket: {
     async open(ws: ServerWebSocket<WsData>) {
@@ -187,13 +176,10 @@ const server = Bun.serve<WsData>({
       try {
         const session = await createSession(sessionId, ws);
         sessions.set(sessionId, session);
-        ws.send(JSON.stringify({ type: "_ready", sessionId }));
+        ws.send(JSON.stringify({ type: '_ready', sessionId }));
       } catch (err) {
-        console.error(
-          `[kith] session create failed session=${sessionId}:`,
-          err,
-        );
-        ws.close(1011, "runtime connect failed");
+        console.error(`[kith] session create failed session=${sessionId}:`, err);
+        ws.close(1011, 'runtime connect failed');
       }
     },
     async message(ws: ServerWebSocket<WsData>, raw) {
@@ -208,13 +194,13 @@ const server = Bun.serve<WsData>({
         return;
       }
 
-      if (msg.type === "speak" && typeof msg.text === "string") {
+      if (msg.type === 'speak' && typeof msg.text === 'string') {
         try {
           await session.voice.speak(msg.text);
         } catch (err) {
           console.error(`[kith] speak failed session=${sessionId}:`, err);
         }
-      } else if (msg.type === "barge-in") {
+      } else if (msg.type === 'barge-in') {
         await session.runtime.bargeIn();
       }
     },

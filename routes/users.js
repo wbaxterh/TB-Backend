@@ -95,21 +95,21 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           await usersCollection.insertOne(user);
           // Don't send password back
           const { password: _, ...userResponse } = user;
-        // Auto-add Kaori as homie for new users
-        try {
-          const KAORI_BOT_ID = '69c15e55c7ebe2c6884f1267';
-          const newUserId = result.insertedId.toString();
-          await usersCollection.updateOne(
-            { _id: result.insertedId },
-            { $addToSet: { homies: KAORI_BOT_ID } }
-          );
-          await usersCollection.updateOne(
-            { _id: new ObjectId(KAORI_BOT_ID) },
-            { $addToSet: { homies: newUserId } }
-          );
-        } catch (kaoriErr) {
-          console.error('Auto-add Kaori error (non-fatal):', kaoriErr.message);
-        }
+          // Auto-add Kaori as homie for new users
+          try {
+            const KAORI_BOT_ID = '69c15e55c7ebe2c6884f1267';
+            const newUserId = result.insertedId.toString();
+            await usersCollection.updateOne(
+              { _id: result.insertedId },
+              { $addToSet: { homies: KAORI_BOT_ID } },
+            );
+            await usersCollection.updateOne(
+              { _id: new ObjectId(KAORI_BOT_ID) },
+              { $addToSet: { homies: newUserId } },
+            );
+          } catch (kaoriErr) {
+            console.error('Auto-add Kaori error (non-fatal):', kaoriErr.message);
+          }
 
           res.status(201).send(userResponse);
         } catch (error) {
@@ -382,8 +382,8 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         // Pagination: ?page=1&limit=20 (defaults: page 1, limit 20)
-        const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+        const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
         const skip = (page - 1) * limit;
 
         const [discoverableUsers, totalCount] = await Promise.all([
@@ -393,7 +393,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
             .skip(skip)
             .limit(limit)
             .toArray(),
-          usersCollection.countDocuments(filter)
+          usersCollection.countDocuments(filter),
         ]);
 
         // Backwards compatible: return flat array if no pagination params sent
@@ -408,7 +408,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
               total: totalCount,
               pages: Math.ceil(totalCount / limit),
               hasMore: page * limit < totalCount,
-            }
+            },
           });
         }
       } catch (error) {
@@ -481,17 +481,17 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           // Add each other as homies immediately
           await usersCollection.updateOne(
             { _id: new ObjectId(targetUserId) },
-            { 
+            {
               $addToSet: { homies: senderId },
-              $pull: { 'homieRequests.received': { from: senderId } }
-            }
+              $pull: { 'homieRequests.received': { from: senderId } },
+            },
           );
           await usersCollection.updateOne(
             { _id: new ObjectId(senderId) },
-            { 
+            {
               $addToSet: { homies: targetUserId },
-              $pull: { 'homieRequests.sent': targetUserId }
-            }
+              $pull: { 'homieRequests.sent': targetUserId },
+            },
           );
           return res.send({ message: 'You are now homies!', autoAccepted: true });
         }

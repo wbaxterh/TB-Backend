@@ -157,7 +157,7 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
         if (video.bunnyVideoId || video.hlsUrl) {
           // Get signed URLs for token-authenticated CDN
           const videoId = video.bunnyVideoId || video.hlsUrl.split('/').slice(-2)[0];
-          const urls = getVideoUrls(videoId); // Using unsigned URLs with referrer protection
+          const urls = getVideoUrls(videoId, true);
 
           return res.send({
             type: 'hls',
