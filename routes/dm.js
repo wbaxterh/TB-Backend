@@ -322,6 +322,8 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
             // Get io reference NOW (before async)
             const ioRef = req.app.get('io');
             const messagesNs = ioRef ? ioRef.of('/messages') : null;
+            // Kith voice session ID (sent by Kaori Live web client)
+            const kithSessionId = req.headers['x-kith-session'] || '';
             
             // Run bot response with typing delay
             (async () => {
@@ -460,6 +462,20 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                   console.log(`[Bot] ${character} responded in conversation ${conversationId} (emitted to user:${senderId} + conversation:${conversationId})`);
                 } else {
                   console.log(`[Bot] ${character} responded but no socket available`);
+                }
+
+                // 8. Fire-and-forget: send bot text to Kith voice service for TTS
+                if (kithSessionId && process.env.KITH_VOICE_URL) {
+                  const kithPayload = JSON.stringify({ text: botResponseText });
+                  const kithUrl = new URL(`/speak/${kithSessionId}`, process.env.KITH_VOICE_URL);
+                  const kithReq = http.request(kithUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(kithPayload) },
+                  });
+                  kithReq.on('error', (e) => console.error('[Bot] Kith voice request error:', e.message));
+                  kithReq.setTimeout(5000, () => kithReq.destroy());
+                  kithReq.write(kithPayload);
+                  kithReq.end();
                 }
               } catch (botErr) {
                 console.error('Bot response error:', botErr.message);

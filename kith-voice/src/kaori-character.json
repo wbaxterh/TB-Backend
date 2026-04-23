@@ -1,0 +1,31 @@
+{
+  "voice": {
+    "stability": 0.35,
+    "similarityBoost": 0.85,
+    "style": 0.65,
+    "useSpeakerBoost": true
+  },
+  "slang": {
+    "gg": "good game",
+    "ngl": "not gonna lie",
+    "fr": "for real",
+    "fs": "frontside",
+    "bs": "backside",
+    "tb": "TrickBook"
+  },
+  "pronunciation": {
+    "uso": "oo-so",
+    "ganbare": "gahn-bah-ray",
+    "itadakimasu": "ee-tah-dah-kee-mah-su",
+    "arigato": "ah-ree-gah-toh",
+    "sugoi": "soo-goy",
+    "yatta": "yah-tah",
+    "kawaii": "kah-wah-ee",
+    "ne": "neh",
+    "Kaori": "kah-oh-ree",
+    "Nishidake": "nee-shee-dah-keh",
+    "Sapporo": "sah-poh-roh",
+    "Hokkaido": "hoh-kai-doh"
+  },
+  "personaMode": "hype"
+}

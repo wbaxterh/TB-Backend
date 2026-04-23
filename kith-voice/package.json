@@ -1,0 +1,19 @@
+{
+  "name": "kith-voice-kaori",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/server.ts",
+    "start": "bun src/server.ts"
+  },
+  "dependencies": {
+    "@kith/core": "file:../../../../kith/packages/core",
+    "@kith/runtime-pipecat": "file:../../../../kith/packages/runtime-pipecat",
+    "@kith/voice-router": "file:../../../../kith/packages/voice-router",
+    "@kith/observability": "file:../../../../kith/packages/observability"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
