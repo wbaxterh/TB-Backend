@@ -34,9 +34,9 @@ const PORT = Number(process.env.PORT ?? 3040);
 const ROOT = path.dirname(Bun.fileURLToPath(import.meta.url));
 const PYTHON_VENV = path.resolve(
   ROOT,
-  '../../../../kith/packages/runtime-pipecat/python/.venv/bin/python',
+  '../../../../../kith/packages/runtime-pipecat/python/.venv/bin/python',
 );
-const PYTHON_CWD = path.resolve(ROOT, '../../../../kith/packages/runtime-pipecat/python');
+const PYTHON_CWD = path.resolve(ROOT, '../../../../../kith/packages/runtime-pipecat/python');
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
 const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'klHOJHbGA89BjwulA7MN';
@@ -89,10 +89,27 @@ async function createSession(sessionId: string, ws: ServerWebSocket<WsData>): Pr
 
   await runtime.connect({ sessionId });
 
+  /** Clean up AI-generated text for natural TTS output. */
+  const cleanForTTS = (text: string): string => {
+    let t = text;
+    // Strip markdown bold/italic
+    t = t.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1');
+    // Strip markdown links [text](url) → text
+    t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    // Collapse repeated punctuation (!!!! → !)
+    t = t.replace(/([!?.]){2,}/g, '$1');
+    // Collapse extended vowels not caught by slang (e.g. "soooooo" → "so")
+    t = t.replace(/([a-z])\1{3,}/gi, '$1$1');
+    // Strip emoji shortcodes like :sparkles:
+    t = t.replace(/:[a-z_]+:/g, '');
+    return t;
+  };
+
   const voice = new VoiceRouter({
     runtime,
     character,
     slang: KAORI_SLANG,
+    transforms: [cleanForTTS],
   });
 
   const unsubscribe = voice.on((event: KithEvent) => {

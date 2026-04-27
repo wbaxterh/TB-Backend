@@ -417,6 +417,21 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                     'ahh my brain is glitching rn, try again in a sec - the AI tokens might be out';
                 }
 
+                // Fallback: call OpenRouter directly via kaori-ai-response.js
+                if (!botResponseText) {
+                  try {
+                    const { generateKaoriResponse } = require('../kaori-ai-response');
+                    botResponseText = await generateKaoriResponse(
+                      content ? content.trim() : '',
+                      db,
+                      conversationId,
+                      senderId,
+                    );
+                  } catch (fallbackErr) {
+                    console.error('Kaori fallback error:', fallbackErr.message);
+                  }
+                }
+
                 if (!botResponseText) {
                   botResponseText = "Hey, what's up?";
                 }
@@ -503,6 +518,7 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                 }
 
                 // 8. Fire-and-forget: send bot text to Kith voice service for TTS
+                console.log(`[Bot] Kith check: sessionId=${kithSessionId || '(none)'}, url=${process.env.KITH_VOICE_URL || '(none)'}`);
                 if (kithSessionId && process.env.KITH_VOICE_URL) {
                   const kithPayload = JSON.stringify({ text: botResponseText });
                   const kithUrl = new URL(`/speak/${kithSessionId}`, process.env.KITH_VOICE_URL);

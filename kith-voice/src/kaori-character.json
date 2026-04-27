@@ -1,17 +1,45 @@
 {
   "voice": {
-    "stability": 0.35,
-    "similarityBoost": 0.85,
-    "style": 0.65,
-    "useSpeakerBoost": true
+    "stability": 0.55,
+    "similarityBoost": 0.82,
+    "style": 0.45,
+    "useSpeakerBoost": true,
+    "speed": 1.05
   },
   "slang": {
     "gg": "good game",
     "ngl": "not gonna lie",
     "fr": "for real",
+    "frfr": "for real for real",
     "fs": "frontside",
     "bs": "backside",
-    "tb": "TrickBook"
+    "tb": "TrickBook",
+    "omg": "oh my god",
+    "rn": "right now",
+    "tbh": "to be honest",
+    "nvm": "never mind",
+    "idk": "I dunno",
+    "wbu": "what about you",
+    "imo": "in my opinion",
+    "icl": "I can't lie",
+    "lol": "[laughs]",
+    "lmao": "[laughs]",
+    "haha": "[laughs]",
+    "hahaha": "[laughs]",
+    "hehe": "[giggles]",
+    "ahhh": "ahh",
+    "ahhhh": "ahh",
+    "sooo": "so",
+    "soooo": "so",
+    "nooo": "no",
+    "noooo": "no",
+    "yesss": "yes",
+    "yessss": "yes",
+    "waaait": "wait",
+    "okayy": "okay",
+    "okaaay": "okay",
+    "hmmmm": "hmm",
+    "hmmm": "hmm"
   },
   "pronunciation": {
     "uso": "oo-so",
@@ -25,7 +53,9 @@
     "Kaori": "kah-oh-ree",
     "Nishidake": "nee-shee-dah-keh",
     "Sapporo": "sah-poh-roh",
-    "Hokkaido": "hoh-kai-doh"
+    "Hokkaido": "hoh-kai-doh",
+    "SSX": "S S X",
+    "VRM": "V R M"
   },
   "personaMode": "hype"
 }
