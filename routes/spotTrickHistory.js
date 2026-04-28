@@ -11,28 +11,40 @@ const connectionString = process.env.ATLAS_URI;
 let db;
 
 MongoClient.connect(connectionString, { useUnifiedTopology: true })
-  .then(client => {
+  .then((client) => {
     db = client.db('TrickList2');
     console.log('SpotTrickHistory: Connected to MongoDB');
   })
-  .catch(err => console.error('SpotTrickHistory DB error:', err));
+  .catch((err) => console.error('SpotTrickHistory DB error:', err));
 
-function col() { return db.collection('spot_trick_history'); }
+function col() {
+  return db.collection('spot_trick_history');
+}
 
 // GET /api/spot-tricks/:spotId — trick history for a spot
 router.get('/:spotId', async (req, res) => {
   try {
     const { spotId } = req.params;
     const { sort = 'year', page = 1, limit = 20 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     const sortObj = sort === 'upvotes' ? { upvotes: -1 } : { year: -1, createdAt: -1 };
 
     const [tricks, total] = await Promise.all([
-      col().find({ spotId: new ObjectId(spotId) }).sort(sortObj).skip(skip).limit(parseInt(limit)).toArray(),
-      col().countDocuments({ spotId: new ObjectId(spotId) })
+      col()
+        .find({ spotId: new ObjectId(spotId) })
+        .sort(sortObj)
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .toArray(),
+      col().countDocuments({ spotId: new ObjectId(spotId) }),
     ]);
 
-    res.json({ tricks, total, page: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)) });
+    res.json({
+      tricks,
+      total,
+      page: parseInt(page, 10),
+      totalPages: Math.ceil(total / parseInt(limit, 10)),
+    });
   } catch (err) {
     console.error('GET spot-tricks error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -44,15 +56,20 @@ router.get('/skater/:skaterName', async (req, res) => {
   try {
     const { skaterName } = req.params;
     const { page = 1, limit = 20 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
     const query = { skaterName: { $regex: new RegExp(skaterName, 'i') } };
 
     const [tricks, total] = await Promise.all([
-      col().find(query).sort({ year: -1 }).skip(skip).limit(parseInt(limit)).toArray(),
-      col().countDocuments(query)
+      col().find(query).sort({ year: -1 }).skip(skip).limit(parseInt(limit, 10)).toArray(),
+      col().countDocuments(query),
     ]);
 
-    res.json({ tricks, total, page: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)) });
+    res.json({
+      tricks,
+      total,
+      page: parseInt(page, 10),
+      totalPages: Math.ceil(total / parseInt(limit, 10)),
+    });
   } catch (err) {
     console.error('GET skater tricks error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -62,7 +79,17 @@ router.get('/skater/:skaterName', async (req, res) => {
 // POST /api/spot-tricks — submit a trick (auth required)
 router.post('/', auth, async (req, res) => {
   try {
-    const { spotId, trickName, skaterName, videoUrl, thumbnailUrl, description, year, source, sourceUrl } = req.body;
+    const {
+      spotId,
+      trickName,
+      skaterName,
+      videoUrl,
+      thumbnailUrl,
+      description,
+      year,
+      source,
+      sourceUrl,
+    } = req.body;
     if (!spotId || !trickName || !skaterName) {
       return res.status(400).json({ error: 'spotId, trickName, and skaterName are required' });
     }
@@ -75,14 +102,14 @@ router.post('/', auth, async (req, res) => {
       thumbnailUrl: thumbnailUrl || null,
       source: source || 'user_submitted',
       sourceUrl: sourceUrl || null,
-      year: year ? parseInt(year) : null,
+      year: year ? parseInt(year, 10) : null,
       description: description || null,
       userId: req.user.userId,
       verified: req.user.role === 'admin',
       upvotes: 0,
       upvotedBy: [],
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     const result = await col().insertOne(trick);
@@ -100,7 +127,7 @@ router.put('/:id/verify', auth, async (req, res) => {
     const result = await col().findOneAndUpdate(
       { _id: new ObjectId(req.params.id) },
       { $set: { verified: true, updatedAt: new Date() } },
-      { returnDocument: 'after' }
+      { returnDocument: 'after' },
     );
     if (!result.value && !result) return res.status(404).json({ error: 'Not found' });
     res.json(result.value || result);

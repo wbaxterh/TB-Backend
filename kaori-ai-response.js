@@ -32,21 +32,21 @@ Your vibe: Think of the cool Japanese girl at the terrain park who's always hypi
 const https = require('https');
 const { Pool } = require('pg');
 
-const pgPool = new Pool({
-  connectionString: 'postgresql://elizaos:elizaos2024!@localhost:5432/elizaos'
+const _pgPool = new Pool({
+  connectionString: process.env.POSTGRES_CONNECTION_STRING || 'postgresql://localhost:5432/elizaos',
 });
 
 // Query RAG context from pgvector
 async function queryRAGContext(userMessage) {
   try {
     const ragQuery = require('./kaori-rag/kaori-query');
-    if (ragQuery && ragQuery.search) {
+    if (ragQuery?.search) {
       const results = await ragQuery.search(userMessage, 3);
       if (results && results.length > 0) {
-        return results.map(r => r.content || r.chunk_text).join('\n\n');
+        return results.map((r) => r.content || r.chunk_text).join('\n\n');
       }
     }
-  } catch (err) {
+  } catch (_err) {
     // RAG not set up yet, that's fine
   }
   return '';
@@ -55,7 +55,7 @@ async function queryRAGContext(userMessage) {
 // Call OpenAI API
 async function callOpenAI(messages, ragContext) {
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
-  
+
   if (!apiKey) {
     console.log('No OpenRouter/OpenAI API key found');
     return null;
@@ -63,48 +63,50 @@ async function callOpenAI(messages, ragContext) {
 
   let systemPrompt = KAORI_SYSTEM_PROMPT;
   if (ragContext) {
-    systemPrompt += '\n\nRecent snowboard news/articles you know about:\n' + ragContext;
+    systemPrompt += `\n\nRecent snowboard news/articles you know about:\n${ragContext}`;
   }
 
   const body = JSON.stringify({
     model: 'x-ai/grok-3-mini',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      ...messages
-    ],
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
     max_tokens: 300,
-    temperature: 0.9
+    temperature: 0.9,
   });
 
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: 'openrouter.ai',
-      path: '/api/v1/chat/completions',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey,
-        'HTTP-Referer': 'https://thetrickbook.com',
-        'X-Title': 'TrickBook Kaori'
-      }
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.choices && parsed.choices[0]) {
-            resolve(parsed.choices[0].message.content.trim());
-          } else {
-            console.error('OpenRouter unexpected response:', data.substring(0, 200));
+  return new Promise((resolve, _reject) => {
+    const req = https.request(
+      {
+        hostname: 'openrouter.ai',
+        path: '/api/v1/chat/completions',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://thetrickbook.com',
+          'X-Title': 'TrickBook Kaori',
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.choices?.[0]) {
+              resolve(parsed.choices[0].message.content.trim());
+            } else {
+              console.error('OpenRouter unexpected response:', data.substring(0, 200));
+              resolve(null);
+            }
+          } catch (e) {
+            console.error('OpenRouter parse error:', e.message);
             resolve(null);
           }
-        } catch (e) {
-          console.error('OpenRouter parse error:', e.message);
-          resolve(null);
-        }
-      });
-    });
+        });
+      },
+    );
     req.on('error', (e) => {
       console.error('OpenRouter request error:', e.message);
       resolve(null);
@@ -114,9 +116,10 @@ async function callOpenAI(messages, ragContext) {
   });
 }
 
-async function generateKaoriResponse(userMessage, db, conversationId, senderId) {
+async function generateKaoriResponse(userMessage, db, conversationId, _senderId) {
   // Get conversation history
-  const recentMessages = await db.collection('dm_messages')
+  const recentMessages = await db
+    .collection('dm_messages')
     .find({ conversationId: conversationId })
     .sort({ createdAt: -1 })
     .limit(6)
@@ -126,7 +129,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId) 
   const openaiMessages = [];
   for (const msg of recentMessages.reverse()) {
     const role = msg.senderId === '69c15e55c7ebe2c6884f1267' ? 'assistant' : 'user';
-    if (msg.content && msg.content.trim()) {
+    if (msg.content?.trim()) {
       openaiMessages.push({ role, content: msg.content.trim() });
     }
   }

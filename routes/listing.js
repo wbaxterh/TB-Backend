@@ -21,18 +21,19 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
     // Helper: populate spot data for tricks that have spotId
     const populateSpotData = async (tricks) => {
-      const spotIds = tricks
-        .filter(t => t.spotId)
-        .map(t => new ObjectId(t.spotId));
+      const spotIds = tricks.filter((t) => t.spotId).map((t) => new ObjectId(t.spotId));
       if (spotIds.length === 0) return tricks;
 
-      const spots = await spotsCollection.find({ _id: { $in: spotIds } })
+      const spots = await spotsCollection
+        .find({ _id: { $in: spotIds } })
         .project({ name: 1, city: 1, state: 1 })
         .toArray();
       const spotMap = {};
-      spots.forEach(s => { spotMap[s._id.toString()] = s; });
+      spots.forEach((s) => {
+        spotMap[s._id.toString()] = s;
+      });
 
-      return tricks.map(t => {
+      return tricks.map((t) => {
         if (t.spotId && spotMap[t.spotId.toString()]) {
           return { ...t, spot: spotMap[t.spotId.toString()] };
         }
@@ -243,7 +244,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
         await trickCollection.updateOne(
           { _id: new ObjectId(trickId) },
-          { $set: { spotId: spotId, updatedAt: new Date() } }
+          { $set: { spotId: spotId, updatedAt: new Date() } },
         );
         // Return updated trick with spot data
         const trick = await trickCollection.findOne({ _id: new ObjectId(trickId) });
@@ -269,10 +270,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         if (req.body.feedPostId !== undefined) {
           setFields.feedPostId = req.body.feedPostId || null;
         }
-        await trickCollection.updateOne(
-          { _id: new ObjectId(trickId) },
-          { $set: setFields }
-        );
+        await trickCollection.updateOne({ _id: new ObjectId(trickId) }, { $set: setFields });
         const trick = await trickCollection.findOne({ _id: new ObjectId(trickId) });
         res.json(trick);
       } catch (error) {

@@ -1,0 +1,19 @@
+{
+  "name": "kith-voice-kaori",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/server.ts",
+    "start": "bun src/server.ts"
+  },
+  "dependencies": {
+    "@kithjs/core": "^0.1.0",
+    "@kithjs/runtime-pipecat": "^0.1.0",
+    "@kithjs/voice-router": "^0.1.0",
+    "@kithjs/observability": "^0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

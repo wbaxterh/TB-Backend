@@ -110,7 +110,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         // Add signed video URLs for video posts
         if (post.mediaType === 'video' && post.bunnyVideoId) {
           try {
-            const urls = getVideoUrls(post.bunnyVideoId);
+            const urls = getVideoUrls(post.bunnyVideoId, true);
             enrichedPost.signedHlsUrl = urls.hlsUrl;
             enrichedPost.signedMp4Url = urls.quality720p;
             enrichedPost.signedThumbnailUrl = urls.thumbnailUrl;
@@ -459,7 +459,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           try {
             const spot = await spotsCollection.findOne(
               { _id: new ObjectId(post.spotId) },
-              { projection: { name: 1, city: 1, state: 1 } }
+              { projection: { name: 1, city: 1, state: 1 } },
             );
             if (spot) enrichedPost.spot = spot;
           } catch (_e) {}
@@ -468,7 +468,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         // Populate trick names if trickIds exist
         if (post.trickIds && post.trickIds.length > 0) {
           try {
-            const trickObjIds = post.trickIds.map(id => new ObjectId(id));
+            const trickObjIds = post.trickIds.map((id) => new ObjectId(id));
             const trickDocs = await trickCollection
               .find({ _id: { $in: trickObjIds } })
               .project({ name: 1 })
@@ -504,7 +504,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         // Get signed URLs (valid for 1 hour)
-        const urls = getVideoUrls(post.bunnyVideoId);
+        const urls = getVideoUrls(post.bunnyVideoId, true);
 
         res.send({
           type: 'bunny',
@@ -680,7 +680,14 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         }
 
         // Only allow updating certain fields
-        const allowedUpdates = ['caption', 'visibility', 'sportTypes', 'tricks', 'spotId', 'trickIds'];
+        const allowedUpdates = [
+          'caption',
+          'visibility',
+          'sportTypes',
+          'tricks',
+          'spotId',
+          'trickIds',
+        ];
         const updates = { updatedAt: new Date() };
 
         allowedUpdates.forEach((field) => {
@@ -763,7 +770,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
         await feedCollection.updateOne(
           { _id: new ObjectId(postId) },
-          { $set: { trickIds: trickIds, updatedAt: new Date() } }
+          { $set: { trickIds: trickIds, updatedAt: new Date() } },
         );
 
         // Update linked tricks to reference this feed post
@@ -771,7 +778,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
           if (ObjectId.isValid(trickId)) {
             await trickCollection.updateOne(
               { _id: new ObjectId(trickId) },
-              { $set: { feedPostId: postId, updatedAt: new Date() } }
+              { $set: { feedPostId: postId, updatedAt: new Date() } },
             );
           }
         }
@@ -810,7 +817,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
 
         await feedCollection.updateOne(
           { _id: new ObjectId(postId) },
-          { $set: { spotId: spotId || null, updatedAt: new Date() } }
+          { $set: { spotId: spotId || null, updatedAt: new Date() } },
         );
 
         res.send({ message: spotId ? 'Spot linked' : 'Spot unlinked', spotId });

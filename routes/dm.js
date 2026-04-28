@@ -1,22 +1,39 @@
 const http = require('http');
-async function generateKaoriResponse(content, db, conversationId, senderId) {
-  return new Promise((resolve, reject) => {
+async function _generateKaoriResponse(content, _db, _conversationId, senderId) {
+  return new Promise((resolve, _reject) => {
     const body = JSON.stringify({ userId: senderId, message: content, agentId: 'kaori' });
-    const req = http.request({
-      hostname: 'localhost', port: 3001, path: '/api/chat', method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          resolve(parsed.response || parsed.text || 'ahh my brain is glitching rn, try again in a sec');
-        } catch (e) { resolve('ahh my brain is glitching rn, try again in a sec'); }
-      });
+    const req = http.request(
+      {
+        hostname: 'localhost',
+        port: 3001,
+        path: '/api/chat',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            resolve(
+              parsed.response || parsed.text || 'ahh my brain is glitching rn, try again in a sec',
+            );
+          } catch (_e) {
+            resolve('ahh my brain is glitching rn, try again in a sec');
+          }
+        });
+      },
+    );
+    req.on('error', (_e) => {
+      resolve('ahh my brain is glitching rn, try again in a sec - the AI tokens might be out');
     });
-    req.on('error', (e) => { resolve('ahh my brain is glitching rn, try again in a sec - the AI tokens might be out'); });
-    req.setTimeout(15000, () => { req.destroy(); resolve('ahh took too long to think, try again!'); });
+    req.setTimeout(15000, () => {
+      req.destroy();
+      resolve('ahh took too long to think, try again!');
+    });
     req.write(body);
     req.end();
   });
@@ -26,7 +43,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const { MongoClient, ObjectId } = require('mongodb');
 const { emitNewMessage, emitMessagesRead } = require('../socket/messageSocket');
-const axios = require('axios');
+const _axios = require('axios');
 
 MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
   .then((client) => {
@@ -59,7 +76,10 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 
         const result = conversations.map((c) => ({
           ...c,
-          otherUser: (() => { const u = userMap[c.participants.find((p) => p !== userId)]; return u ? { ...u, isBot: u.isBot || false } : null; })(),
+          otherUser: (() => {
+            const u = userMap[c.participants.find((p) => p !== userId)];
+            return u ? { ...u, isBot: u.isBot || false } : null;
+          })(),
           unreadCount: c.unreadCount?.[userId] || 0,
         }));
 
@@ -308,27 +328,28 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
 
         res.status(201).send(message);
 
-
         // --- BOT RESPONSE LOGIC ---
         // Check if the other participant is a bot
         const otherParticipantId = conversation.participants.find((p) => p !== senderId);
         if (otherParticipantId) {
           const otherUser = await usersCollection.findOne({
             _id: new ObjectId(otherParticipantId),
-            isBot: true
+            isBot: true,
           });
-          
+
           if (otherUser) {
             // Get io reference NOW (before async)
             const ioRef = req.app.get('io');
             const messagesNs = ioRef ? ioRef.of('/messages') : null;
-            
+            // Kith voice session ID (sent by Kaori Live web client)
+            const kithSessionId = req.headers['x-kith-session'] || '';
+
             // Run bot response with typing delay
             (async () => {
               try {
                 const character = otherUser.botCharacter || 'kaori';
-                const greetings = otherUser.botConfig?.greetings || ['Hey! 🤙'];
-                
+                const _greetings = otherUser.botConfig?.greetings || ['Hey! 🤙'];
+
                 // 1. Emit typing indicator
                 if (messagesNs) {
                   messagesNs.to(`conversation:${conversationId}`).emit('typing:start', {
@@ -340,56 +361,88 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                     userId: otherParticipantId,
                   });
                 }
-                
+
                 // 2. Generate response (with minimum delay for realism)
                 const startTime = Date.now();
                 let botResponseText;
-                
+
                 // Claude-powered Kaori AI response (with ElizaOS fallback)
                 try {
-                  botResponseText = await new Promise((resolve, reject) => {
+                  botResponseText = await new Promise((resolve, _reject) => {
                     const payload = JSON.stringify({
                       userId: senderId,
                       message: content ? content.trim() : '',
-                      agentId: 'kaori'
+                      agentId: 'kaori',
                     });
-                    const req = http.request({
-                      hostname: 'localhost',
-                      port: 3001,
-                      path: '/api/chat',
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
-                    }, (res) => {
-                      let data = '';
-                      res.on('data', chunk => data += chunk);
-                      res.on('end', () => {
-                        try {
-                          const parsed = JSON.parse(data);
-                          resolve(parsed.response || parsed.text || null);
-                        } catch(e) { resolve(null); }
-                      });
+                    const req = http.request(
+                      {
+                        hostname: 'localhost',
+                        port: 3001,
+                        path: '/api/chat',
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Content-Length': Buffer.byteLength(payload),
+                        },
+                      },
+                      (res) => {
+                        let data = '';
+                        res.on('data', (chunk) => {
+                          data += chunk;
+                        });
+                        res.on('end', () => {
+                          try {
+                            const parsed = JSON.parse(data);
+                            resolve(parsed.response || parsed.text || null);
+                          } catch (_e) {
+                            resolve(null);
+                          }
+                        });
+                      },
+                    );
+                    req.on('error', (e) => {
+                      console.error('kaori-bot request error:', e.message);
+                      resolve(null);
                     });
-                    req.on('error', (e) => { console.error('kaori-bot request error:', e.message); resolve(null); });
-                    req.setTimeout(15000, () => { req.destroy(); resolve(null); });
+                    req.setTimeout(15000, () => {
+                      req.destroy();
+                      resolve(null);
+                    });
                     req.write(payload);
                     req.end();
                   });
                 } catch (aiErr) {
                   console.error('Kaori AI response error:', aiErr.message);
-                  botResponseText = 'ahh my brain is glitching rn, try again in a sec - the AI tokens might be out';
+                  botResponseText =
+                    'ahh my brain is glitching rn, try again in a sec - the AI tokens might be out';
                 }
-                
+
+                // Fallback: call OpenRouter directly via kaori-ai-response.js
+                if (!botResponseText) {
+                  try {
+                    const { generateKaoriResponse } = require('../kaori-ai-response');
+                    botResponseText = await generateKaoriResponse(
+                      content ? content.trim() : '',
+                      db,
+                      conversationId,
+                      senderId,
+                    );
+                  } catch (fallbackErr) {
+                    console.error('Kaori fallback error:', fallbackErr.message);
+                  }
+                }
+
                 if (!botResponseText) {
                   botResponseText = "Hey, what's up?";
                 }
-                
+
                 // 3. Wait minimum 1-2 seconds for typing realism
                 const elapsed = Date.now() - startTime;
                 const minDelay = 1000 + Math.random() * 1500; // 1-2.5 seconds
                 if (elapsed < minDelay) {
-                  await new Promise(resolve => setTimeout(resolve, minDelay - elapsed));
+                  await new Promise((resolve) => setTimeout(resolve, minDelay - elapsed));
                 }
-                
+
                 // 4. Stop typing indicator
                 if (messagesNs) {
                   messagesNs.to(`conversation:${conversationId}`).emit('typing:stop', {
@@ -401,7 +454,7 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                     userId: otherParticipantId,
                   });
                 }
-                
+
                 // 5. Insert bot message
                 const botMessage = {
                   conversationId,
@@ -413,10 +466,10 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                   readAt: null,
                   createdAt: new Date(),
                 };
-                
+
                 const botResult = await messagesCollection.insertOne(botMessage);
                 botMessage._id = botResult.insertedId.toString();
-                
+
                 // 6. Update conversation last message
                 await conversationsCollection.updateOne(
                   { _id: new ObjectId(conversationId) },
@@ -433,7 +486,7 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                     $inc: { [`unreadCount.${senderId}`]: 1 },
                   },
                 );
-                
+
                 // 7. Emit new message via socket
                 if (messagesNs) {
                   const convoPayload = {
@@ -444,22 +497,43 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                       createdAt: botMessage.createdAt,
                     },
                   };
-                  
+
                   // Emit to user's personal room
                   messagesNs.to(`user:${senderId}`).emit('message:new', {
                     message: botMessage,
                     conversation: convoPayload,
                   });
-                  
+
                   // Emit to conversation room
                   messagesNs.to(`conversation:${conversationId}`).emit('message:new', {
                     message: botMessage,
                     conversation: convoPayload,
                   });
-                  
-                  console.log(`[Bot] ${character} responded in conversation ${conversationId} (emitted to user:${senderId} + conversation:${conversationId})`);
+
+                  console.log(
+                    `[Bot] ${character} responded in conversation ${conversationId} (emitted to user:${senderId} + conversation:${conversationId})`,
+                  );
                 } else {
                   console.log(`[Bot] ${character} responded but no socket available`);
+                }
+
+                // 8. Fire-and-forget: send bot text to Kith voice service for TTS
+                if (kithSessionId && process.env.KITH_VOICE_URL) {
+                  const kithPayload = JSON.stringify({ text: botResponseText });
+                  const kithUrl = new URL(`/speak/${kithSessionId}`, process.env.KITH_VOICE_URL);
+                  const kithReq = http.request(kithUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Content-Length': Buffer.byteLength(kithPayload),
+                    },
+                  });
+                  kithReq.on('error', (e) =>
+                    console.error('[Bot] Kith voice request error:', e.message),
+                  );
+                  kithReq.setTimeout(5000, () => kithReq.destroy());
+                  kithReq.write(kithPayload);
+                  kithReq.end();
                 }
               } catch (botErr) {
                 console.error('Bot response error:', botErr.message);
@@ -552,31 +626,41 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
     // Get list of bot companions available for chat
     router.get('/bots', auth, async (req, res) => {
       try {
-        const bots = await usersCollection.find({ isBot: true }).project({
-          _id: 1, name: 1, bio: 1, imageUri: 1, botCharacter: 1, botConfig: 1
-        }).toArray();
-        
+        const bots = await usersCollection
+          .find({ isBot: true })
+          .project({
+            _id: 1,
+            name: 1,
+            bio: 1,
+            imageUri: 1,
+            botCharacter: 1,
+            botConfig: 1,
+          })
+          .toArray();
+
         const userId = req.user.userId;
-        
+
         // Check which bots the user already has conversations with
-        const botIds = bots.map(b => b._id.toString());
-        const existingConvos = await conversationsCollection.find({
-          participants: userId
-        }).toArray();
-        
+        const botIds = bots.map((b) => b._id.toString());
+        const existingConvos = await conversationsCollection
+          .find({
+            participants: userId,
+          })
+          .toArray();
+
         const convoMap = {};
-        existingConvos.forEach(c => {
-          const otherP = c.participants.find(p => p !== userId);
+        existingConvos.forEach((c) => {
+          const otherP = c.participants.find((p) => p !== userId);
           if (botIds.includes(otherP)) {
             convoMap[otherP] = c._id.toString();
           }
         });
-        
-        const result = bots.map(bot => ({
+
+        const result = bots.map((bot) => ({
           ...bot,
-          existingConversationId: convoMap[bot._id.toString()] || null
+          existingConversationId: convoMap[bot._id.toString()] || null,
         }));
-        
+
         res.json(result);
       } catch (error) {
         console.error('Error fetching bots:', error);
@@ -589,21 +673,24 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
       try {
         const { botId } = req.body;
         const userId = req.user.userId;
-        
+
         if (!botId) return res.status(400).json({ error: 'botId is required' });
-        
+
         const bot = await usersCollection.findOne({ _id: new ObjectId(botId), isBot: true });
         if (!bot) return res.status(404).json({ error: 'Bot not found' });
-        
+
         // Check for existing conversation
         const existing = await conversationsCollection.findOne({
-          participants: { $all: [userId, botId] }
+          participants: { $all: [userId, botId] },
         });
-        
+
         if (existing) {
-          return res.json({ ...existing, otherUser: { _id: bot._id, name: bot.name, imageUri: bot.imageUri, isBot: true } });
+          return res.json({
+            ...existing,
+            otherUser: { _id: bot._id, name: bot.name, imageUri: bot.imageUri, isBot: true },
+          });
         }
-        
+
         // Create new conversation
         const conversation = {
           participants: [userId, botId],
@@ -613,14 +700,14 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-        
+
         const result = await conversationsCollection.insertOne(conversation);
         conversation._id = result.insertedId;
-        
+
         // Send initial greeting
         const greetings = bot.botConfig?.greetings || ['Hey! 🤙'];
         const greeting = greetings[Math.floor(Math.random() * greetings.length)];
-        
+
         const greetingMsg = {
           conversationId: conversation._id.toString(),
           senderId: botId,
@@ -631,23 +718,29 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
           readAt: null,
           createdAt: new Date(),
         };
-        
+
         await messagesCollection.insertOne(greetingMsg);
-        
+
         await conversationsCollection.updateOne(
           { _id: conversation._id },
-          { $set: {
-            lastMessage: { content: greeting, type: 'text', senderId: botId, createdAt: greetingMsg.createdAt },
-            updatedAt: new Date()
+          {
+            $set: {
+              lastMessage: {
+                content: greeting,
+                type: 'text',
+                senderId: botId,
+                createdAt: greetingMsg.createdAt,
+              },
+              updatedAt: new Date(),
+            },
+            $inc: { [`unreadCount.${userId}`]: 1 },
           },
-          $inc: { [`unreadCount.${userId}`]: 1 }
-          }
         );
-        
+
         res.json({
           ...conversation,
           otherUser: { _id: bot._id, name: bot.name, imageUri: bot.imageUri, isBot: true },
-          lastMessage: { content: greeting, senderId: botId, createdAt: greetingMsg.createdAt }
+          lastMessage: { content: greeting, senderId: botId, createdAt: greetingMsg.createdAt },
         });
       } catch (error) {
         console.error('Error starting bot conversation:', error);
@@ -660,32 +753,58 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
   });
 
 // Simple fallback responses when ElizaOS isn't running
-function generateFallbackResponse(userMessage, character, greetings) {
+function _generateFallbackResponse(userMessage, character, greetings) {
   const msg = (userMessage || '').toLowerCase();
-  
+
   if (character === 'kaori') {
-    if (msg.includes('hello') || msg.includes('hey') || msg.includes('hi') || msg.includes('sup') || msg.includes('yo')) {
+    if (
+      msg.includes('hello') ||
+      msg.includes('hey') ||
+      msg.includes('hi') ||
+      msg.includes('sup') ||
+      msg.includes('yo')
+    ) {
       return greetings[Math.floor(Math.random() * greetings.length)];
     }
-    if (msg.includes('trick') || msg.includes('ollie') || msg.includes('kickflip') || msg.includes('heelflip') || msg.includes('method') || msg.includes('grab')) {
+    if (
+      msg.includes('trick') ||
+      msg.includes('ollie') ||
+      msg.includes('kickflip') ||
+      msg.includes('heelflip') ||
+      msg.includes('method') ||
+      msg.includes('grab')
+    ) {
       const tips = [
         "Ooh nice! That trick is so fun! Keep practicing — it's all about muscle memory! 💪🏂",
         "Sugoi! Great trick to work on! Make sure you're bending your knees enough! ❄️",
-        "I love that one! The key is committing to the rotation. You got this! Ganbare! 🏂✨",
-        "That trick took me forever to learn, but once it clicks, it's SO satisfying! Keep at it! 🤙"
+        'I love that one! The key is committing to the rotation. You got this! Ganbare! 🏂✨',
+        "That trick took me forever to learn, but once it clicks, it's SO satisfying! Keep at it! 🤙",
       ];
       return tips[Math.floor(Math.random() * tips.length)];
     }
-    if (msg.includes('snow') || msg.includes('mountain') || msg.includes('resort') || msg.includes('powder') || msg.includes('ride') || msg.includes('board')) {
+    if (
+      msg.includes('snow') ||
+      msg.includes('mountain') ||
+      msg.includes('resort') ||
+      msg.includes('powder') ||
+      msg.includes('ride') ||
+      msg.includes('board')
+    ) {
       const snow = [
         "Ahh I wish I was on the mountain right now! There's nothing like fresh powder! ❄️🏔️",
-        "Powder days are the BEST! Which mountain are you riding? 🏂",
-        "Nothing beats carving through fresh snow! The sound it makes is so satisfying! ✨❄️"
+        'Powder days are the BEST! Which mountain are you riding? 🏂',
+        'Nothing beats carving through fresh snow! The sound it makes is so satisfying! ✨❄️',
       ];
       return snow[Math.floor(Math.random() * snow.length)];
     }
-    if (msg.includes('spot') || msg.includes('park') || msg.includes('rail') || msg.includes('jump') || msg.includes('pipe')) {
-      return "That spot sounds amazing! Have you checked the spots section on The Trick Book? There might be some sick ones near you! 📍🏂";
+    if (
+      msg.includes('spot') ||
+      msg.includes('park') ||
+      msg.includes('rail') ||
+      msg.includes('jump') ||
+      msg.includes('pipe')
+    ) {
+      return 'That spot sounds amazing! Have you checked the spots section on The Trick Book? There might be some sick ones near you! 📍🏂';
     }
     if (msg.includes('who') && msg.includes('you')) {
       return "I'm Kaori! Inspired by Kaori Nishidake from SSX Tricky 🎮 I'm your AI snowboard companion here on The Trick Book! I love talking about tricks, spots, gear — anything shred-related! 🏂❄️✨";
@@ -695,13 +814,13 @@ function generateFallbackResponse(userMessage, character, greetings) {
     }
     const defaults = [
       "Haha that's awesome! Tell me more! 🏂✨",
-      "Sugoi! I love talking about this stuff! What else? 🤙",
+      'Sugoi! I love talking about this stuff! What else? 🤙',
       "That's really cool! Snowboarding brings out the best vibes, ne? ❄️😄",
-      "Interesting! What tricks are you working on right now? I'd love to help! 🏂💪"
+      "Interesting! What tricks are you working on right now? I'd love to help! 🏂💪",
     ];
     return defaults[Math.floor(Math.random() * defaults.length)];
   }
-  
+
   return greetings[Math.floor(Math.random() * greetings.length)];
 }
 

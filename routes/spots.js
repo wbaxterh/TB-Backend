@@ -897,7 +897,10 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         };
 
         // Add to userPhotos array
-        await spotsCollection.updateOne({ _id: new ObjectId(id) }, { $push: { userPhotos: newPhoto } });
+        await spotsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $push: { userPhotos: newPhoto } },
+        );
 
         console.log(`[Spots] User ${req.user.userId} uploaded photo for spot ${id}`);
 

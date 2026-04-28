@@ -82,12 +82,12 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
             const foundTrick = trickIdStr ? trickMap[trickIdStr] : null;
             return {
               ...trick,
-              name: (foundTrick && foundTrick.name) || trick.name || 'Unknown Trick',
-              checked: (foundTrick && foundTrick.checked) || trick.checked || 'To Do',
-              link: (foundTrick && foundTrick.link) || trick.link || '',
-              notes: (foundTrick && foundTrick.notes) || trick.notes || '',
-              createdAt: (foundTrick && foundTrick.createdAt) || trick.createdAt,
-              updatedAt: (foundTrick && foundTrick.updatedAt) || trick.updatedAt,
+              name: foundTrick?.name || trick.name || 'Unknown Trick',
+              checked: foundTrick?.checked || trick.checked || 'To Do',
+              link: foundTrick?.link || trick.link || '',
+              notes: foundTrick?.notes || trick.notes || '',
+              createdAt: foundTrick?.createdAt || trick.createdAt,
+              updatedAt: foundTrick?.updatedAt || trick.updatedAt,
             };
           })
           // Sort tricks by most recent activity (updatedAt or createdAt), newest first
@@ -218,7 +218,9 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
 
       const users = await db
         .collection('users')
-        .find({ _id: { $in: userIds.map((id) => (typeof id === 'string' ? new ObjectId(id) : id)) } })
+        .find({
+          _id: { $in: userIds.map((id) => (typeof id === 'string' ? new ObjectId(id) : id)) },
+        })
         .toArray();
 
       const userMap = users.reduce((map, user) => {
