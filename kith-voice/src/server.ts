@@ -12,9 +12,9 @@
  */
 
 import path from 'node:path';
-import type { KithEvent } from '@kith/core';
-import { consoleExporter, InMemoryObservability } from '@kith/observability';
-import { PipecatRuntime } from '@kith/runtime-pipecat';
+import type { KithEvent } from '@kithjs/core';
+import { consoleExporter, InMemoryObservability } from '@kithjs/observability';
+import { PipecatRuntime } from '@kithjs/runtime-pipecat';
 import {
   DEFAULT_BOARD_SPORTS_SLANG,
   DEFAULT_ENGLISH_SLANG,
@@ -23,7 +23,7 @@ import {
   type VoiceCharacter,
   VoiceRouter,
   voiceCharacterToRuntimeConfig,
-} from '@kith/voice-router';
+} from '@kithjs/voice-router';
 import type { ServerWebSocket } from 'bun';
 
 import kaoriProfile from './kaori-character.json' with { type: 'json' };
@@ -32,11 +32,12 @@ const character = kaoriProfile as VoiceCharacter;
 
 const PORT = Number(process.env.PORT ?? 3040);
 const ROOT = path.dirname(Bun.fileURLToPath(import.meta.url));
-const PYTHON_VENV = path.resolve(
-  ROOT,
-  '../../../../../kith/packages/runtime-pipecat/python/.venv/bin/python',
-);
-const PYTHON_CWD = path.resolve(ROOT, '../../../../../kith/packages/runtime-pipecat/python');
+const PYTHON_VENV =
+  process.env.PIPECAT_PYTHON_PATH ||
+  path.resolve(ROOT, '../node_modules/@kithjs/runtime-pipecat/python/.venv/bin/python');
+const PYTHON_CWD =
+  process.env.PIPECAT_PYTHON_CWD ||
+  path.resolve(ROOT, '../node_modules/@kithjs/runtime-pipecat/python');
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
 const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'klHOJHbGA89BjwulA7MN';

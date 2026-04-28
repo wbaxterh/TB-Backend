@@ -8,10 +8,10 @@
     "start": "bun src/server.ts"
   },
   "dependencies": {
-    "@kith/core": "file:/Users/weshuber/Documents/kith/packages/core",
-    "@kith/runtime-pipecat": "file:/Users/weshuber/Documents/kith/packages/runtime-pipecat",
-    "@kith/voice-router": "file:/Users/weshuber/Documents/kith/packages/voice-router",
-    "@kith/observability": "file:/Users/weshuber/Documents/kith/packages/observability"
+    "@kithjs/core": "^0.1.0",
+    "@kithjs/runtime-pipecat": "^0.1.0",
+    "@kithjs/voice-router": "^0.1.0",
+    "@kithjs/observability": "^0.1.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

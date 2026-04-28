@@ -518,7 +518,6 @@ MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
                 }
 
                 // 8. Fire-and-forget: send bot text to Kith voice service for TTS
-                console.log(`[Bot] Kith check: sessionId=${kithSessionId || '(none)'}, url=${process.env.KITH_VOICE_URL || '(none)'}`);
                 if (kithSessionId && process.env.KITH_VOICE_URL) {
                   const kithPayload = JSON.stringify({ text: botResponseText });
                   const kithUrl = new URL(`/speak/${kithSessionId}`, process.env.KITH_VOICE_URL);
