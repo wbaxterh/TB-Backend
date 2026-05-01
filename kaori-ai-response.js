@@ -53,7 +53,7 @@ async function queryRAGContext(userMessage) {
 }
 
 // Call OpenAI API
-async function callOpenAI(messages, ragContext) {
+async function callOpenAI(messages, ragContext, relationshipProfile) {
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -62,6 +62,36 @@ async function callOpenAI(messages, ragContext) {
   }
 
   let systemPrompt = KAORI_SYSTEM_PROMPT;
+
+  // Inject relationship context so Kaori adapts her personality
+  if (relationshipProfile) {
+    const p = relationshipProfile;
+    const stage = p.relationshipStage || 'stranger';
+    const name = p.memory?.userName || '';
+    const facts = (p.memory?.knownFacts || []).join('; ');
+    const topics = (p.traits?.preferredTopics || []).join(', ');
+    const sports = (p.traits?.sports || []).join(', ');
+    const style = p.traits?.communicationStyle || 'casual';
+    const mood = p.memory?.lastSessionMood || 'neutral';
+    const count = p.interactionCount || 0;
+
+    systemPrompt += `\n\n--- RELATIONSHIP CONTEXT ---
+Your relationship with this user: ${stage} (${count} messages exchanged)
+${name ? `Their name: ${name}` : 'You don\'t know their name yet — try to learn it naturally!'}
+${facts ? `Things you remember about them: ${facts}` : ''}
+${topics ? `Topics they enjoy: ${topics}` : ''}
+${sports ? `Sports they do: ${sports}` : ''}
+Their communication style: ${style}
+Their mood last time: ${mood}
+
+Adapt your energy to match the relationship stage:
+- stranger: be welcoming, ask their name, learn about them
+- acquaintance: remember what you know, be friendly
+- friend: be more personal, reference shared memories, use their name
+- close_friend: be very warm, inside jokes, deeper conversations
+- bestie: maximum energy, deeply personal, your favorite human`;
+  }
+
   if (ragContext) {
     systemPrompt += `\n\nRecent snowboard news/articles you know about:\n${ragContext}`;
   }
@@ -116,7 +146,7 @@ async function callOpenAI(messages, ragContext) {
   });
 }
 
-async function generateKaoriResponse(userMessage, db, conversationId, _senderId) {
+async function generateKaoriResponse(userMessage, db, conversationId, senderId) {
   // Get conversation history
   const recentMessages = await db
     .collection('dm_messages')
@@ -127,8 +157,9 @@ async function generateKaoriResponse(userMessage, db, conversationId, _senderId)
 
   // Build messages array (oldest first)
   const openaiMessages = [];
+  const kaoriBotId = '69c15e55c7ebe2c6884f1267';
   for (const msg of recentMessages.reverse()) {
-    const role = msg.senderId === '69c15e55c7ebe2c6884f1267' ? 'assistant' : 'user';
+    const role = msg.senderId === kaoriBotId ? 'assistant' : 'user';
     if (msg.content?.trim()) {
       openaiMessages.push({ role, content: msg.content.trim() });
     }
@@ -137,11 +168,41 @@ async function generateKaoriResponse(userMessage, db, conversationId, _senderId)
   // Add current message
   openaiMessages.push({ role: 'user', content: userMessage });
 
+  // Fetch relationship profile for this user
+  let relationshipProfile = null;
+  try {
+    relationshipProfile = await db
+      .collection('companion_profiles')
+      .findOne({ userId: senderId, companionId: kaoriBotId });
+  } catch (_err) {
+    // Profile not found is fine — Kaori will use defaults
+  }
+
+  // Update interaction count + timestamps
+  if (relationshipProfile) {
+    const newCount = (relationshipProfile.interactionCount || 0) + 1;
+    const { computeStage } = require('./routes/companionProfile');
+    const newStage = computeStage(newCount);
+    await db.collection('companion_profiles').updateOne(
+      { userId: senderId, companionId: kaoriBotId },
+      {
+        $set: {
+          interactionCount: newCount,
+          relationshipStage: newStage,
+          lastInteraction: new Date(),
+          ...(!relationshipProfile.firstInteraction ? { firstInteraction: new Date() } : {}),
+        },
+      },
+    );
+    relationshipProfile.interactionCount = newCount;
+    relationshipProfile.relationshipStage = newStage;
+  }
+
   // Try RAG context
   const ragContext = await queryRAGContext(userMessage);
 
-  // Try OpenAI
-  const response = await callOpenAI(openaiMessages, ragContext);
+  // Try OpenAI with relationship context
+  const response = await callOpenAI(openaiMessages, ragContext, relationshipProfile);
   if (response) {
     return response;
   }
