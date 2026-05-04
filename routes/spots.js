@@ -358,6 +358,29 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
       }
     });
 
+    // Lightweight endpoint for map pins — returns only coordinates, name, and category
+    router.get('/map-pins', async (req, res) => {
+      try {
+        const pins = await spotsCollection
+          .find(
+            {
+              approvalStatus: 'approved',
+              latitude: { $exists: true },
+              longitude: { $exists: true },
+            },
+            {
+              projection: { name: 1, latitude: 1, longitude: 1, category: 1, state: 1, country: 1 },
+            },
+          )
+          .toArray();
+
+        res.json(pins);
+      } catch (error) {
+        console.error('Error retrieving map pins', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
     // Get all approved public spots with pagination and filtering
     router.get('/', async (req, res) => {
       try {
