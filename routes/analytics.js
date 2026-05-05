@@ -1,17 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { MongoClient } = require('mongodb');
-const authAdmin = require('../middleware/authAdmin');
+const jwt = require('jsonwebtoken');
+const { MongoClient, ObjectId } = require('mongodb');
 const connectionString = process.env.ATLAS_URI;
 
 let eventsCollection;
+let usersCollection;
 
 MongoClient.connect(connectionString)
   .then((client) => {
     const db = client.db('TrickList2');
     eventsCollection = db.collection('analytics_events');
+    usersCollection = db.collection('users');
 
-    // Create indexes for fast querying
     eventsCollection.createIndex({ event: 1, timestamp: -1 });
     eventsCollection.createIndex({ timestamp: -1 });
     eventsCollection.createIndex({ sessionId: 1 });
@@ -20,6 +21,26 @@ MongoClient.connect(connectionString)
     console.log('Analytics: Connected to MongoDB');
   })
   .catch((err) => console.error('Analytics DB error:', err));
+
+// Admin auth using the existing DB connection (avoids authAdmin's separate connection)
+async function requireAdmin(req, res, next) {
+  const token = req.header('x-auth-token');
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    if (!usersCollection) return res.status(503).json({ error: 'Not ready' });
+
+    const user = await usersCollection.findOne({ _id: new ObjectId(payload.userId) });
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    req.user = payload;
+    next();
+  } catch (_err) {
+    res.status(400).json({ error: 'Invalid token' });
+  }
+}
 
 // ============================================
 // PUBLIC: Receive events from frontend
@@ -84,7 +105,7 @@ router.post('/events/batch', async (req, res) => {
 // ============================================
 
 // Overview stats for a date range
-router.get('/dashboard/overview', [authAdmin()], async (req, res) => {
+router.get('/dashboard/overview', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -121,7 +142,7 @@ router.get('/dashboard/overview', [authAdmin()], async (req, res) => {
 });
 
 // Traffic over time (pageviews per day)
-router.get('/dashboard/traffic', [authAdmin()], async (req, res) => {
+router.get('/dashboard/traffic', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -157,7 +178,7 @@ router.get('/dashboard/traffic', [authAdmin()], async (req, res) => {
 });
 
 // Top pages
-router.get('/dashboard/pages', [authAdmin()], async (req, res) => {
+router.get('/dashboard/pages', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -194,7 +215,7 @@ router.get('/dashboard/pages', [authAdmin()], async (req, res) => {
 });
 
 // Landing page section engagement
-router.get('/dashboard/sections', [authAdmin()], async (req, res) => {
+router.get('/dashboard/sections', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -230,7 +251,7 @@ router.get('/dashboard/sections', [authAdmin()], async (req, res) => {
 });
 
 // Scroll depth distribution
-router.get('/dashboard/scroll-depth', [authAdmin()], async (req, res) => {
+router.get('/dashboard/scroll-depth', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -264,7 +285,7 @@ router.get('/dashboard/scroll-depth', [authAdmin()], async (req, res) => {
 });
 
 // CTA performance
-router.get('/dashboard/ctas', [authAdmin()], async (req, res) => {
+router.get('/dashboard/ctas', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -301,7 +322,7 @@ router.get('/dashboard/ctas', [authAdmin()], async (req, res) => {
 });
 
 // App store clicks breakdown
-router.get('/dashboard/app-stores', [authAdmin()], async (req, res) => {
+router.get('/dashboard/app-stores', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -336,7 +357,7 @@ router.get('/dashboard/app-stores', [authAdmin()], async (req, res) => {
 });
 
 // Conversion funnel
-router.get('/dashboard/funnel', [authAdmin()], async (req, res) => {
+router.get('/dashboard/funnel', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
@@ -378,7 +399,7 @@ router.get('/dashboard/funnel', [authAdmin()], async (req, res) => {
 });
 
 // Referrer breakdown
-router.get('/dashboard/referrers', [authAdmin()], async (req, res) => {
+router.get('/dashboard/referrers', requireAdmin, async (req, res) => {
   if (!eventsCollection) return res.status(503).json({ error: 'Not ready' });
 
   try {
