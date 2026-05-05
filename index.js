@@ -42,6 +42,7 @@ const newsletter = require('./routes/newsletter');
 const botChat = require('./routes/botChat');
 const spotTrickHistory = require('./routes/spotTrickHistory');
 const stats = require('./routes/stats');
+const analytics = require('./routes/analytics');
 
 // Create HTTP server for Socket.IO
 const server = http.createServer(app);
@@ -93,6 +94,7 @@ app.use('/api/newsletter', newsletter);
 app.use('/api/bot-chat', botChat);
 app.use('/api/spot-tricks', spotTrickHistory);
 app.use('/api/stats', stats);
+app.use('/api/analytics', analytics);
 
 const port = process.env.PORT || config.get('port');
 server.listen(port, () => {
