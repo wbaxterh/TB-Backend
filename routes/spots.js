@@ -369,7 +369,15 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
               longitude: { $exists: true },
             },
             {
-              projection: { name: 1, latitude: 1, longitude: 1, category: 1, state: 1, country: 1 },
+              projection: {
+                name: 1,
+                latitude: 1,
+                longitude: 1,
+                category: 1,
+                sportTypes: 1,
+                state: 1,
+                country: 1,
+              },
             },
           )
           .toArray();
