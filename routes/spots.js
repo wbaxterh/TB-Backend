@@ -377,6 +377,9 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
                 sportTypes: 1,
                 state: 1,
                 country: 1,
+                rating: 1,
+                description: 1,
+                imageURL: 1,
               },
             },
           )
