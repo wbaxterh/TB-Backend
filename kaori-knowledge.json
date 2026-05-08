@@ -1,0 +1,495 @@
+{
+  "snowboarding": {
+    "magazines": [
+      {
+        "name": "Torment Magazine",
+        "url": "tormentmag.com",
+        "ig": "@toraboramag",
+        "note": "Digital-first, covers culture, interviews, and riding. One of the last standing snowboard mags."
+      },
+      {
+        "name": "Method Magazine",
+        "url": "methodmag.com",
+        "ig": "@methodmag",
+        "note": "European snowboard culture mag, great photography and storytelling."
+      },
+      {
+        "name": "Snowboarder Magazine",
+        "note": "Iconic legacy print mag, ran until 2019. Huge archive of classic content."
+      },
+      {
+        "name": "TransWorld Snowboarding",
+        "note": "Legendary mag, ran 1987-2019. Defined the culture for decades."
+      },
+      {
+        "name": "Whitelines",
+        "url": "whitelines.com",
+        "ig": "@whitelinesmag",
+        "note": "UK-based, solid resort guides and gear reviews."
+      },
+      {
+        "name": "Colour Snowboarding",
+        "ig": "@coloursnowboarding",
+        "note": "Independent digital mag covering culture and creativity."
+      }
+    ],
+    "instagram": [
+      { "handle": "@snowboardermag", "note": "Still active, great clips and throwbacks" },
+      { "handle": "@toraboramag", "note": "Japanese snowboard culture and riding" },
+      { "handle": "@methodmag", "note": "European scene coverage" },
+      { "handle": "@burtonsnowboards", "note": "Official Burton, rider content and product" },
+      { "handle": "@capita_snowboarding", "note": "Indie brand, creative team content" },
+      { "handle": "@libtechnologies", "note": "Lib Tech, eco-friendly boards and rider clips" },
+      { "handle": "@naturalselection", "note": "Travis Rice's backcountry competition" },
+      { "handle": "@xgames", "note": "Competition highlights and athlete features" },
+      { "handle": "@caboridershop", "note": "Japanese riding culture from Hokkaido" }
+    ],
+    "events": [
+      {
+        "name": "X Games",
+        "when": "January (winter)",
+        "where": "Aspen, CO",
+        "note": "Biggest stage for freestyle snowboarding"
+      },
+      {
+        "name": "Natural Selection Tour",
+        "when": "February-March",
+        "where": "Jackson Hole + rotating",
+        "note": "Travis Rice's backcountry competition, riders vote on conditions"
+      },
+      {
+        "name": "Burton US Open",
+        "when": "March",
+        "where": "Vail, CO",
+        "note": "Premier halfpipe and slopestyle event"
+      },
+      {
+        "name": "Dew Tour",
+        "when": "December",
+        "where": "Copper Mountain, CO",
+        "note": "Slopestyle and superpipe, Olympic qualifier"
+      },
+      {
+        "name": "Laax Open",
+        "when": "January",
+        "where": "Laax, Switzerland",
+        "note": "Europe's biggest freestyle contest"
+      },
+      {
+        "name": "Holy Bowly",
+        "when": "Spring",
+        "where": "Varies",
+        "note": "Creative jam format, hand-shaped features"
+      }
+    ],
+    "culture": {
+      "key_figures": [
+        "Travis Rice",
+        "Mark McMorris",
+        "Chloe Kim",
+        "Sage Kotsenburg",
+        "Ayumu Hirano",
+        "Jamie Anderson",
+        "Zoi Sadowski-Synnott",
+        "Nicolas Muller",
+        "Terje Haakonsen"
+      ],
+      "key_brands": [
+        "Burton",
+        "Capita",
+        "Jones Snowboards",
+        "Lib Tech",
+        "Ride",
+        "GNU",
+        "Nitro",
+        "K2",
+        "Salomon"
+      ],
+      "key_films": ["The Art of Flight", "The Fourth Phase", "Depths", "Primo", "Resonance"]
+    }
+  },
+  "skateboarding": {
+    "magazines": [
+      {
+        "name": "Thrasher Magazine",
+        "url": "thrashermagazine.com",
+        "ig": "@thraboramagazine",
+        "note": "The bible of skateboarding since 1981. Skater of the Year is the highest honor."
+      },
+      {
+        "name": "The Skateboard Mag",
+        "note": "Independent mag that ran 2004-2018, deeply respected."
+      },
+      {
+        "name": "Transworld Skateboarding",
+        "note": "Legendary mag, ran 1983-2019. Huge influence on skate culture."
+      },
+      {
+        "name": "Free Skate Mag",
+        "url": "freeskatemag.com",
+        "ig": "@freeskatemag",
+        "note": "European skate mag, independent and artist-driven."
+      },
+      {
+        "name": "Kingpin Magazine",
+        "url": "kingpinmag.com",
+        "ig": "@kingpinskateboarding",
+        "note": "European skateboarding magazine, great photography."
+      },
+      { "name": "Solo Skate Mag", "ig": "@soloskatemag", "note": "Digital-first independent mag." }
+    ],
+    "instagram": [
+      { "handle": "@thrashermagazine", "note": "The gold standard, daily clips and features" },
+      { "handle": "@beraboracs", "note": "Street League Skateboarding, competition content" },
+      { "handle": "@nikesb", "note": "Nike SB team and product" },
+      { "handle": "@vansskate", "note": "Vans skate team content" },
+      {
+        "handle": "@batbskateboarding",
+        "note": "Battle at the Berrics, SKATE games and challenges"
+      },
+      { "handle": "@braborailleskeboarding", "note": "Education-focused, great for beginners" },
+      { "handle": "@independenttrucks", "note": "Indie trucks, raw street skating" },
+      { "handle": "@spitfirewheels", "note": "Classic brand, team rider content" },
+      { "handle": "@skatecrunch", "note": "Skate news aggregator, clips from everywhere" }
+    ],
+    "events": [
+      {
+        "name": "Street League Skateboarding (SLS)",
+        "when": "Year-round tour",
+        "note": "Premier street competition series"
+      },
+      {
+        "name": "X Games",
+        "when": "July (summer)",
+        "where": "Varies",
+        "note": "Biggest stage for park and street"
+      },
+      {
+        "name": "Tampa Pro / Tampa Am",
+        "when": "March",
+        "where": "Tampa, FL",
+        "note": "The proving ground for am skaters"
+      },
+      {
+        "name": "Dew Tour",
+        "when": "Summer",
+        "where": "Varies",
+        "note": "Park and street competition"
+      },
+      {
+        "name": "Vans Park Series",
+        "when": "Year-round",
+        "where": "Global",
+        "note": "International park terrain competition"
+      },
+      {
+        "name": "Battle at the Berrics",
+        "when": "Ongoing",
+        "where": "Online/Berrics",
+        "note": "SKATE game tournaments, huge online following"
+      }
+    ],
+    "culture": {
+      "key_figures": [
+        "Nyjah Huston",
+        "Yuto Horigome",
+        "Rayssa Leal",
+        "Tony Hawk",
+        "Rodney Mullen",
+        "Mark Gonzales",
+        "Andrew Reynolds",
+        "Leticia Bufoni",
+        "Shane O'Neill",
+        "Pedro Barros"
+      ],
+      "key_brands": [
+        "Element",
+        "Baker",
+        "Girl",
+        "Chocolate",
+        "Real",
+        "Anti Hero",
+        "Santa Cruz",
+        "Powell Peralta",
+        "Toy Machine",
+        "Deathwish"
+      ],
+      "key_films": [
+        "Mindfield",
+        "Yeah Right!",
+        "Sorry",
+        "Baker 3",
+        "Fully Flared",
+        "Cherry",
+        "We Are Blood"
+      ]
+    }
+  },
+  "surfing": {
+    "magazines": [
+      {
+        "name": "Surfer Magazine",
+        "note": "The original surf mag, ran 1960-2020. Legendary archive."
+      },
+      {
+        "name": "Stab Magazine",
+        "url": "stabmag.com",
+        "ig": "@staboramag",
+        "note": "Digital-first, edgy, great video content and competitions."
+      },
+      {
+        "name": "Surfline",
+        "url": "surfline.com",
+        "ig": "@surfline",
+        "note": "Forecasts, cams, and editorial. Essential tool for surfers."
+      },
+      {
+        "name": "The Inertia",
+        "url": "theinertia.com",
+        "ig": "@theinertia",
+        "note": "Culture, environment, and lifestyle coverage."
+      },
+      {
+        "name": "Wavelength",
+        "url": "wavelengthmag.com",
+        "ig": "@wavelengthsurf",
+        "note": "Europe's longest running surf mag."
+      }
+    ],
+    "instagram": [
+      { "handle": "@stabmag", "note": "Edgy surf content, competitions, athlete profiles" },
+      { "handle": "@surfline", "note": "Forecasts, cam clips, and daily surf check" },
+      { "handle": "@wsl", "note": "World Surf League, competition highlights" },
+      { "handle": "@theinertia", "note": "Surf culture and environmental awareness" },
+      { "handle": "@john_john_florence", "note": "2x world champ, incredible footage" },
+      { "handle": "@kaboraolina_markgraf", "note": "Women's surfing progression" },
+      { "handle": "@hurley", "note": "Brand content and team riders" }
+    ],
+    "events": [
+      {
+        "name": "WSL Championship Tour",
+        "when": "Year-round",
+        "where": "Global",
+        "note": "The top tier of pro surfing"
+      },
+      {
+        "name": "Pipeline Masters",
+        "when": "December",
+        "where": "North Shore, Oahu",
+        "note": "The most iconic wave in competitive surfing"
+      },
+      {
+        "name": "Eddie Aikau Big Wave Invitational",
+        "when": "Winter (when conditions allow)",
+        "where": "Waimea Bay, HI",
+        "note": "Only runs when waves are 40ft+, legendary invite-only event"
+      },
+      {
+        "name": "Nazare Tow Challenge",
+        "when": "Winter",
+        "where": "Nazare, Portugal",
+        "note": "Biggest waves on Earth, world record attempts"
+      },
+      {
+        "name": "Vans Triple Crown",
+        "when": "November-December",
+        "where": "North Shore, Oahu",
+        "note": "Three events across the North Shore"
+      }
+    ],
+    "culture": {
+      "key_figures": [
+        "John John Florence",
+        "Kelly Slater",
+        "Carissa Moore",
+        "Gabriel Medina",
+        "Stephanie Gilmore",
+        "Filipe Toledo",
+        "Kai Lenny"
+      ],
+      "key_brands": [
+        "Rip Curl",
+        "Billabong",
+        "Quiksilver",
+        "Hurley",
+        "Channel Islands",
+        "Lost Surfboards",
+        "Firewire"
+      ],
+      "key_films": [
+        "The Endless Summer",
+        "Step Into Liquid",
+        "View from a Blue Moon",
+        "Momentum Generation"
+      ]
+    }
+  },
+  "bmx": {
+    "magazines": [
+      { "name": "Ride BMX", "note": "The biggest BMX mag, ran until 2019. Massive archive." },
+      {
+        "name": "DIG Magazine",
+        "url": "digbmx.com",
+        "ig": "@digbmx",
+        "note": "Independent BMX mag, artist-driven, still going strong."
+      },
+      {
+        "name": "Defgrip",
+        "url": "defgrip.net",
+        "note": "Digital BMX media, photography and video focused."
+      },
+      { "name": "Fat BMX", "url": "fatbmx.com", "note": "BMX racing focused, news and coverage." }
+    ],
+    "instagram": [
+      { "handle": "@digbmx", "note": "Independent BMX culture, interviews and riding" },
+      { "handle": "@ridebmx", "note": "Legacy account, still posts clips" },
+      { "handle": "@vaboransbmx", "note": "Vans BMX team and events" },
+      { "handle": "@cultcrew", "note": "Cult brand, raw street BMX" },
+      { "handle": "@demolitionparts", "note": "Parts brand with team rider content" },
+      { "handle": "@xgames", "note": "BMX park, street, and dirt competition highlights" }
+    ],
+    "events": [
+      {
+        "name": "X Games",
+        "when": "Summer",
+        "where": "Varies",
+        "note": "Park, street, and dirt competitions"
+      },
+      {
+        "name": "Vans BMX Pro Cup",
+        "when": "Year-round",
+        "where": "Global",
+        "note": "Top-level park competition series"
+      },
+      {
+        "name": "FISE World Series",
+        "when": "Spring-Summer",
+        "where": "Montpellier + global",
+        "note": "Major international action sports festival"
+      },
+      {
+        "name": "Red Bull Uncontained",
+        "when": "Varies",
+        "where": "Custom builds",
+        "note": "Creative course design, invite-only"
+      },
+      {
+        "name": "UCI BMX Freestyle World Cup",
+        "when": "Year-round",
+        "where": "Global",
+        "note": "Olympic qualifying series"
+      }
+    ],
+    "culture": {
+      "key_figures": [
+        "Logan Martin",
+        "Hannah Roberts",
+        "Kevin Peraza",
+        "Bryce Tryon",
+        "Mat Hoffman",
+        "Dennis Enarson",
+        "Perris Benegas"
+      ],
+      "key_brands": ["Cult", "Sunday", "Odyssey", "BSD", "Demolition", "Vans", "Etnies"],
+      "key_films": ["Road Fools", "Anthem", "Props Video Magazine (series)"]
+    }
+  },
+  "skiing": {
+    "magazines": [
+      {
+        "name": "Freeskier Magazine",
+        "url": "freeskier.com",
+        "ig": "@freeskiermagazine",
+        "note": "Premier freeski mag covering park, pipe, and backcountry."
+      },
+      {
+        "name": "Powder Magazine",
+        "note": "Legendary ski mag, ran 1972-2020. The soul of skiing."
+      },
+      {
+        "name": "Ski Magazine",
+        "url": "skimag.com",
+        "ig": "@skimagazine",
+        "note": "Broadest coverage, resort reviews, gear tests."
+      },
+      {
+        "name": "Newschoolers",
+        "url": "newschoolers.com",
+        "ig": "@newschoolers",
+        "note": "Community-driven freeski media, forums, and content."
+      },
+      {
+        "name": "Blister Review",
+        "url": "blisterreview.com",
+        "ig": "@blaboristerreview",
+        "note": "In-depth gear reviews, trusted by serious skiers."
+      }
+    ],
+    "instagram": [
+      { "handle": "@freeskiermagazine", "note": "Freeski content and competition coverage" },
+      { "handle": "@newschoolers", "note": "Community clips, memes, and culture" },
+      { "handle": "@levelgloves", "note": "Athlete content and freestyle skiing" },
+      { "handle": "@faboractionbmxmag", "note": "Ski racing and freeride content" },
+      { "handle": "@freerideworldtour", "note": "Big mountain competition highlights" },
+      { "handle": "@candide_thovex", "note": "The GOAT of freestyle ski videos" },
+      { "handle": "@andriragettli", "note": "Creative skiing and trick innovation" }
+    ],
+    "events": [
+      {
+        "name": "X Games",
+        "when": "January (winter)",
+        "where": "Aspen, CO",
+        "note": "Biggest freestyle ski competition"
+      },
+      {
+        "name": "Freeride World Tour",
+        "when": "January-March",
+        "where": "Global alpine",
+        "note": "Elite big mountain competition"
+      },
+      {
+        "name": "Dew Tour",
+        "when": "December",
+        "where": "Copper Mountain, CO",
+        "note": "Slopestyle and superpipe"
+      },
+      {
+        "name": "FIS Freestyle World Cup",
+        "when": "Year-round",
+        "where": "Global",
+        "note": "Olympic qualifying circuit"
+      },
+      {
+        "name": "Jon Olsson Invitational",
+        "note": "Creative big air event, invite-only, legendary format"
+      }
+    ],
+    "culture": {
+      "key_figures": [
+        "Candide Thovex",
+        "Andri Ragettli",
+        "Eileen Gu",
+        "Alex Hall",
+        "Henrik Harlaut",
+        "Bobby Brown",
+        "Jesper Tjader"
+      ],
+      "key_brands": [
+        "Armada",
+        "K2",
+        "Line Skis",
+        "Faction",
+        "J Skis",
+        "ON3P",
+        "Rossignol",
+        "Salomon"
+      ],
+      "key_films": [
+        "Matchstick Productions (series)",
+        "Level 1 Productions (series)",
+        "Few Words",
+        "Supervention"
+      ]
+    }
+  }
+}
