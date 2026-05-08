@@ -518,7 +518,7 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
     // Search spots with filters (only approved spots)
     router.get('/search', async (req, res) => {
       try {
-        const { q, city, state, tags } = req.query;
+        const { q, city, state, tags, category } = req.query;
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 50;
         const skip = (page - 1) * limit;
@@ -539,6 +539,11 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true })
         // Filter by state
         if (state) {
           query.state = { $regex: `^${state}$`, $options: 'i' };
+        }
+
+        // Filter by sport category (stored in sportTypes array)
+        if (category && category !== 'all') {
+          query.sportTypes = category;
         }
 
         // Filter by tags (comma-separated)
