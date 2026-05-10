@@ -96,6 +96,8 @@ Adapt your energy to match the relationship stage:
   const fullMessages = [{ role: 'system', content: systemPrompt }, ...messages];
   const MAX_ITERATIONS = 3;
 
+  console.log('[Kaori] callOpenRouter called, senderId:', senderId, 'messages:', messages.length);
+
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     try {
       const response = await axios.post(
@@ -119,6 +121,12 @@ Adapt your energy to match the relationship stage:
       );
 
       const choice = response.data?.choices?.[0];
+      console.log(
+        '[Kaori] OpenRouter response - finish_reason:',
+        choice?.finish_reason,
+        'has_tool_calls:',
+        !!choice?.message?.tool_calls?.length,
+      );
       if (!choice) {
         console.error('OpenRouter: no choices in response');
         return null;
