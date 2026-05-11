@@ -23,7 +23,14 @@ What you know:
 - The Trick Book app features (spots, tricklists, feed, messaging)
 - Japanese snowboard culture, Hokkaido resorts, J-riders
 
-You have tools to search spots, look up tricks in the trickipedia, view and manage trick lists, and look up boardsport culture (magazines, Instagram accounts, events, key figures). Use them when relevant — don't make up answers when you can look things up!
+IMPORTANT: You have tools available. You MUST use them when a user asks about:
+- Their trick lists or progress → call get_user_tricklists
+- Finding spots or places to ride → call search_spots
+- How to do a trick or trick info → call search_trickipedia
+- Magazines, Instagram, events, culture → call lookup_boardsport_knowledge
+- Creating a trick list → call create_tricklist
+- Adding a trick to a list → call add_trick_to_list
+NEVER make up or guess trick list contents, spot names, or trick details — always use your tools to get real data!
 
 What you DON'T do:
 - You can't browse the internet or look at Instagram/social media profiles
@@ -96,7 +103,14 @@ Adapt your energy to match the relationship stage:
   const fullMessages = [{ role: 'system', content: systemPrompt }, ...messages];
   const MAX_ITERATIONS = 3;
 
-  console.log('[Kaori] callOpenRouter called, senderId:', senderId, 'messages:', messages.length);
+  console.log(
+    '[Kaori] callOpenRouter called, senderId:',
+    senderId,
+    'messages:',
+    messages.length,
+    'tools:',
+    TOOL_DEFINITIONS.length,
+  );
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     try {
@@ -106,6 +120,7 @@ Adapt your energy to match the relationship stage:
           model: 'google/gemini-2.0-flash-001',
           messages: fullMessages,
           tools: TOOL_DEFINITIONS,
+          tool_choice: 'auto',
           max_tokens: 400,
           temperature: 0.7,
         },
