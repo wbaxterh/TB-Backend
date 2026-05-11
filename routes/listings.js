@@ -1,6 +1,5 @@
 //This is the route for CRUD on a TrickList
 const express = require('express');
-const router = express.Router();
 const Joi = require('joi');
 const multer = require('multer');
 
@@ -28,11 +27,11 @@ const _schema = {
 };
 
 const ObjectId = require('mongodb').ObjectId;
-const { MongoClient, DBRef } = require('mongodb');
-const connectionString = process.env.ATLAS_URI;
-MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client) => {
+const { DBRef } = require('mongodb');
+
+module.exports = (db) => {
+  const router = express.Router();
   console.log('Connected to Database');
-  const db = client.db('TrickList2');
   const tricksCollection = db.collection('tricklists');
 
   //SIMPLE GET TRICKLISTS
@@ -268,6 +267,6 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
       res.status(500).send({ error: 'Error updating visibility' });
     }
   });
-});
 
-module.exports = router;
+  return router;
+};

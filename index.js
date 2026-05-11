@@ -3,46 +3,15 @@ const http = require('http');
 const app = express();
 require('dotenv').config();
 
-// Socket.IO setup - use socket/index.js which has namespaces for feed and messages
+const { connectToDatabase, closeDatabase } = require('./db');
 const { initializeSocket } = require('./socket/index');
 
-const categories = require('./routes/categories');
-const listings = require('./routes/listings');
-const listing = require('./routes/listing');
-const users = require('./routes/users');
-const user = require('./routes/user');
-const auth = require('./routes/auth');
-// const googleSSO = require("./routes/auth");
-const image = require('./routes/image');
-const my = require('./routes/my');
-const blog = require('./routes/blog');
-const blogImage = require('./routes/blogImage');
-const messages = require('./routes/messages');
-const contact = require('./routes/contact');
-const expoPushTokens = require('./routes/expoPushTokens');
 const helmet = require('helmet');
 const compression = require('compression');
 const config = require('config');
 const cors = require('cors');
 const path = require('path');
 const bodyParser = require('body-parser');
-const trickipedia = require('./routes/trickipedia');
-const trickImage = require('./routes/trickImage');
-const spots = require('./routes/spots');
-const spotlists = require('./routes/spotlists');
-const payments = require('./routes/payments');
-const media = require('./routes/media');
-const feed = require('./routes/feed');
-const upload = require('./routes/upload');
-const dm = require('./routes/dm');
-const companionProfile = require('./routes/companionProfile');
-const couch = require('./routes/couch');
-const spotReviews = require('./routes/spotReviews');
-const newsletter = require('./routes/newsletter');
-const botChat = require('./routes/botChat');
-const spotTrickHistory = require('./routes/spotTrickHistory');
-const stats = require('./routes/stats');
-const analytics = require('./routes/analytics');
 
 // Create HTTP server for Socket.IO
 const server = http.createServer(app);
@@ -52,52 +21,73 @@ const io = initializeSocket(server);
 app.set('io', io);
 
 // Enable CORS for all routes
-app.use(
-  cors({
-    origin: '*', // Allows all origins
-    // For development, you might use '*' to allow all origins
-  }),
-);
-
+app.use(cors({ origin: '*' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json({ limit: '10mb' }));
 app.use(helmet());
 app.use(compression());
 app.use(bodyParser.json());
 
-app.use('/api/categories', categories);
-app.use('/api/listing', listing);
-app.use('/api/listings', listings);
-app.use('/api/user', user);
-app.use('/api/users', users);
-app.use('/api/auth', auth);
-app.use('/api/blog', blog);
-app.use('/api/my', my);
-app.use('/api/expoPushTokens', expoPushTokens);
-app.use('/api/messages', messages);
-app.use('/api/image', image);
-app.use('/api/blogImage', blogImage);
-app.use('/api/contact', contact);
-app.use('/api/trickipedia', trickipedia);
-app.use('/api/trickImage', trickImage);
-app.use('/api/spots', spots);
-app.use('/api/spotlists', spotlists);
-app.use('/api/payments', payments);
-app.use('/api/media', media);
-app.use('/api/feed', feed);
-app.use('/api/upload', upload);
-app.use('/api/dm', dm);
-app.use('/api/companion', companionProfile);
-app.use('/api/couch', couch);
-app.use('/api/spot-reviews', spotReviews);
-app.use('/api/newsletter', newsletter);
-app.use('/api/bot-chat', botChat);
-app.use('/api/spot-tricks', spotTrickHistory);
-app.use('/api/stats', stats);
-app.use('/api/analytics', analytics);
+async function startServer() {
+  // Connect to MongoDB FIRST — single shared connection
+  const db = await connectToDatabase();
 
-const port = process.env.PORT || config.get('port');
-server.listen(port, () => {
-  console.log(`Server started on port ${port}...`);
-  console.log(`Socket.IO listening for connections`);
+  // Mount routes — pass db to factory functions
+  app.use('/api/categories', require('./routes/categories')(db));
+  app.use('/api/listing', require('./routes/listing')(db));
+  app.use('/api/listings', require('./routes/listings')(db));
+  app.use('/api/user', require('./routes/user')(db));
+  app.use('/api/users', require('./routes/users')(db));
+  app.use('/api/auth', require('./routes/auth')(db));
+  app.use('/api/blog', require('./routes/blog')(db));
+  app.use('/api/my', require('./routes/my'));
+  app.use('/api/expoPushTokens', require('./routes/expoPushTokens'));
+  app.use('/api/messages', require('./routes/messages'));
+  app.use('/api/image', require('./routes/image')(db));
+  app.use('/api/blogImage', require('./routes/blogImage'));
+  app.use('/api/contact', require('./routes/contact'));
+  app.use('/api/trickipedia', require('./routes/trickipedia')(db));
+  app.use('/api/trickImage', require('./routes/trickImage'));
+  app.use('/api/spots', require('./routes/spots')(db));
+  app.use('/api/spotlists', require('./routes/spotlists')(db));
+  app.use('/api/payments', require('./routes/payments')(db));
+  app.use('/api/media', require('./routes/media')(db));
+  app.use('/api/feed', require('./routes/feed')(db));
+  app.use('/api/upload', require('./routes/upload'));
+  app.use('/api/dm', require('./routes/dm')(db));
+  app.use('/api/companion', require('./routes/companionProfile')(db));
+  app.use('/api/couch', require('./routes/couch')(db));
+  app.use('/api/spot-reviews', require('./routes/spotReviews')(db));
+  app.use('/api/newsletter', require('./routes/newsletter')(db));
+  app.use('/api/bot-chat', require('./routes/botChat')(db));
+  app.use('/api/spot-tricks', require('./routes/spotTrickHistory')(db));
+  app.use('/api/stats', require('./routes/stats')(db));
+  app.use('/api/analytics', require('./routes/analytics')(db));
+
+  const port = process.env.PORT || config.get('port');
+  server.listen(port, () => {
+    console.log(`Server started on port ${port}...`);
+    console.log(`Socket.IO listening for connections`);
+  });
+}
+
+// Graceful shutdown
+function gracefulShutdown(signal) {
+  console.log(`${signal} received. Shutting down gracefully...`);
+  server.close(async () => {
+    await closeDatabase();
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });

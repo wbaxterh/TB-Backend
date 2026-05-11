@@ -1,5 +1,4 @@
 const express = require('express');
-const router = express.Router();
 const AWS = require('aws-sdk');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
@@ -28,12 +27,8 @@ const upload = multer({
 //     dest: "uploads/",
 //   limits: { fieldSize: 25 * 1024 * 1024 },
 
-const { MongoClient } = require('mongodb');
-const _ObjectId = require('mongodb').ObjectId;
-const connectionString = process.env.ATLAS_URI;
-
-MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client) => {
-  const db = client.db('TrickList2');
+module.exports = (db) => {
+  const router = express.Router();
   const usersCollection = db.collection('users');
 
   router.get('/', async (_req, res) => {
@@ -70,5 +65,6 @@ MongoClient.connect(connectionString, { useUnifiedTopology: true }).then((client
       return res.status(400).send(error);
     }
   });
-});
-module.exports = router;
+
+  return router;
+};

@@ -1,5 +1,4 @@
-const { MongoClient, ObjectId } = require('mongodb');
-const connectionString = process.env.ATLAS_URI;
+const { ObjectId } = require('mongodb');
 
 const FREE_TIER_LIMITS = {
   maxSpotLists: 3,
@@ -25,10 +24,7 @@ module.exports = {
   // Check if user can create more spot lists
   async checkSpotListLimit(req, res, next) {
     try {
-      const client = await MongoClient.connect(connectionString, {
-        useUnifiedTopology: true,
-      });
-      const db = client.db('TrickList2');
+      const db = require('../db').getDb();
       const usersCollection = db.collection('users');
 
       const user = await usersCollection.findOne({
@@ -68,10 +64,7 @@ module.exports = {
   // Check if user can add more spots to a list
   async checkSpotLimit(req, res, next) {
     try {
-      const client = await MongoClient.connect(connectionString, {
-        useUnifiedTopology: true,
-      });
-      const db = client.db('TrickList2');
+      const db = require('../db').getDb();
       const usersCollection = db.collection('users');
 
       const user = await usersCollection.findOne({
@@ -120,10 +113,7 @@ module.exports = {
   // Check total spots limit
   async checkTotalSpotsLimit(req, res, next) {
     try {
-      const client = await MongoClient.connect(connectionString, {
-        useUnifiedTopology: true,
-      });
-      const db = client.db('TrickList2');
+      const db = require('../db').getDb();
       const usersCollection = db.collection('users');
 
       const user = await usersCollection.findOne({
@@ -170,10 +160,7 @@ module.exports = {
   // Get user's current usage
   async getUserUsage(req, res) {
     try {
-      const client = await MongoClient.connect(connectionString, {
-        useUnifiedTopology: true,
-      });
-      const db = client.db('TrickList2');
+      const db = require('../db').getDb();
       const usersCollection = db.collection('users');
 
       const user = await usersCollection.findOne({

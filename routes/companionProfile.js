@@ -17,11 +17,9 @@
  */
 
 const express = require('express');
-const router = express.Router();
 const auth = require('../middleware/auth');
-const { MongoClient, ObjectId } = require('mongodb');
 
-const STAGES = ['stranger', 'acquaintance', 'friend', 'close_friend', 'bestie'];
+const _STAGES = ['stranger', 'acquaintance', 'friend', 'close_friend', 'bestie'];
 
 function computeStage(interactionCount) {
   if (interactionCount < 5) return 'stranger';
@@ -36,9 +34,7 @@ function generateGreeting(profile) {
   const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
   const stage = profile.relationshipStage || 'stranger';
   const name = profile.memory?.userName || '';
-  const lastInteraction = profile.lastInteraction
-    ? new Date(profile.lastInteraction)
-    : null;
+  const lastInteraction = profile.lastInteraction ? new Date(profile.lastInteraction) : null;
   const daysSinceLastVisit = lastInteraction
     ? Math.floor((Date.now() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24))
     : null;
@@ -129,125 +125,118 @@ function generateGreeting(profile) {
   return greeting;
 }
 
-MongoClient.connect(process.env.ATLAS_URI, { useUnifiedTopology: true })
-  .then((client) => {
-    const db = client.db('TrickList2');
-    const profilesCollection = db.collection('companion_profiles');
+function createRouter(db) {
+  const router = express.Router();
+  const profilesCollection = db.collection('companion_profiles');
 
-    // Ensure index
-    profilesCollection.createIndex(
-      { userId: 1, companionId: 1 },
-      { unique: true },
-    ).catch(() => {});
+  // Ensure index
+  profilesCollection.createIndex({ userId: 1, companionId: 1 }, { unique: true }).catch(() => {});
 
-    // GET /api/companion/profile/:companionId — get or create relationship profile
-    router.get('/profile/:companionId', auth, async (req, res) => {
-      try {
-        const userId = req.user.userId;
-        const { companionId } = req.params;
+  // GET /api/companion/profile/:companionId — get or create relationship profile
+  router.get('/profile/:companionId', auth, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { companionId } = req.params;
 
-        let profile = await profilesCollection.findOne({ userId, companionId });
+      let profile = await profilesCollection.findOne({ userId, companionId });
 
-        if (!profile) {
-          profile = {
-            userId,
-            companionId,
-            relationshipStage: 'stranger',
-            interactionCount: 0,
-            traits: {
-              preferredTopics: [],
-              communicationStyle: 'casual',
-              humorLevel: 'medium',
-              emotionalOpenness: 'medium',
-              sports: [],
-            },
-            memory: {
-              userName: '',
-              knownFacts: [],
-              lastTrickDiscussed: '',
-              lastSessionMood: 'neutral',
-            },
-            greetingStyle: 'default',
-            firstInteraction: null,
-            lastInteraction: null,
-            createdAt: new Date(),
-          };
+      if (!profile) {
+        profile = {
+          userId,
+          companionId,
+          relationshipStage: 'stranger',
+          interactionCount: 0,
+          traits: {
+            preferredTopics: [],
+            communicationStyle: 'casual',
+            humorLevel: 'medium',
+            emotionalOpenness: 'medium',
+            sports: [],
+          },
+          memory: {
+            userName: '',
+            knownFacts: [],
+            lastTrickDiscussed: '',
+            lastSessionMood: 'neutral',
+          },
+          greetingStyle: 'default',
+          firstInteraction: null,
+          lastInteraction: null,
+          createdAt: new Date(),
+        };
 
-          await profilesCollection.insertOne(profile);
-        }
-
-        res.json(profile);
-      } catch (error) {
-        console.error('Error fetching companion profile:', error);
-        res.status(500).json({ error: 'Failed to fetch profile' });
+        await profilesCollection.insertOne(profile);
       }
-    });
 
-    // POST /api/companion/profile/:companionId/greeting — generate a greeting
-    router.post('/profile/:companionId/greeting', auth, async (req, res) => {
-      try {
-        const userId = req.user.userId;
-        const { companionId } = req.params;
-
-        let profile = await profilesCollection.findOne({ userId, companionId });
-
-        if (!profile) {
-          profile = {
-            userId,
-            companionId,
-            relationshipStage: 'stranger',
-            interactionCount: 0,
-            traits: {},
-            memory: {},
-          };
-        }
-
-        const greeting = generateGreeting(profile);
-
-        res.json({ greeting, stage: profile.relationshipStage });
-      } catch (error) {
-        console.error('Error generating greeting:', error);
-        res.status(500).json({ error: 'Failed to generate greeting' });
-      }
-    });
-
-    // PUT /api/companion/profile/:companionId — update profile fields
-    router.put('/profile/:companionId', auth, async (req, res) => {
-      try {
-        const userId = req.user.userId;
-        const { companionId } = req.params;
-        const updates = req.body;
-
-        // Only allow updating specific fields
-        const allowed = {};
-        if (updates.memory) allowed['memory'] = updates.memory;
-        if (updates.traits) allowed['traits'] = updates.traits;
-        if (updates.greetingStyle) allowed['greetingStyle'] = updates.greetingStyle;
-
-        if (Object.keys(allowed).length === 0) {
-          return res.status(400).json({ error: 'No valid fields to update' });
-        }
-
-        const result = await profilesCollection.findOneAndUpdate(
-          { userId, companionId },
-          { $set: allowed },
-          { returnDocument: 'after', upsert: true },
-        );
-
-        res.json(result.value || result);
-      } catch (error) {
-        console.error('Error updating companion profile:', error);
-        res.status(500).json({ error: 'Failed to update profile' });
-      }
-    });
-
-    console.log('Companion Profile API connected to MongoDB');
-  })
-  .catch((err) => {
-    console.error('Companion Profile MongoDB connection error:', err);
+      res.json(profile);
+    } catch (error) {
+      console.error('Error fetching companion profile:', error);
+      res.status(500).json({ error: 'Failed to fetch profile' });
+    }
   });
 
-// Export both the router and helper functions for use in dm.js
-module.exports = router;
+  // POST /api/companion/profile/:companionId/greeting — generate a greeting
+  router.post('/profile/:companionId/greeting', auth, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { companionId } = req.params;
+
+      let profile = await profilesCollection.findOne({ userId, companionId });
+
+      if (!profile) {
+        profile = {
+          userId,
+          companionId,
+          relationshipStage: 'stranger',
+          interactionCount: 0,
+          traits: {},
+          memory: {},
+        };
+      }
+
+      const greeting = generateGreeting(profile);
+
+      res.json({ greeting, stage: profile.relationshipStage });
+    } catch (error) {
+      console.error('Error generating greeting:', error);
+      res.status(500).json({ error: 'Failed to generate greeting' });
+    }
+  });
+
+  // PUT /api/companion/profile/:companionId — update profile fields
+  router.put('/profile/:companionId', auth, async (req, res) => {
+    try {
+      const userId = req.user.userId;
+      const { companionId } = req.params;
+      const updates = req.body;
+
+      // Only allow updating specific fields
+      const allowed = {};
+      if (updates.memory) allowed['memory'] = updates.memory;
+      if (updates.traits) allowed['traits'] = updates.traits;
+      if (updates.greetingStyle) allowed['greetingStyle'] = updates.greetingStyle;
+
+      if (Object.keys(allowed).length === 0) {
+        return res.status(400).json({ error: 'No valid fields to update' });
+      }
+
+      const result = await profilesCollection.findOneAndUpdate(
+        { userId, companionId },
+        { $set: allowed },
+        { returnDocument: 'after', upsert: true },
+      );
+
+      res.json(result.value || result);
+    } catch (error) {
+      console.error('Error updating companion profile:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
+    }
+  });
+
+  return router;
+}
+
+// Export both the factory function and helper functions for use in dm.js / kaori-ai-response.js
+module.exports = createRouter;
 module.exports.computeStage = computeStage;
 module.exports.generateGreeting = generateGreeting;
