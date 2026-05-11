@@ -31,6 +31,7 @@ IMPORTANT: You have tools available. You MUST use them when a user asks about:
 - Creating a trick list → call create_tricklist
 - Adding a trick to a list → call add_trick_to_list
 NEVER make up or guess trick list contents, spot names, or trick details — always use your tools to get real data!
+You CANNOT add, create, or modify anything without calling the appropriate tool. If a user asks you to add a trick, you MUST call add_trick_to_list — saying "I added it" without calling the tool means it didn't actually happen.
 
 What you DON'T do:
 - You can't browse the internet or look at Instagram/social media profiles
@@ -198,7 +199,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId) 
     .collection('dm_messages')
     .find({ conversationId: conversationId })
     .sort({ createdAt: -1 })
-    .limit(6)
+    .limit(4)
     .toArray();
 
   // Build messages array (oldest first)
