@@ -129,6 +129,26 @@ const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'remember_user_info',
+      description:
+        'Save information about the user for future sessions. ALWAYS call this when a user tells you their name, what sports they do, or notable facts about themselves. This persists across sessions so you can greet them personally next time.',
+      parameters: {
+        type: 'object',
+        properties: {
+          user_name: { type: 'string', description: "The user's name (first name or nickname)" },
+          sports: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Sports the user does (e.g. ["skateboarding", "snowboarding"])',
+          },
+          fact: { type: 'string', description: 'A notable fact about the user to remember' },
+        },
+      },
+    },
+  },
 ];
 
 // ============================================
@@ -389,6 +409,45 @@ function lookupBoardsportKnowledge(args) {
   return { sport, topic, data: KNOWLEDGE[sport][topic] };
 }
 
+async function rememberUserInfo(args, db, senderId) {
+  try {
+    const kaoriBotId = '69c15e55c7ebe2c6884f1267';
+    const update = {};
+
+    if (args.user_name) {
+      update['memory.userName'] = args.user_name;
+    }
+    if (args.sports && args.sports.length > 0) {
+      update['traits.sports'] = args.sports;
+    }
+
+    const operations = { $set: update };
+
+    if (args.fact) {
+      operations.$addToSet = { 'memory.knownFacts': args.fact };
+    }
+
+    if (Object.keys(update).length === 0 && !args.fact) {
+      return { error: 'Nothing to remember — provide a name, sports, or fact' };
+    }
+
+    await db
+      .collection('companion_profiles')
+      .updateOne({ userId: senderId, companionId: kaoriBotId }, operations, { upsert: true });
+
+    const saved = [];
+    if (args.user_name) saved.push(`name: ${args.user_name}`);
+    if (args.sports?.length) saved.push(`sports: ${args.sports.join(', ')}`);
+    if (args.fact) saved.push(`fact: ${args.fact}`);
+
+    console.log(`[Kaori] Remembered for user ${senderId}: ${saved.join(', ')}`);
+    return { success: true, saved, message: `Remembered: ${saved.join(', ')}` };
+  } catch (err) {
+    console.error('Tool remember_user_info error:', err.message);
+    return { error: 'Could not save user info right now' };
+  }
+}
+
 // ============================================
 // DISPATCHER
 // ============================================
@@ -409,6 +468,8 @@ async function executeToolCall(toolName, args, db, senderId) {
       return await updateTrickStatus(args, db);
     case 'lookup_boardsport_knowledge':
       return lookupBoardsportKnowledge(args);
+    case 'remember_user_info':
+      return await rememberUserInfo(args, db, senderId);
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
