@@ -402,7 +402,7 @@ module.exports = (db) => {
                     console.error('kaori-bot request error:', e.message);
                     resolve(null);
                   });
-                  req.setTimeout(15000, () => {
+                  req.setTimeout(2000, () => {
                     req.destroy();
                     resolve(null);
                   });
