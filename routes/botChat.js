@@ -86,6 +86,7 @@ module.exports = (db) => {
         fromUserId: userId,
         toUserId: botId,
         userId: userId,
+        message: message,
         type: 'user',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -94,7 +95,7 @@ module.exports = (db) => {
       const userMessageResult = await db.collection('bot_chats').insertOne(userMessage);
       userMessage._id = userMessageResult.insertedId;
 
-      // Forward to ElizaOS API
+      // Forward to ElizaOS API, fall back to OpenRouter if unavailable
       let botResponse;
       try {
         const elizaResponse = await axios.post(
@@ -112,8 +113,17 @@ module.exports = (db) => {
         botResponse = elizaResponse.data.response || 'Sorry, I had trouble responding to that!';
       } catch (elizaError) {
         console.error('ElizaOS API error:', elizaError.message);
-        botResponse =
-          "Hey! I'm having some technical difficulties right now. Can you try again in a moment? 🤖✨";
+        // Fallback to OpenRouter/Kaori AI response
+        try {
+          const { generateKaoriResponse } = require('../kaori-ai-response');
+          botResponse = await generateKaoriResponse(message, db, null, userId);
+        } catch (fallbackErr) {
+          console.error('Kaori fallback error:', fallbackErr.message);
+        }
+        if (!botResponse) {
+          botResponse =
+            "Hey! I'm having some technical difficulties right now. Can you try again in a moment? 🤖✨";
+        }
       }
 
       // Save bot response
