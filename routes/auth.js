@@ -81,6 +81,11 @@ module.exports = (db) => {
           name: name,
           email: email,
           imageUri: picture,
+          isGoogleSSO: true,
+          network: true,
+          homies: [],
+          homieRequests: { sent: [], received: [] },
+          createdAt: new Date(),
         };
         const result = await usersCollection.insertOne(newUser);
         //console.log("New user inserted via google auth: ", result);
@@ -138,6 +143,10 @@ module.exports = (db) => {
           name: fullName || 'Apple User',
           email: userEmail,
           appleUserId: appleUserId,
+          network: true,
+          homies: [],
+          homieRequests: { sent: [], received: [] },
+          createdAt: new Date(),
         };
         const result = await usersCollection.insertOne(newUser);
         user = {
