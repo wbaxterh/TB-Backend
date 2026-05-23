@@ -118,9 +118,9 @@ module.exports = (db) => {
     const { identityToken, fullName, email } = req.body;
     console.log('request body to apple auth == ', req.body);
     try {
-      // Verify the token with Apple
+      // Verify the token with Apple — accept both iOS bundle ID and web Services ID
       const applePayload = await appleSignin.verifyIdToken(identityToken, {
-        audience: process.env.APPLE_CLIENT_ID, // Your app's bundle identifier
+        audience: [process.env.APPLE_CLIENT_ID, process.env.APPLE_WEB_SERVICE_ID].filter(Boolean),
         ignoreExpiration: false,
       });
 
