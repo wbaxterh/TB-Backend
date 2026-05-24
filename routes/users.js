@@ -6,6 +6,7 @@ const nodemailer = require('nodemailer');
 const _usersStore = require('../store/users');
 const validateWith = require('../middleware/validation');
 const authAccountOrAdmin = require('../middleware/authAccountOrAdmin');
+const authAdmin = require('../middleware/authAdmin');
 const auth = require('../middleware/auth');
 const ObjectId = require('mongodb').ObjectId;
 
@@ -127,7 +128,7 @@ module.exports = (db) => {
     }
   });
 
-  router.get('/all', async (_req, res) => {
+  router.get('/all', authAdmin(), async (_req, res) => {
     try {
       const users = await usersCollection.find().toArray();
       res.status(200).send(users);

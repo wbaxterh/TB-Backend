@@ -6,6 +6,7 @@ const multer = require('multer');
 const _store = require('../store/listings');
 // const validateWith = require("../middleware/validation");
 const _auth = require('../middleware/auth');
+const authAdmin = require('../middleware/authAdmin');
 const _delay = require('../middleware/delay');
 const _listingMapper = require('../mappers/listings');
 const _config = require('config');
@@ -197,7 +198,7 @@ module.exports = (db) => {
       return res.status(400).send(error);
     }
   });
-  router.get('/all', async (_req, res) => {
+  router.get('/all', authAdmin(), async (_req, res) => {
     try {
       const allTrickLists = await tricksCollection.find().toArray();
       res.status(200).send(allTrickLists);
