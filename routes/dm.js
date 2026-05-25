@@ -341,6 +341,11 @@ module.exports = (db) => {
           const messagesNs = ioRef ? ioRef.of('/messages') : null;
           // Kith voice session ID (sent by Kaori Live web client)
           const kithSessionId = req.headers['x-kith-session'] || '';
+          if (kithSessionId) {
+            console.log(`[Kith] Session ID received: ${kithSessionId}`);
+          } else {
+            console.log('[Kith] No x-kith-session header in request');
+          }
 
           // Run bot response with typing delay
           (async () => {
