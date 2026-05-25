@@ -178,7 +178,7 @@ async function searchSpots(args, db) {
       return {
         results: [],
         message:
-          'No spots found in the TrickBook database for this search. Do NOT make up or suggest spot names that are not in these results. Tell the user no spots were found and suggest they add one.',
+          'No spots found in the TrickBook database for this search. Tell the user there are no spots listed in TrickBook for this yet. You MAY suggest spots from your own knowledge but you MUST clearly say "these aren\'t listed in TrickBook yet but from what I know..." and suggest they add them to the app.',
       };
     }
 
@@ -196,7 +196,7 @@ async function searchSpots(args, db) {
       })),
       total: spots.length,
       important:
-        'ONLY mention spots from this results list. Do NOT add, invent, or suggest any spots that are not in these results.',
+        'These are from the TrickBook database. Present them as TrickBook spots. If the user asks about spots NOT in these results, you may suggest from your own knowledge but clearly say they are not listed in TrickBook yet.',
     };
   } catch (err) {
     console.error('Tool search_spots error:', err.message);
