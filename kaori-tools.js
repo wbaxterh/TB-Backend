@@ -259,27 +259,34 @@ async function getUserTricklists(db, senderId) {
       trickMap[t._id.toString()] = t;
     }
 
-    return {
-      lists: trickLists.map((tl) => {
-        const resolvedTricks = tl.tricks.map((t) => {
-          const found = t._id ? trickMap[t._id.toString()] : null;
-          return {
-            id: t._id?.toString() || '',
-            name: found?.name || t.name || 'Unknown',
-            status: found?.checked || t.checked || 'To Do',
-          };
-        });
-        const completed = resolvedTricks.filter(
-          (t) => t.status === 'Complete' || t.status === true,
-        ).length;
+    const allLists = trickLists.map((tl) => {
+      const resolvedTricks = tl.tricks.map((t) => {
+        const found = t._id ? trickMap[t._id.toString()] : null;
         return {
-          id: tl._id.toString(),
-          name: tl.name,
-          totalTricks: resolvedTricks.length,
-          completed,
-          tricks: resolvedTricks.slice(0, 10), // Limit to avoid huge payloads
+          id: t._id?.toString() || '',
+          name: found?.name || t.name || 'Unknown',
+          status: found?.checked || t.checked || 'To Do',
         };
-      }),
+      });
+      const completed = resolvedTricks.filter(
+        (t) => t.status === 'Complete' || t.status === true,
+      ).length;
+      return {
+        id: tl._id.toString(),
+        name: tl.name,
+        totalTricks: resolvedTricks.length,
+        completed,
+        tricks: resolvedTricks.slice(0, 5),
+      };
+    });
+
+    // Return top 6 most recent + summary to keep responses short
+    const recentLists = allLists.slice(0, 6);
+    return {
+      totalListCount: allLists.length,
+      showing: recentLists.length,
+      lists: recentLists,
+      summary: `User has ${allLists.length} trick lists total. Showing the most recent ${recentLists.length}. Keep your response brief — mention 3-4 list names max, don't list all of them.`,
     };
   } catch (err) {
     console.error('Tool get_user_tricklists error:', err.message);
