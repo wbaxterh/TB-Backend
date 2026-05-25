@@ -8,6 +8,7 @@ const validateWith = require('../middleware/validation');
 const authAccountOrAdmin = require('../middleware/authAccountOrAdmin');
 const authAdmin = require('../middleware/authAdmin');
 const auth = require('../middleware/auth');
+const escapeRegex = require('../utils/escapeRegex');
 const ObjectId = require('mongodb').ObjectId;
 
 // Email transporter for password reset
@@ -375,7 +376,7 @@ module.exports = (db) => {
 
       if (searchQuery) {
         // When searching, search ALL users by name (case-insensitive, partial match)
-        filter.name = { $regex: searchQuery, $options: 'i' };
+        filter.name = { $regex: escapeRegex(searchQuery), $options: 'i' };
       }
 
       // Pagination: ?page=1&limit=20 (defaults: page 1, limit 20)

@@ -4,6 +4,7 @@
  */
 const express = require('express');
 const auth = require('../middleware/auth');
+const escapeRegex = require('../utils/escapeRegex');
 const { ObjectId } = require('mongodb');
 
 module.exports = (db) => {
@@ -49,7 +50,7 @@ module.exports = (db) => {
       const { skaterName } = req.params;
       const { page = 1, limit = 20 } = req.query;
       const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-      const query = { skaterName: { $regex: new RegExp(skaterName, 'i') } };
+      const query = { skaterName: { $regex: new RegExp(escapeRegex(skaterName), 'i') } };
 
       const [tricks, total] = await Promise.all([
         col().find(query).sort({ year: -1 }).skip(skip).limit(parseInt(limit, 10)).toArray(),

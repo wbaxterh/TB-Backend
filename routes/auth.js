@@ -48,6 +48,7 @@ module.exports = (db) => {
           role: userExists.role,
         },
         process.env.JWT_SECRET,
+        { expiresIn: '7d' },
       );
       res.send({ token });
     } catch (error) {
@@ -110,6 +111,7 @@ module.exports = (db) => {
           role: user.role ? user.role : null,
         },
         process.env.JWT_SECRET,
+        { expiresIn: '7d' },
       );
       res.send({ token });
     } catch (error) {
@@ -167,6 +169,7 @@ module.exports = (db) => {
           role: user.role ? user.role : null,
         },
         process.env.JWT_SECRET,
+        { expiresIn: '7d' },
       );
       res.send({ token });
     } catch (error) {

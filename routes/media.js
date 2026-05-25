@@ -5,6 +5,7 @@
 
 const express = require('express');
 const auth = require('../middleware/auth');
+const escapeRegex = require('../utils/escapeRegex');
 const ObjectId = require('mongodb').ObjectId;
 
 // Sport types enum
@@ -227,10 +228,10 @@ module.exports = (db) => {
       const query = {
         status: 'published',
         $or: [
-          { title: { $regex: q, $options: 'i' } },
-          { description: { $regex: q, $options: 'i' } },
-          { tags: { $regex: q, $options: 'i' } },
-          { 'athletes.name': { $regex: q, $options: 'i' } },
+          { title: { $regex: escapeRegex(q), $options: 'i' } },
+          { description: { $regex: escapeRegex(q), $options: 'i' } },
+          { tags: { $regex: escapeRegex(q), $options: 'i' } },
+          { 'athletes.name': { $regex: escapeRegex(q), $options: 'i' } },
         ],
       };
 

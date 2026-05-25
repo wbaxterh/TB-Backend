@@ -1,6 +1,7 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const auth = require('../middleware/auth');
+const escapeRegex = require('../utils/escapeRegex');
 
 // Utility function to generate a URL slug from the trick name
 const generateSlug = (name) =>
@@ -59,8 +60,8 @@ module.exports = (db) => {
       if (difficulty) query.difficulty = difficulty;
       if (search) {
         query.$or = [
-          { name: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
+          { name: { $regex: escapeRegex(search), $options: 'i' } },
+          { description: { $regex: escapeRegex(search), $options: 'i' } },
         ];
       }
 
@@ -83,8 +84,8 @@ module.exports = (db) => {
       if (difficulty) query.difficulty = difficulty;
       if (search) {
         query.$or = [
-          { name: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
+          { name: { $regex: escapeRegex(search), $options: 'i' } },
+          { description: { $regex: escapeRegex(search), $options: 'i' } },
         ];
       }
 

@@ -5,6 +5,7 @@ const { ObjectId } = require('mongodb');
 const validateWith = require('../middleware/validation');
 const auth = require('../middleware/auth');
 const authAdmin = require('../middleware/authAdmin');
+const escapeRegex = require('../utils/escapeRegex');
 const multer = require('multer');
 const googlePlaces = require('../services/googlePlaces');
 const s3Upload = require('../services/s3Upload');
@@ -419,7 +420,7 @@ module.exports = (db) => {
 
       // Search by name
       if (q) {
-        query.name = { $regex: q, $options: 'i' };
+        query.name = { $regex: escapeRegex(q), $options: 'i' };
       }
 
       const totalCount = await spotsCollection.countDocuments(query);
@@ -525,17 +526,17 @@ module.exports = (db) => {
 
       // Text search on name
       if (q) {
-        query.name = { $regex: q, $options: 'i' };
+        query.name = { $regex: escapeRegex(q), $options: 'i' };
       }
 
       // Filter by city
       if (city) {
-        query.city = { $regex: city, $options: 'i' };
+        query.city = { $regex: escapeRegex(city), $options: 'i' };
       }
 
       // Filter by state
       if (state) {
-        query.state = { $regex: `^${state}$`, $options: 'i' };
+        query.state = { $regex: `^${escapeRegex(state)}$`, $options: 'i' };
       }
 
       // Filter by sport category (stored in sportTypes array)
@@ -547,7 +548,7 @@ module.exports = (db) => {
       if (tags) {
         const tagList = tags.split(',').map((t) => t.trim());
         query.tags = {
-          $regex: tagList.map((t) => `(?=.*${t})`).join(''),
+          $regex: tagList.map((t) => `(?=.*${escapeRegex(t)})`).join(''),
           $options: 'i',
         };
       }
