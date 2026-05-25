@@ -280,13 +280,12 @@ async function getUserTricklists(db, senderId) {
       };
     });
 
-    // Return top 6 most recent + summary to keep responses short
-    const recentLists = allLists.slice(0, 6);
+    // Return last 3 + total count — guide the model to be concise
+    const recentLists = allLists.slice(-3);
     return {
       totalListCount: allLists.length,
-      showing: recentLists.length,
-      lists: recentLists,
-      summary: `User has ${allLists.length} trick lists total. Showing the most recent ${recentLists.length}. Keep your response brief — mention 3-4 list names max, don't list all of them.`,
+      recentLists,
+      responseGuide: `Tell the user: "You have ${allLists.length} trick lists total! Your last 3 are: [names of the 3 lists]. Which one are you looking for?" Do NOT list all ${allLists.length} lists. Keep it short.`,
     };
   } catch (err) {
     console.error('Tool get_user_tricklists error:', err.message);
