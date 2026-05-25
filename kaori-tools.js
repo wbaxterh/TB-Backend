@@ -175,7 +175,11 @@ async function searchSpots(args, db) {
     const spots = await db.collection('spots').find(query).sort({ rating: -1 }).limit(5).toArray();
 
     if (spots.length === 0) {
-      return { results: [], message: 'No spots found matching that search' };
+      return {
+        results: [],
+        message:
+          'No spots found in the TrickBook database for this search. Do NOT make up or suggest spot names that are not in these results. Tell the user no spots were found and suggest they add one.',
+      };
     }
 
     return {
@@ -191,6 +195,8 @@ async function searchSpots(args, db) {
         description: s.description ? s.description.substring(0, 150) : '',
       })),
       total: spots.length,
+      important:
+        'ONLY mention spots from this results list. Do NOT add, invent, or suggest any spots that are not in these results.',
     };
   } catch (err) {
     console.error('Tool search_spots error:', err.message);
