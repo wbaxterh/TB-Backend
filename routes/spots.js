@@ -51,7 +51,7 @@ const schema = {
   sportTypes: Joi.array()
     .items(Joi.string().valid(...SPORT_TYPES))
     .optional(),
-  category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'other').optional(),
+  category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'resort', 'other').optional(),
 };
 
 const updateSchema = {
@@ -69,7 +69,7 @@ const updateSchema = {
   sportTypes: Joi.array()
     .items(Joi.string().valid(...SPORT_TYPES))
     .optional(),
-  category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'other').optional(),
+  category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'resort', 'other').optional(),
 };
 
 const approvalSchema = {
