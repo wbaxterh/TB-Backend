@@ -120,7 +120,7 @@ Adapt your energy to match the relationship stage:
       const response = await axios.post(
         'https://openrouter.ai/api/v1/chat/completions',
         {
-          model: 'google/gemini-2.0-flash-001',
+          model: 'google/gemini-3.5-flash',
           messages: fullMessages,
           tools: TOOL_DEFINITIONS,
           tool_choice: 'auto',
