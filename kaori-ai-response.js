@@ -201,7 +201,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId) 
     .collection('dm_messages')
     .find({ conversationId: conversationId })
     .sort({ createdAt: -1 })
-    .limit(4)
+    .limit(10)
     .toArray();
 
   // Build messages array (oldest first)

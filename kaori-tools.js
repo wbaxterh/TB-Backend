@@ -325,16 +325,19 @@ async function createTricklist(args, db, senderId) {
   }
 }
 
-async function addTrickToList(args, db) {
+async function addTrickToList(args, db, senderId) {
   try {
     if (!ObjectId.isValid(args.list_id)) {
       return { error: 'Invalid list ID' };
     }
 
-    // Verify the list exists
+    // Verify the list exists AND belongs to this user
     const list = await db.collection('tricklists').findOne({ _id: new ObjectId(args.list_id) });
     if (!list) {
       return { error: 'Trick list not found' };
+    }
+    if (list.user?.$id && list.user.$id.toString() !== senderId) {
+      return { error: 'You can only add tricks to your own lists' };
     }
 
     // Insert the trick
@@ -370,31 +373,40 @@ async function addTrickToList(args, db) {
   }
 }
 
-async function updateTrickStatus(args, db) {
+async function updateTrickStatus(args, db, senderId) {
   try {
     if (!ObjectId.isValid(args.trick_id)) {
       return { error: 'Invalid trick ID' };
     }
 
-    const result = await db
+    // Verify trick exists and belongs to a list the user owns
+    const existingTrick = await db
+      .collection('tricks')
+      .findOne({ _id: new ObjectId(args.trick_id) });
+    if (!existingTrick) {
+      return { error: 'Trick not found' };
+    }
+    if (existingTrick.list_id) {
+      const list = await db
+        .collection('tricklists')
+        .findOne({ _id: new ObjectId(existingTrick.list_id) });
+      if (list?.user?.$id && list.user.$id.toString() !== senderId) {
+        return { error: 'You can only update tricks in your own lists' };
+      }
+    }
+
+    await db
       .collection('tricks')
       .findOneAndUpdate(
         { _id: new ObjectId(args.trick_id) },
         { $set: { checked: args.status, updatedAt: new Date() } },
-        { returnDocument: 'after' },
       );
-
-    if (!result.value && !result) {
-      return { error: 'Trick not found' };
-    }
-
-    const trick = result.value || result;
     return {
       success: true,
       trickId: args.trick_id,
-      trickName: trick.name || 'Unknown',
+      trickName: existingTrick.name || 'Unknown',
       newStatus: args.status,
-      message: `Marked "${trick.name || 'trick'}" as ${args.status}`,
+      message: `Marked "${existingTrick.name || 'trick'}" as ${args.status}`,
     };
   } catch (err) {
     console.error('Tool update_trick_status error:', err.message);
@@ -475,9 +487,9 @@ async function executeToolCall(toolName, args, db, senderId) {
     case 'create_tricklist':
       return await createTricklist(args, db, senderId);
     case 'add_trick_to_list':
-      return await addTrickToList(args, db);
+      return await addTrickToList(args, db, senderId);
     case 'update_trick_status':
-      return await updateTrickStatus(args, db);
+      return await updateTrickStatus(args, db, senderId);
     case 'lookup_boardsport_knowledge':
       return lookupBoardsportKnowledge(args);
     case 'remember_user_info':
