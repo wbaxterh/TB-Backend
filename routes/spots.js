@@ -36,6 +36,16 @@ const SPORT_TYPES = [
   'wakeboarding',
 ];
 
+// Spot venue categories
+const SPOT_CATEGORIES = [
+  { id: 'park', name: 'Park', icon: 'leaf' },
+  { id: 'street', name: 'Street', icon: 'business' },
+  { id: 'indoor', name: 'Indoor', icon: 'home' },
+  { id: 'diy', name: 'DIY', icon: 'construct' },
+  { id: 'resort', name: 'Resort', icon: 'snow' },
+  { id: 'other', name: 'Other', icon: 'ellipsis-horizontal' },
+];
+
 const schema = {
   name: Joi.string().required(),
   latitude: Joi.number().required(),
@@ -90,6 +100,11 @@ module.exports = (db) => {
         label: sport.charAt(0).toUpperCase() + sport.slice(1),
       })),
     });
+  });
+
+  // Get available spot categories - doesn't need DB
+  router.get('/spot-categories', (_req, res) => {
+    res.json({ spotCategories: SPOT_CATEGORIES });
   });
 
   // Search Google Places for autocomplete/location finding
