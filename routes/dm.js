@@ -42,6 +42,7 @@ const express = require('express');
 const auth = require('../middleware/auth');
 const { ObjectId } = require('mongodb');
 const { emitNewMessage, emitMessagesRead } = require('../socket/messageSocket');
+const notificationSender = require('../services/notificationSender');
 const _axios = require('axios');
 
 module.exports = (db) => {
@@ -322,7 +323,42 @@ module.exports = (db) => {
         });
       }
 
-      // TODO: Send push notification as fallback
+      // Push notification fallback — fires for the recipient on all their live tokens.
+      // Fire-and-forget so we don't slow the HTTP response.
+      (async () => {
+        try {
+          const sender = await usersCollection.findOne(
+            { _id: new ObjectId(senderId) },
+            { projection: { name: 1 } },
+          );
+          const title = sender?.name || 'New message';
+          const body =
+            message.type === 'shared'
+              ? previewContent
+              : message.content?.slice(0, 140) || 'New message';
+
+          const result = await notificationSender.send({
+            userId: recipientId,
+            category: 'messages',
+            title,
+            body,
+            threadId: conversationId,
+            channelId: 'messages',
+            interruptionLevel: 'active',
+            fromUserId: senderId,
+            data: {
+              category: 'messages',
+              conversationId,
+              url: `/(tabs)/homies/chat/${conversationId}`,
+            },
+          });
+          console.log(
+            `[dm] push → recipient ${recipientId} · sent ${result.sent} · skipped ${result.skipped || 'none'}`,
+          );
+        } catch (err) {
+          console.error('[dm] push send failed', err?.message || err);
+        }
+      })();
 
       res.status(201).send(message);
 

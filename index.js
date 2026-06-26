@@ -3,8 +3,18 @@ const http = require('http');
 const app = express();
 require('dotenv').config();
 
+// Trust the first proxy hop (AWS LB / nginx / Cloudflare). Required for
+// express-rate-limit v7+ to correctly identify clients via X-Forwarded-For,
+// otherwise it throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on every limited
+// endpoint (registration, login, etc.).
+app.set('trust proxy', 1);
+
 const { connectToDatabase, closeDatabase } = require('./db');
 const { initializeSocket } = require('./socket/index');
+const notificationSender = require('./services/notificationSender');
+const reminderPlanner = require('./services/reminderPlanner');
+const receiptsPoller = require('./workers/receiptsPoller');
+const reminderSender = require('./workers/reminderSender');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -26,6 +36,7 @@ const allowedOrigins = [
   'https://thetrickbook.com',
   'https://www.thetrickbook.com',
   'http://localhost:3000',
+  'http://localhost:3002',
   'http://localhost:8081',
 ];
 app.use(
@@ -46,6 +57,17 @@ app.use(express.json({ limit: '10mb' }));
 app.use(helmet());
 app.use(compression());
 app.use(bodyParser.json());
+
+// One-line request logger — keeps lock-screen/push debugging visible.
+// Skip noisy health checks. Safe to remove later if it gets too chatty.
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    console.log(`[req] ${req.method} ${req.originalUrl} → ${res.statusCode} (${ms}ms)`);
+  });
+  next();
+});
 
 async function startServer() {
   // Connect to MongoDB FIRST — single shared connection
@@ -69,7 +91,13 @@ async function startServer() {
 
   // Mount routes — pass db to factory functions
   app.use('/api/auth', authLimiter);
-  app.use('/api/users', registrationLimiter);
+  // Only rate-limit account creation (POST /api/users), not every /api/users/* read
+  app.use('/api/users', (req, res, next) => {
+    if (req.method === 'POST' && (req.path === '/' || req.path === '')) {
+      return registrationLimiter(req, res, next);
+    }
+    next();
+  });
   app.use('/api/categories', require('./routes/categories')(db));
   app.use('/api/listing', require('./routes/listing')(db));
   app.use('/api/listings', require('./routes/listings')(db));
@@ -78,8 +106,12 @@ async function startServer() {
   app.use('/api/auth', require('./routes/auth')(db));
   app.use('/api/blog', require('./routes/blog')(db));
   app.use('/api/my', require('./routes/my'));
-  app.use('/api/expoPushTokens', require('./routes/expoPushTokens'));
-  app.use('/api/messages', require('./routes/messages'));
+  app.use('/api/push-tokens', require('./routes/pushTokens')(db));
+  app.use(
+    '/api/users/me/notification-preferences',
+    require('./routes/notificationPreferences')(db),
+  );
+  app.use('/api/users/me/reminder-cadence', require('./routes/reminderCadence')(db));
   app.use('/api/image', require('./routes/image')(db));
   app.use('/api/blogImage', require('./routes/blogImage'));
   app.use('/api/contact', require('./routes/contact'));
@@ -101,6 +133,13 @@ async function startServer() {
   app.use('/api/stats', require('./routes/stats')(db));
   app.use('/api/analytics', require('./routes/analytics')(db));
 
+  // Notification subsystem — initialize sender/planner (creates indexes) and
+  // start the receipts poller + reminder sender workers.
+  notificationSender.init(db);
+  reminderPlanner.init(db);
+  receiptsPoller.start(db);
+  reminderSender.start(db);
+
   const port = process.env.PORT || config.get('port');
   server.listen(port, () => {
     console.log(`Server started on port ${port}...`);
@@ -111,6 +150,8 @@ async function startServer() {
 // Graceful shutdown
 function gracefulShutdown(signal) {
   console.log(`${signal} received. Shutting down gracefully...`);
+  receiptsPoller.stop();
+  reminderSender.stop();
   server.close(async () => {
     await closeDatabase();
     process.exit(0);
