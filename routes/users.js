@@ -95,7 +95,7 @@ module.exports = (db) => {
           createdAt: new Date(),
         };
 
-        await usersCollection.insertOne(user);
+        const result = await usersCollection.insertOne(user);
         // Don't send password back
         const { password: _, ...userResponse } = user;
         // Auto-add Kaori as homie for new users
