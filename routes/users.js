@@ -50,7 +50,12 @@ const schema = {
       id: Joi.string(),
       emoji: Joi.string(),
       bg: Joi.string(),
-    }).optional(),
+      // Web sends avatarIcon: null when no avatar is selected; allow it through
+      // so registration doesn't 400 on a null object. (Applied on prod 2026; this
+      // brings the live hotfix into git.)
+    })
+      .optional()
+      .allow(null),
   }).optional(),
 };
 
