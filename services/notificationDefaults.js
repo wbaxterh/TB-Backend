@@ -3,12 +3,13 @@
  * shape contract for the prefs subdoc. Spec: docs/docs/features/notifications.md §4.1.
  */
 
-const CATEGORIES = ['messages', 'reminders'];
+const CATEGORIES = ['messages', 'reminders', 'homies'];
 
 function buildDefaultNotificationPreferences() {
   return {
     messages: { push: true, inApp: true, email: false },
     reminders: { push: true, inApp: false, email: false },
+    homies: { push: true, inApp: true, email: false },
     quietHours: { start: '21:00', end: '09:00', timezone: 'America/New_York' },
     osPermission: { ios: 'unknown', android: 'unknown', web: 'unknown' },
     updatedAt: new Date(),

@@ -25,6 +25,7 @@ const timeStr = Joi.string().regex(/^\d{2}:\d{2}$/);
 const patchSchema = {
   messages: categorySchema.optional(),
   reminders: categorySchema.optional(),
+  homies: categorySchema.optional(),
   quietHours: Joi.object({
     start: timeStr.optional(),
     end: timeStr.optional(),
@@ -75,6 +76,7 @@ module.exports = (db) => {
     const allow = {
       messages: ['push', 'inApp', 'email'],
       reminders: ['push', 'inApp', 'email'],
+      homies: ['push', 'inApp', 'email'],
       quietHours: ['start', 'end', 'timezone'],
       osPermission: ['ios', 'android', 'web'],
     };

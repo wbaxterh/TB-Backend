@@ -9,6 +9,7 @@ const authAccountOrAdmin = require('../middleware/authAccountOrAdmin');
 const authAdmin = require('../middleware/authAdmin');
 const auth = require('../middleware/auth');
 const escapeRegex = require('../utils/escapeRegex');
+const notificationSender = require('../services/notificationSender');
 const ObjectId = require('mongodb').ObjectId;
 
 // Email transporter for password reset
@@ -498,6 +499,36 @@ module.exports = (db) => {
         );
         return res.send({ message: 'You are now homies!', autoAccepted: true });
       }
+
+      // Push notification to the recipient that they got a homie request.
+      // Fire-and-forget — never block or fail the request on a push error.
+      (async () => {
+        try {
+          const sender = await usersCollection.findOne(
+            { _id: new ObjectId(senderId) },
+            { projection: { name: 1 } },
+          );
+          const senderName = sender?.name || 'Someone';
+          const result = await notificationSender.send({
+            userId: targetId,
+            category: 'homies',
+            title: 'New homie request 🛹',
+            body: `${senderName} wants to be your homie`,
+            channelId: 'homies',
+            interruptionLevel: 'active',
+            fromUserId: senderId,
+            data: {
+              category: 'homies',
+              url: '/(tabs)/homies?tab=requests',
+            },
+          });
+          console.log(
+            `[homie-request] push → recipient ${targetId} · sent ${result.sent} · skipped ${result.skipped || 'none'}`,
+          );
+        } catch (err) {
+          console.error('[homie-request] push send failed', err?.message || err);
+        }
+      })();
 
       res.send({ message: 'Homie request sent' });
     } catch (error) {
