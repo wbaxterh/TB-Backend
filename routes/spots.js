@@ -92,6 +92,10 @@ module.exports = (db) => {
   const spotsCollection = db.collection('spots');
   const spotListsCollection = db.collection('spotlists');
 
+  spotsCollection
+    .createIndex({ approvalStatus: 1, latitude: 1, longitude: 1 }, { background: true })
+    .catch(() => {});
+
   // Get available sport types - doesn't need DB
   router.get('/sport-types', (_req, res) => {
     res.json({
@@ -371,31 +375,73 @@ module.exports = (db) => {
     }
   });
 
-  // Lightweight endpoint for map pins — returns only coordinates, name, and category
+  // Lightweight endpoint for map pins — coordinates only, trimmed projection.
+  // Supports bounding-box query (minLat, maxLat, minLng, maxLng) plus sportType/category filters.
   router.get('/map-pins', async (req, res) => {
     try {
+      const { minLat, maxLat, minLng, maxLng, sportType, category } = req.query;
+
+      const query = { approvalStatus: 'approved' };
+
+      const hasBounds =
+        minLat !== undefined &&
+        maxLat !== undefined &&
+        minLng !== undefined &&
+        maxLng !== undefined;
+
+      if (hasBounds) {
+        const minLatNum = parseFloat(minLat);
+        const maxLatNum = parseFloat(maxLat);
+        const minLngNum = parseFloat(minLng);
+        const maxLngNum = parseFloat(maxLng);
+
+        if (
+          Number.isNaN(minLatNum) ||
+          Number.isNaN(maxLatNum) ||
+          Number.isNaN(minLngNum) ||
+          Number.isNaN(maxLngNum)
+        ) {
+          return res.status(400).json({ error: 'Invalid bounding box parameters' });
+        }
+
+        query.latitude = { $gte: minLatNum, $lte: maxLatNum };
+
+        // Handle antimeridian crossing (e.g. min=170, max=-170 wraps the date line)
+        if (minLngNum <= maxLngNum) {
+          query.longitude = { $gte: minLngNum, $lte: maxLngNum };
+        } else {
+          query.$or = [
+            { longitude: { $gte: minLngNum } },
+            { longitude: { $lte: maxLngNum } },
+          ];
+        }
+      } else {
+        query.latitude = { $exists: true };
+        query.longitude = { $exists: true };
+      }
+
+      if (sportType && sportType !== 'all') {
+        query.sportTypes = sportType;
+      }
+
+      if (category && category !== 'all') {
+        query.category = category;
+      }
+
       const pins = await spotsCollection
-        .find(
-          {
-            approvalStatus: 'approved',
-            latitude: { $exists: true },
-            longitude: { $exists: true },
+        .find(query, {
+          projection: {
+            name: 1,
+            latitude: 1,
+            longitude: 1,
+            category: 1,
+            sportTypes: 1,
+            rating: 1,
+            imageURL: 1,
+            city: 1,
+            state: 1,
           },
-          {
-            projection: {
-              name: 1,
-              latitude: 1,
-              longitude: 1,
-              category: 1,
-              sportTypes: 1,
-              state: 1,
-              country: 1,
-              rating: 1,
-              description: 1,
-              imageURL: 1,
-            },
-          },
-        )
+        })
         .toArray();
 
       res.json(pins);
