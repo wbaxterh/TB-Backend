@@ -32,12 +32,15 @@ const character = kaoriProfile as VoiceCharacter;
 
 const PORT = Number(process.env.PORT ?? 3040);
 const ROOT = path.dirname(Bun.fileURLToPath(import.meta.url));
+// Vendored Python sidecar (git-tracked at kith-voice/python-sidecar). We
+// keep our own copy so local pipeline patches — e.g. forwarding the
+// `speed` voice setting the upstream pipeline drops — survive `bun install`
+// wiping node_modules. Build its venv once with python-sidecar/setup.sh.
+// Env vars still override (e.g. a shared venv on the EC2 box).
 const PYTHON_VENV =
-  process.env.PIPECAT_PYTHON_PATH ||
-  path.resolve(ROOT, '../node_modules/@kithjs/runtime-pipecat/python/.venv/bin/python');
+  process.env.PIPECAT_PYTHON_PATH || path.resolve(ROOT, '../python-sidecar/.venv/bin/python');
 const PYTHON_CWD =
-  process.env.PIPECAT_PYTHON_CWD ||
-  path.resolve(ROOT, '../node_modules/@kithjs/runtime-pipecat/python');
+  process.env.PIPECAT_PYTHON_CWD || path.resolve(ROOT, '../python-sidecar');
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
 const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'klHOJHbGA89BjwulA7MN';
@@ -231,3 +234,7 @@ const server = Bun.serve<WsData>({
 });
 
 console.log(`[kith] Kaori voice service listening on http://localhost:${server.port}`);
+// Make the active sidecar auditable (guards against a stale override
+// silently running an unpatched, no-speed copy).
+console.log(`[kith] python sidecar cwd:  ${PYTHON_CWD}`);
+console.log(`[kith] python interpreter:  ${PYTHON_VENV}`);

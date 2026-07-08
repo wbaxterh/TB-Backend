@@ -1,0 +1,29 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "kith-voice-kaori",
+      "dependencies": {
+        "@kithjs/core": "^0.1.0",
+        "@kithjs/observability": "^0.1.0",
+        "@kithjs/runtime-pipecat": "^0.1.0",
+        "@kithjs/voice-router": "^0.1.0",
+      },
+      "devDependencies": {
+        "typescript": "^5.6.0",
+      },
+    },
+  },
+  "packages": {
+    "@kithjs/core": ["@kithjs/core@0.1.0", "", {}, "sha512-hDM6wucPb7PsWvAwzlLINDpHNfpSw6h0bw1UKdO+w76G2DAFB9lOvJyydu1ft4lzP2/V43fKN69KW6jeEM0p2g=="],
+
+    "@kithjs/observability": ["@kithjs/observability@0.1.0", "", { "dependencies": { "@kithjs/core": "^0.1.0" } }, "sha512-dPgVpjlVzpO51xx4t4wVw7AUd7huCh3f8Co9lPm2w+i8ZC7WZM03g6C1sKXwgZNHr8Eq8Q1wNatvnWT9RxZUoQ=="],
+
+    "@kithjs/runtime-pipecat": ["@kithjs/runtime-pipecat@0.1.0", "", { "dependencies": { "@kithjs/core": "^0.1.0" } }, "sha512-bkZ1n3Pt+mqkO3VoRGMgCb8k4SB4v66UpkZ1pmrrS2s1YTDKS/hCYz4D6fAZyeYKC/g66tXVet4pC8s3TEG3nA=="],
+
+    "@kithjs/voice-router": ["@kithjs/voice-router@0.1.0", "", { "dependencies": { "@kithjs/core": "^0.1.0" } }, "sha512-vW5vt5xLgBHIlFodHfsoc1dqiWhvyWIrFxaeXSTakjDKHslLW6h2kE3XaJUoD35u+klP/zEvj7dQfNcFSClSNA=="],
+
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+  }
+}

@@ -1,0 +1,28 @@
+[project]
+name = "kith-runtime-pipecat"
+version = "0.0.0"
+description = "Python sidecar for @kith/runtime-pipecat."
+requires-python = ">=3.11"
+# Major versions capped so a rebuild months later can't pull a breaking
+# SDK (e.g. an elevenlabs 3.x that changes text_to_speech.convert or how
+# `speed` is accepted). requirements-lock.txt holds the exact working set;
+# setup.sh installs from it. These caps are the fallback when it isn't used.
+dependencies = [
+  "websockets>=12.0,<17",
+  "pydantic>=2.6,<3",
+  "elevenlabs>=2.0,<3",
+]
+
+[project.optional-dependencies]
+# Pipecat services wired in Day 4. Kept optional so the mock sidecar runs
+# without needing to resolve Pipecat's dependency tree.
+pipecat = [
+  "pipecat-ai[elevenlabs,silero,openai]>=0.0.40",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["kith_runtime"]
