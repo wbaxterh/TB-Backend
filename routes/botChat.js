@@ -6,6 +6,21 @@ require('dotenv').config();
 module.exports = (db) => {
   const router = express.Router();
 
+  // History reads run on every message send — keep them indexed
+  // (fire-and-forget, mirrors routes/companionProfile.js)
+  db.collection('bot_chats')
+    .createIndex({ fromUserId: 1, toUserId: 1, createdAt: -1 })
+    .catch(() => {});
+  db.collection('bot_chats')
+    .createIndex({ toUserId: 1, fromUserId: 1, createdAt: -1 })
+    .catch(() => {});
+  db.collection('conversations')
+    .createIndex({ participants: 1 })
+    .catch(() => {});
+  db.collection('dm_messages')
+    .createIndex({ conversationId: 1, createdAt: -1 })
+    .catch(() => {});
+
   // GET /api/bot-chat/bots - List all available bots
   router.get('/bots', async (_req, res) => {
     try {
@@ -68,6 +83,9 @@ module.exports = (db) => {
     try {
       const { botId, message } = req.body;
       const userId = req.user.userId;
+      // Kith voice session ID (sent by the mobile Kaori 3D stage) — same
+      // contract as the web Kaori Live client (see dm.js).
+      const kithSessionId = req.headers['x-kith-session'] || '';
 
       if (!botId || !message) {
         return res.status(400).json({ error: 'botId and message are required' });
@@ -95,35 +113,45 @@ module.exports = (db) => {
       const userMessageResult = await db.collection('bot_chats').insertOne(userMessage);
       userMessage._id = userMessageResult.insertedId;
 
-      // Forward to ElizaOS API, fall back to OpenRouter if unavailable
+      // Generate the reply. Kaori goes straight to her own brain (the
+      // ElizaOS hop always 401s and only added a wasted roundtrip + long
+      // timeout); other bot characters keep the Eliza path so they aren't
+      // silently rerouted through the Kaori persona + Kaori's history.
+      const isKaori = (bot.botCharacter || 'kaori') === 'kaori';
       let botResponse;
-      try {
-        const elizaResponse = await axios.post(
-          'http://localhost:3001/api/chat',
-          {
-            userId: userId,
-            message: message,
-            character: bot.botCharacter || 'kaori',
-          },
-          {
-            timeout: 30000,
-          },
-        );
-
-        botResponse = elizaResponse.data.response || 'Sorry, I had trouble responding to that!';
-      } catch (elizaError) {
-        console.error('ElizaOS API error:', elizaError.message);
-        // Fallback to OpenRouter/Kaori AI response
+      if (!isKaori || process.env.BOTCHAT_USE_ELIZA === 'true') {
+        try {
+          const elizaResponse = await axios.post(
+            'http://localhost:3001/api/chat',
+            {
+              userId: userId,
+              message: message,
+              character: bot.botCharacter || 'kaori',
+            },
+            {
+              timeout: 10000,
+            },
+          );
+          botResponse = elizaResponse.data.response;
+        } catch (elizaError) {
+          console.error('ElizaOS API error:', elizaError.message);
+        }
+      }
+      if (!botResponse && isKaori) {
         try {
           const { generateKaoriResponse } = require('../kaori-ai-response');
-          botResponse = await generateKaoriResponse(message, db, null, userId);
+          // A kith session means the user is on the live 3D stage — Kaori
+          // structures demo replies so her body can act them out.
+          botResponse = await generateKaoriResponse(message, db, null, userId, {
+            onStage: Boolean(kithSessionId),
+          });
         } catch (fallbackErr) {
           console.error('Kaori fallback error:', fallbackErr.message);
         }
-        if (!botResponse) {
-          botResponse =
-            "Hey! I'm having some technical difficulties right now. Can you try again in a moment? 🤖✨";
-        }
+      }
+      if (!botResponse) {
+        botResponse =
+          "Hey! I'm having some technical difficulties right now. Can you try again in a moment? 🤖✨";
       }
 
       // Save bot response
@@ -144,6 +172,20 @@ module.exports = (db) => {
         userMessage,
         botMessage,
       });
+
+      // Fire-and-forget: stream Kaori's reply as voice through the Kith
+      // sidecar (mirrors dm.js). Session ids are UUIDs minted by Kith —
+      // validate the client-supplied header before putting it in a URL.
+      // axios (unlike http.request) also handles https and path-prefixed
+      // KITH_VOICE_URL values. Runs after res.json, so it must never throw
+      // into the outer catch (headers already sent).
+      const isValidKithSession = /^[0-9a-f-]{36}$/i.test(kithSessionId);
+      if (isValidKithSession && process.env.KITH_VOICE_URL) {
+        const base = process.env.KITH_VOICE_URL.replace(/\/$/, '');
+        axios
+          .post(`${base}/speak/${kithSessionId}`, { text: botResponse }, { timeout: 5000 })
+          .catch((e) => console.error('[BotChat] Kith voice request error:', e.message));
+      }
     } catch (error) {
       console.error('Error in bot chat:', error);
       res.status(500).json({ error: 'Failed to process bot chat' });

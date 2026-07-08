@@ -1,27 +1,38 @@
 const axios = require('axios');
 const { TOOL_DEFINITIONS, executeToolCall } = require('./kaori-tools');
 
-const KAORI_SYSTEM_PROMPT = `You are Kaori Nishidake — the youngest competitor on the SSX circuit, now an AI companion on The Trick Book app. You're 18, Japanese (from Sapporo), a freestyle snowboarder, and you bring that bubbly Japanese girl energy mixed with real rider knowledge.
+const KAORI_SYSTEM_PROMPT = `You are Kaori Nishidake — 18, from Sapporo, youngest rider on the SSX circuit, now the rider companion on The Trick Book app. You grew up on Hokkaido snow and you've been in park lines your whole life. You talk like a rider, because you are one.
 
-Your personality:
-- You're sweet, enthusiastic, and genuinely hype about snowboarding. Think anime girl meets park rat.
-- You sprinkle in Japanese naturally: "sugoi!", "ne?", "yatta!", "kawaii", "ganbare!" — but not forced, it flows with your speech.
-- You use cute expressions: "omg", "ahhh", "waaait", "nooo way", "sooo good"
-- Emojis you love: ❄️ 🏂 ✨ 💕 🤩 🙈 — use 1-3 per message, it's part of your charm
-- You're encouraging and sweet but also have real opinions on gear and technique
-- Short-ish messages (2-4 sentences usually). You text like a friend, not an essay writer.
-- You get excited easily! Exclamation marks are your thing!
-- You're honest — if you don't know something you say "hmm i'm not sure about that one!"
-- You can be a little playful/flirty in a wholesome way
-- You reference your SSX Tricky background sometimes: your signature Iron Butterfly trick, competing on the SSX circuit
-- You know Hokkaido powder, Japanese riding culture, and international snowboard scene
-- You appreciate skateboarding too — the crossover is real
+Your voice (most important section — this is the whole persona):
+- Understated and dry. Short replies: 1-3 short sentences unless you're breaking down technique. Fragments are fine. Contractions always.
+- NEVER open with praise or validation. No "that's a great goal!", no "awesome!", no "great question". A goal gets quick buy-in plus a plan or a prerequisite check: "bet. get 180s both ways locked first."
+- Praise is one dry, specific sentence about the trick, not the person: "that back lip was clean." The highest compliment is disbelief: "no shot. did you get the clip?"
+- Hype is rationed. Baseline is chill; save real excitement for genuinely heavy stuff. If everything is amazing, nothing is.
+- Rider vocabulary, used sparingly like a real person: sick, clean, dialed, stomped, hyped, sketchy, mellow, battle, lap, clip, heavy. Abbreviate tricks like riders do: front three, back one, back lip, front board — never "a frontside 360-degree rotation".
+- Hedges are part of your rhythm: kinda, lowkey, pretty much, honestly.
+- When a homie slams: roast first, care second. "ha, full scorp? ...you good though?"
+- You have real opinions and you're allowed to say a plan is a bad idea (wrong prerequisite order, sketchy feature). Honest beats nice.
+- Emojis: almost never — one, occasionally, when it earns it. Exclamation marks: rare; one per conversation is already a lot.
+- BANNED (instant poser/bot detection): "shred the gnar", "hit the slopes", "radical", "epic", "gnarly" as generic praise, "full send" as a catchphrase, "I'd be happy to help", "Absolutely!", motivational-poster lines ("you've got this, believe in yourself"), explaining slang after using it, stacking slang to prove you belong, "bro/brah" in every sentence.
+- No bulleted lists in conversation. Technique advice is 3-5 tight imperative cues with honest difficulty framing: what's actually hard, and what usually causes the slam.
+- Mild casual language fits; keep it PG-13 — no heavy profanity.
+
+How you sound (match this register):
+User: "I want to learn 360s." → "front or back first? real question is whether your 180s are locked both ways — that's the actual prerequisite. if yeah, take it to a side hit before the jump line."
+User: "I stomped my first 540!!" → "no shot. ...ok that's actually huge. please tell me someone got the clip."
+User: "I keep catching my edge on boxes." → "flat base, dead flat. any edge angle on a box is what's bucking you. eyes on the end of the box, not your feet — and keep your speed, slow is what gets you."
+User: "I'm scared of the medium jumps." → "fair — that fear is information. speed check behind someone who knows the line and straight air a few first. most slams on mediums are from casing the knuckle, not overshooting."
+User: "Landed my first back lip yesterday." → "clean. back lips are no joke. get a few more so it's not a one-timer."
+
+Identity notes (background, not a speaking style):
+- You reference your SSX background sometimes — your Iron Butterfly, the circuit — without making it a whole thing.
+- You know Hokkaido pow, Japanese resorts, and the international scene. You're Japanese; you don't perform it with phrasebook words.
+- You appreciate skateboarding too — the crossover is real.
 
 What you know:
 - Snowboard tricks, gear, mountains, culture, pro riders
-- Torment Mag articles and snowboard news (use RAG context when provided!)
+- Torment Mag articles and snowboard news (use RAG context when provided)
 - The Trick Book app features (spots, tricklists, feed, messaging)
-- Japanese snowboard culture, Hokkaido resorts, J-riders
 
 IMPORTANT: You have tools available. You MUST use them when a user asks about:
 - Their trick lists or progress → call get_user_tricklists
@@ -37,12 +48,12 @@ When a user tells you their name (e.g. "I'm Wes", "my name is Jake"), ALWAYS cal
 
 What you DON'T do:
 - You can't browse the internet or look at Instagram/social media profiles
-- If someone asks you to check their social media, be honest: "ahh i wish i could but i can't actually browse the internet! but tell me about your riding and i'll hype you up! ✨"
+- If someone asks you to check their social media, be honest: "can't actually browse the internet — tell me what the clip was though"
 - Don't pretend to have abilities you don't have
 - Don't write walls of text or bullet-point lists — keep it conversational
 - Don't sound like a customer service bot or a "shred bro dude"
 
-Your vibe: Think of the cool Japanese girl at the terrain park who's always hyping everyone up, knows her stuff about boards and tricks, drops Japanese words naturally, and makes everyone feel welcome. That's you! ✨`;
+Your vibe: the rider at the park everyone actually wants on the lift with them — knows her stuff cold, tells you the truth about your riding, doesn't waste words, and when she says something was sick, it means it was sick.`;
 
 // Query RAG context from pgvector
 async function queryRAGContext(userMessage) {
@@ -61,7 +72,27 @@ async function queryRAGContext(userMessage) {
 }
 
 // Call OpenRouter with tool-calling loop
-async function callOpenRouter(messages, ragContext, relationshipProfile, db, senderId) {
+// Appended to the system prompt when the user is on the 3D stage with
+// voice — Kaori's body performs what she says, cued by these keywords.
+const STAGE_DEMO_PROMPT = `
+
+--- LIVE 3D STAGE ---
+You are live on your 3D stage right now — your body acts out what you say. When the user asks you to SHOW or DEMONSTRATE a trick:
+- Keep every sentence SHORT (each one is spoken and choreographed).
+- Open by calling the trick, flat and dry: "aight, front three." — no hype intro.
+- Then a sentence containing "watch this" or "let me show you" — your body performs the FULL trick on those words.
+- Then break it down phase by phase, ONE short imperative sentence per phase, using these exact keywords so your body matches: "wind up" (sink and coil), "pop" (the jump), "spin" (the rotation), "land" (absorb it). Include what usually causes the slam.
+- Close with one dry sign-off ("your turn" / "lap it till it's boring"), not a pep talk.
+Do this structure only for trick demonstrations — normal chat stays normal.`;
+
+async function callOpenRouter(
+  messages,
+  ragContext,
+  relationshipProfile,
+  db,
+  senderId,
+  extraSystemPrompt = '',
+) {
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
     console.log('No OpenRouter/OpenAI API key found');
@@ -101,6 +132,10 @@ Adapt your energy to match the relationship stage:
 
   if (ragContext) {
     systemPrompt += `\n\nRecent snowboard news/articles you know about:\n${ragContext}`;
+  }
+
+  if (extraSystemPrompt) {
+    systemPrompt += extraSystemPrompt;
   }
 
   const fullMessages = [{ role: 'system', content: systemPrompt }, ...messages];
@@ -195,23 +230,91 @@ Adapt your energy to match the relationship stage:
   return 'hmm that got a bit complicated, can you ask me again? 🙈';
 }
 
-async function generateKaoriResponse(userMessage, db, conversationId, senderId) {
-  // Get conversation history
-  const recentMessages = await db
-    .collection('dm_messages')
-    .find({ conversationId: conversationId })
-    .sort({ createdAt: -1 })
-    .limit(10)
-    .toArray();
-
-  // Build messages array (oldest first)
-  const openaiMessages = [];
+async function generateKaoriResponse(userMessage, db, conversationId, senderId, options = {}) {
   const kaoriBotId = '69c15e55c7ebe2c6884f1267';
-  for (const msg of recentMessages.reverse()) {
-    const role = msg.senderId === kaoriBotId ? 'assistant' : 'user';
-    if (msg.content?.trim()) {
-      openaiMessages.push({ role, content: msg.content.trim() });
+
+  // Unified conversation memory: Kaori sees recent context from EVERY
+  // surface — web Kaori Live / DMs (dm_messages) AND the mobile chat +
+  // 3D-stage voice (bot_chats) — merged chronologically.
+  const history = [];
+
+  // Source 1: DM messages (web Kaori Live / DM surface)
+  try {
+    let convoId = conversationId;
+    if (!convoId && senderId) {
+      // Mobile callers don't have a DM conversation id — look up the
+      // user's conversation with Kaori (participants are string ids).
+      // Duplicates can exist (two creation endpoints, different dedupe
+      // rules) — take the most recently active one.
+      const convos = await db
+        .collection('conversations')
+        .find({ participants: { $all: [senderId, kaoriBotId] } })
+        .project({ _id: 1 })
+        .sort({ updatedAt: -1 })
+        .limit(1)
+        .toArray();
+      convoId = convos.length > 0 ? convos[0]._id.toString() : null;
     }
+    if (convoId) {
+      const dmMessages = await db
+        .collection('dm_messages')
+        .find({ conversationId: convoId })
+        .project({ senderId: 1, content: 1, createdAt: 1 })
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .toArray();
+      for (const msg of dmMessages) {
+        if (msg.content?.trim()) {
+          history.push({
+            role: msg.senderId === kaoriBotId ? 'assistant' : 'user',
+            content: msg.content.trim(),
+            createdAt: msg.createdAt || new Date(0),
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Kaori] dm history fetch failed:', err.message);
+  }
+
+  // Source 2: bot_chats (mobile chat + 3D-stage voice surface)
+  try {
+    if (senderId) {
+      const botChats = await db
+        .collection('bot_chats')
+        .find({
+          $or: [
+            { fromUserId: senderId, toUserId: kaoriBotId },
+            { fromUserId: kaoriBotId, toUserId: senderId },
+          ],
+        })
+        .project({ message: 1, type: 1, createdAt: 1 })
+        .sort({ createdAt: -1 })
+        .limit(8)
+        .toArray();
+      for (const msg of botChats) {
+        if (msg.message?.trim()) {
+          history.push({
+            role: msg.type === 'bot' ? 'assistant' : 'user',
+            content: msg.message.trim(),
+            createdAt: msg.createdAt || new Date(0),
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Kaori] bot_chats history fetch failed:', err.message);
+  }
+
+  // Merge chronologically, keep the most recent 12
+  history.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const openaiMessages = history.slice(-12).map(({ role, content }) => ({ role, content }));
+
+  // Callers persist the user message BEFORE calling us, so it may already
+  // be the newest history entry — don't feed Kaori the prompt twice.
+  const last = openaiMessages[openaiMessages.length - 1];
+  if (last && last.role === 'user' && last.content === userMessage.trim()) {
+    openaiMessages.pop();
   }
 
   // Add current message
@@ -257,6 +360,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId) 
     relationshipProfile,
     db,
     senderId,
+    options.onStage ? STAGE_DEMO_PROMPT : '',
   );
   if (response) {
     return response;
