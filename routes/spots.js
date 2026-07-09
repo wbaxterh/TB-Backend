@@ -410,10 +410,7 @@ module.exports = (db) => {
         if (minLngNum <= maxLngNum) {
           query.longitude = { $gte: minLngNum, $lte: maxLngNum };
         } else {
-          query.$or = [
-            { longitude: { $gte: minLngNum } },
-            { longitude: { $lte: maxLngNum } },
-          ];
+          query.$or = [{ longitude: { $gte: minLngNum } }, { longitude: { $lte: maxLngNum } }];
         }
       } else {
         query.latitude = { $exists: true };
@@ -440,6 +437,8 @@ module.exports = (db) => {
             imageURL: 1,
             city: 1,
             state: 1,
+            country: 1,
+            description: 1,
           },
         })
         .toArray();
