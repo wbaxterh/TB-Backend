@@ -123,22 +123,72 @@ module.exports = (db) => {
     }
   });
 
+  // Public lookup by email. Returns ONLY safe, non-sensitive fields — never the
+  // password hash or password-reset tokens (this endpoint has no auth, so it
+  // previously let anyone dump any account's hash + live reset token).
+  const PUBLIC_USER_PROJECTION = {
+    name: 1,
+    email: 1,
+    imageUri: 1,
+    sports: 1,
+    riderProfile: 1,
+  };
+
   router.get('/', async (req, res) => {
+    if (!req.query.email) {
+      return res.status(400).send({ error: 'email query parameter is required' });
+    }
     try {
-      console.log(req.query.email);
-      const userExists2 = await usersCollection.findOne({
-        email: req.query.email,
-      });
-      res.status(200).send(userExists2);
+      const user = await usersCollection.findOne(
+        { email: req.query.email },
+        { projection: PUBLIC_USER_PROJECTION },
+      );
+      res.status(200).send(user);
     } catch (_error) {
       res.status(400).send('Error Getting User');
     }
   });
 
-  router.get('/all', authAdmin(), async (_req, res) => {
+  // Admin-only, paginated, and projected. Never ships password hashes or reset
+  // tokens, and never dumps the whole collection into memory/over the wire.
+  router.get('/all', authAdmin(), async (req, res) => {
     try {
-      const users = await usersCollection.find().toArray();
-      res.status(200).send(users);
+      const page = Math.max(0, Number.parseInt(req.query.page, 10) || 0);
+      const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+      const search = (req.query.search || '').trim();
+
+      const filter = {};
+      if (search) {
+        const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        filter.$or = [
+          { name: { $regex: safe, $options: 'i' } },
+          { email: { $regex: safe, $options: 'i' } },
+        ];
+      }
+
+      const projection = {
+        name: 1,
+        email: 1,
+        role: 1,
+        imageUri: 1,
+        sports: 1,
+        isBot: 1,
+        network: 1,
+        createdAt: 1,
+      };
+
+      const [items, total] = await Promise.all([
+        usersCollection
+          .find(filter)
+          .project(projection)
+          .sort({ createdAt: -1 })
+          .skip(page * limit)
+          .limit(limit)
+          .toArray(),
+        usersCollection.countDocuments(filter),
+      ]);
+
+      res.status(200).send({ items, total, page, limit, totalPages: Math.ceil(total / limit) });
     } catch (error) {
       console.error(error);
       res.status(500).send('Error getting users');

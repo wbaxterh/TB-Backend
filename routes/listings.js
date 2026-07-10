@@ -5,8 +5,9 @@ const multer = require('multer');
 
 const _store = require('../store/listings');
 // const validateWith = require("../middleware/validation");
-const _auth = require('../middleware/auth');
+const auth = require('../middleware/auth');
 const authAdmin = require('../middleware/authAdmin');
+const jwt = require('jsonwebtoken');
 const _delay = require('../middleware/delay');
 const _listingMapper = require('../mappers/listings');
 const _config = require('config');
@@ -35,6 +36,23 @@ module.exports = (db) => {
   console.log('Connected to Database');
   const tricksCollection = db.collection('tricklists');
 
+  const isAdmin = (req) => req.user?.role === 'admin';
+  // Returns the userId string from the x-auth-token if present and valid, else null.
+  const optionalUserId = (req) => {
+    const token = req.header('x-auth-token');
+    if (!token) return null;
+    try {
+      return jwt.verify(token, process.env.JWT_SECRET).userId;
+    } catch (_err) {
+      return null;
+    }
+  };
+  const userOwnsList = async (listId, userId) => {
+    if (!ObjectId.isValid(listId)) return false;
+    const list = await tricksCollection.findOne({ _id: new ObjectId(listId) });
+    return !!list && String(list.user?.$id) === String(userId);
+  };
+
   //SIMPLE GET TRICKLISTS
   // router.get("/", (req, res) => {
   //   // console.log(req.query.userId);
@@ -53,10 +71,14 @@ module.exports = (db) => {
   //GET TRICK LISTS WITH COMPLETE STATUS
   router.get('/', async (req, res) => {
     try {
-      const trickLists = await db
-        .collection('tricklists')
-        .find({ 'user.$id': req.query.userId })
-        .toArray();
+      // Only the owner (proven via a valid token) sees private lists; everyone
+      // else — logged out or viewing another rider — sees public lists only.
+      const requesterId = optionalUserId(req);
+      const isOwner = requesterId && String(requesterId) === String(req.query.userId);
+      const listQuery = { 'user.$id': req.query.userId };
+      if (!isOwner) listQuery.isPublic = true;
+
+      const trickLists = await db.collection('tricklists').find(listQuery).toArray();
       const trickIds = trickLists.flatMap((trickList) =>
         trickList.tricks.map((trick) => trick._id),
       );
@@ -122,6 +144,7 @@ module.exports = (db) => {
 
   router.post(
     '/',
+    auth,
     // [
     //   // Order of these middleware matters.
     //   // "upload" should come before other "validate" because we have to handle
@@ -140,7 +163,7 @@ module.exports = (db) => {
     async (req, res) => {
       const listing = {
         name: req.body.title,
-        user: new DBRef('users', req.body.userId),
+        user: new DBRef('users', req.user.userId),
         completed: 0,
         tricks: [],
         isPublic: req.body.isPublic === true,
@@ -168,11 +191,14 @@ module.exports = (db) => {
       // res.status(201).send(listing);
     },
   );
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', auth, async (req, res) => {
     const id = req.params.id;
 
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: 'Invalid ID' });
+    }
+    if (!isAdmin(req) && !(await userOwnsList(id, req.user.userId))) {
+      return res.status(403).send({ error: 'Access denied.' });
     }
     const result = await db.collection('tricklists').deleteOne({ _id: new ObjectId(id) });
 
@@ -187,7 +213,10 @@ module.exports = (db) => {
       }
     }
   });
-  router.put('/edit', async (req, res) => {
+  router.put('/edit', auth, async (req, res) => {
+    if (!isAdmin(req) && !(await userOwnsList(req.body.trickListId, req.user.userId))) {
+      return res.status(403).send({ error: 'Access denied.' });
+    }
     const filter3 = { _id: new ObjectId(req.body.trickListId) };
     const update2 = { $set: { name: req.body.name } };
     try {
@@ -198,10 +227,30 @@ module.exports = (db) => {
       return res.status(400).send(error);
     }
   });
-  router.get('/all', authAdmin(), async (_req, res) => {
+  // Admin-only + paginated. Previously dumped every tricklist (with embedded
+  // tricks arrays) unbounded — one of the queries that timed out /admin.
+  router.get('/all', authAdmin(), async (req, res) => {
     try {
-      const allTrickLists = await tricksCollection.find().toArray();
-      res.status(200).send(allTrickLists);
+      const page = Math.max(0, Number.parseInt(req.query.page, 10) || 0);
+      const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+      const [items, total] = await Promise.all([
+        tricksCollection
+          .find()
+          .project({ name: 1, user: 1, completed: 1, isPublic: 1, createdAt: 1, tricks: 1 })
+          .sort({ createdAt: -1 })
+          .skip(page * limit)
+          .limit(limit)
+          .toArray(),
+        tricksCollection.countDocuments(),
+      ]);
+      // Collapse the tricks array to a count for the list view.
+      const rows = items.map(({ tricks, ...rest }) => ({
+        ...rest,
+        tricksCount: Array.isArray(tricks) ? tricks.length : 0,
+      }));
+      res
+        .status(200)
+        .send({ items: rows, total, page, limit, totalPages: Math.ceil(total / limit) });
     } catch (error) {
       console.error(error);
       res.status(500).send('Error getting tricks');
@@ -221,6 +270,7 @@ module.exports = (db) => {
         .find({
           _id: { $in: userIds.map((id) => (typeof id === 'string' ? new ObjectId(id) : id)) },
         })
+        .project({ name: 1 })
         .toArray();
 
       const userMap = users.reduce((map, user) => {
@@ -243,12 +293,15 @@ module.exports = (db) => {
   });
 
   // Toggle trick list visibility (public/private)
-  router.put('/:id/visibility', async (req, res) => {
+  router.put('/:id/visibility', auth, async (req, res) => {
     const id = req.params.id;
     const { isPublic } = req.body;
 
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: 'Invalid ID' });
+    }
+    if (!isAdmin(req) && !(await userOwnsList(id, req.user.userId))) {
+      return res.status(403).send({ error: 'Access denied.' });
     }
 
     try {

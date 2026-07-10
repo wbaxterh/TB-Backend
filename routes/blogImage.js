@@ -3,6 +3,7 @@ const router = express.Router();
 const AWS = require('aws-sdk');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
+const authAdmin = require('../middleware/authAdmin');
 
 const s3 = new AWS.S3({
   accessKeyId: process.env.AWS_KEY,
@@ -29,9 +30,13 @@ const upload = multer({
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 }, // Set file size limit to 5MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) return cb(null, true);
+    cb(new Error('Only image files are allowed'));
+  },
 });
 
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', authAdmin(), upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
@@ -39,7 +44,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   res.status(200).send({ imageUrl });
 });
 
-router.delete('/delete-folder/:slug', async (req, res) => {
+router.delete('/delete-folder/:slug', authAdmin(), async (req, res) => {
   const { slug } = req.params;
 
   // Define the S3 bucket and prefix (folder)

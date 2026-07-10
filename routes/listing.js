@@ -2,7 +2,8 @@
 const express = require('express');
 
 const _store = require('../store/listings');
-const _auth = require('../middleware/auth');
+const auth = require('../middleware/auth');
+const authAdmin = require('../middleware/authAdmin');
 const _listingMapper = require('../mappers/listings');
 
 const ObjectId = require('mongodb').ObjectId;
@@ -14,6 +15,22 @@ module.exports = (db) => {
   const trickCollection = db.collection('tricks');
   const spotsCollection = db.collection('spots');
   const _trick_id = '';
+
+  // Ownership helpers. A trick's owner is the owner of the tricklist that
+  // contains it (tricklists.user.$id, stored as the string userId — the same
+  // value the JWT carries and existing GET queries match on). String-compared
+  // so a legacy ObjectId-typed $id still resolves.
+  const isAdmin = (req) => req.user?.role === 'admin';
+  const userOwnsTrickList = async (listId, userId) => {
+    if (!ObjectId.isValid(listId)) return false;
+    const list = await tricksCollection.findOne({ _id: new ObjectId(listId) });
+    return !!list && String(list.user?.$id) === String(userId);
+  };
+  const userOwnsTrick = async (trickId, userId) => {
+    if (!ObjectId.isValid(trickId)) return false;
+    const list = await tricksCollection.findOne({ 'tricks._id': new ObjectId(trickId) });
+    return !!list && String(list.user?.$id) === String(userId);
+  };
 
   // Helper: populate spot data for tricks that have spotId
   const populateSpotData = async (tricks) => {
@@ -48,10 +65,22 @@ module.exports = (db) => {
       .catch((error) => console.error(error));
   });
 
-  router.get('/allData', async (_req, res) => {
+  // Admin-only + paginated. Previously unauthenticated and dumped the entire
+  // tricks collection (every user's private trick data) on every call.
+  router.get('/allData', authAdmin(), async (req, res) => {
     try {
-      const allTricks = await trickCollection.find().toArray();
-      res.status(200).send(allTricks);
+      const page = Math.max(0, Number.parseInt(req.query.page, 10) || 0);
+      const limit = Math.min(200, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
+      const [items, total] = await Promise.all([
+        trickCollection
+          .find()
+          .sort({ createdAt: -1 })
+          .skip(page * limit)
+          .limit(limit)
+          .toArray(),
+        trickCollection.countDocuments(),
+      ]);
+      res.status(200).send({ items, total, page, limit, totalPages: Math.ceil(total / limit) });
     } catch (error) {
       res.status(500).send(error);
     }
@@ -71,7 +100,7 @@ module.exports = (db) => {
   });
 
   //data for graph
-  router.get('/graph', async (_req, res) => {
+  router.get('/graph', authAdmin(), async (_req, res) => {
     try {
       const results = await trickCollection
         .aggregate([
@@ -123,10 +152,13 @@ module.exports = (db) => {
     }
   });
 
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', auth, async (req, res) => {
     const id = req.params.id;
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: 'Invalid ID' });
+    }
+    if (!isAdmin(req) && !(await userOwnsTrick(id, req.user.userId))) {
+      return res.status(403).send({ error: 'Access denied.' });
     }
     const result = await db.collection('tricks').deleteOne({ _id: new ObjectId(id) });
     if (result.deletedCount === 0) {
@@ -144,7 +176,10 @@ module.exports = (db) => {
     }
   });
 
-  router.put('/edit', async (req, res) => {
+  router.put('/edit', auth, async (req, res) => {
+    if (!isAdmin(req) && !(await userOwnsTrick(req.body.trickId, req.user.userId))) {
+      return res.status(403).send({ error: 'Access denied.' });
+    }
     const filter3 = { _id: new ObjectId(req.body.trickId) };
     const setFields = {
       name: req.body.name,
@@ -172,7 +207,10 @@ module.exports = (db) => {
     }
   });
 
-  router.put('/update', async (req, res) => {
+  router.put('/update', auth, async (req, res) => {
+    if (!isAdmin(req) && !(await userOwnsTrick(req.body._id, req.user.userId))) {
+      return res.status(403).send({ error: 'Access denied.' });
+    }
     const filter2 = { _id: new ObjectId(req.body._id) };
     const update = { $set: { checked: req.body.checked, updatedAt: new Date() } };
     try {
@@ -184,7 +222,10 @@ module.exports = (db) => {
     }
   });
 
-  router.put('/', async (req, res) => {
+  router.put('/', auth, async (req, res) => {
+    if (!isAdmin(req) && !(await userOwnsTrickList(req.body.list_id, req.user.userId))) {
+      return res.status(403).send({ error: 'Access denied.' });
+    }
     try {
       const trickDocument = {
         ...req.body,
@@ -221,10 +262,13 @@ module.exports = (db) => {
   });
 
   // PUT /listing/:trickId/spot — Link/unlink a spot to a trick
-  router.put('/:trickId/spot', async (req, res) => {
+  router.put('/:trickId/spot', auth, async (req, res) => {
     const { trickId } = req.params;
     if (!ObjectId.isValid(trickId)) {
       return res.status(400).json({ error: 'Invalid trick ID' });
+    }
+    if (!isAdmin(req) && !(await userOwnsTrick(trickId, req.user.userId))) {
+      return res.status(403).json({ error: 'Access denied.' });
     }
     try {
       const spotId = req.body.spotId || null;
@@ -253,10 +297,13 @@ module.exports = (db) => {
   });
 
   // PUT /listing/:trickId/video — Link a feed post or external video to a trick
-  router.put('/:trickId/video', async (req, res) => {
+  router.put('/:trickId/video', auth, async (req, res) => {
     const { trickId } = req.params;
     if (!ObjectId.isValid(trickId)) {
       return res.status(400).json({ error: 'Invalid trick ID' });
+    }
+    if (!isAdmin(req) && !(await userOwnsTrick(trickId, req.user.userId))) {
+      return res.status(403).json({ error: 'Access denied.' });
     }
     try {
       const setFields = { updatedAt: new Date() };
