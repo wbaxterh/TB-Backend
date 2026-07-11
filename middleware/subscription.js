@@ -40,9 +40,11 @@ module.exports = {
         return next();
       }
 
-      // Check spot list count for free users
+      // Check spot list count for free users (the default "Saved Spots" bucket
+      // is not a user-named list, so it doesn't count against the limit).
       const spotListsCount = await db.collection('spotlists').countDocuments({
         userId: req.user.userId,
+        isDefaultSaved: { $ne: true },
       });
 
       if (spotListsCount >= FREE_TIER_LIMITS.maxSpotLists) {

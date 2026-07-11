@@ -1,10 +1,23 @@
 const express = require('express');
 const Joi = require('joi');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 const { ObjectId } = require('mongodb');
 const validateWith = require('../middleware/validation');
 const auth = require('../middleware/auth');
 const authAdmin = require('../middleware/authAdmin');
+
+// Returns the { userId, role } from a valid x-auth-token if present, else null.
+// Used by public routes that reveal extra data (e.g. a private spot) to its owner.
+const optionalUser = (req) => {
+  const token = req.header('x-auth-token');
+  if (!token) return null;
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch (_err) {
+    return null;
+  }
+};
 const escapeRegex = require('../utils/escapeRegex');
 const multer = require('multer');
 const googlePlaces = require('../services/googlePlaces');
@@ -670,6 +683,47 @@ module.exports = (db) => {
     }
   });
 
+  // One default "Saved Spots" list per user backs the one-tap save / My Spots
+  // "saved" bucket. Partial-unique so concurrent saves can't create duplicates.
+  spotListsCollection
+    .createIndex({ userId: 1 }, { unique: true, partialFilterExpression: { isDefaultSaved: true } })
+    .catch(() => {});
+
+  const SAVED_LIST_NAME = 'Saved Spots';
+
+  // Get the current user's saved spots (the default Saved Spots list), paginated
+  // newest-first. Backs the "Saved" half of the flat My Spots view.
+  router.get('/saved', [auth], async (req, res) => {
+    try {
+      const page = Math.max(0, Number.parseInt(req.query.page, 10) || 0);
+      const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+      const list = await spotListsCollection.findOne({
+        userId: req.user.userId,
+        isDefaultSaved: true,
+      });
+      const ids = (list?.spotIds || []).slice().reverse(); // newest saved first
+      const total = ids.length;
+      const pageIds = ids.slice(page * limit, page * limit + limit);
+      const found = await spotsCollection.find({ _id: { $in: pageIds } }).toArray();
+      // Preserve saved order
+      const byId = new Map(found.map((s) => [String(s._id), s]));
+      const spots = pageIds.map((sid) => byId.get(String(sid))).filter(Boolean);
+      res.status(200).json({
+        spots,
+        pagination: {
+          page,
+          limit,
+          totalCount: total,
+          totalPages: Math.ceil(total / limit),
+          hasMore: (page + 1) * limit < total,
+        },
+      });
+    } catch (error) {
+      console.error('Error retrieving saved spots', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
   // Get a single spot by ID
   router.get('/:id', async (req, res) => {
     const id = req.params.id;
@@ -681,6 +735,16 @@ module.exports = (db) => {
       if (!spot) {
         return res.status(404).json({ error: 'Spot not found' });
       }
+      // Approved spots are public; private/pending/rejected are visible only to
+      // the owner or an admin.
+      if (spot.approvalStatus && spot.approvalStatus !== 'approved') {
+        const requester = optionalUser(req);
+        const isOwner =
+          requester && spot.userId && String(spot.userId) === String(requester.userId);
+        if (!isOwner && requester?.role !== 'admin') {
+          return res.status(404).json({ error: 'Spot not found' });
+        }
+      }
       res.status(200).json(spot);
     } catch (error) {
       console.error('Error retrieving spot', error);
@@ -688,11 +752,20 @@ module.exports = (db) => {
     }
   });
 
-  // Update a spot
+  // Update a spot (owner or admin only)
   router.put('/:id', [auth, validateWith(updateSchema)], async (req, res) => {
     const id = req.params.id;
     if (!ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid ID' });
+    }
+
+    const existing = await spotsCollection.findOne({ _id: new ObjectId(id) });
+    if (!existing) {
+      return res.status(404).json({ error: 'Spot not found' });
+    }
+    const isOwner = existing.userId && String(existing.userId) === String(req.user.userId);
+    if (!isOwner && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Not authorized to edit this spot' });
     }
 
     const {
@@ -811,15 +884,35 @@ module.exports = (db) => {
     }
   });
 
-  // Delete a spot (admin only)
-  router.delete('/:id', [authAdmin()], async (req, res) => {
+  // Delete a spot (owner or admin only)
+  router.delete('/:id', [auth], async (req, res) => {
     const id = req.params.id;
     if (!ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid ID' });
     }
 
     try {
-      // First, remove the spot from all spot lists
+      const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
+      if (!spot) {
+        return res.status(404).json({ error: 'Spot not found' });
+      }
+      const isOwner = spot.userId && String(spot.userId) === String(req.user.userId);
+      if (!isOwner && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Not authorized to delete this spot' });
+      }
+
+      // Clean up the owner's uploaded photos from S3 (best-effort)
+      for (const photo of spot.userPhotos || []) {
+        if (photo.key) {
+          try {
+            await s3Upload.deleteFile(photo.key);
+          } catch (err) {
+            console.error(`[Spots] Failed to delete S3 photo ${photo.key}:`, err.message);
+          }
+        }
+      }
+
+      // Remove the spot from all spot lists
       await spotListsCollection.updateMany(
         { spotIds: new ObjectId(id) },
         { $pull: { spotIds: new ObjectId(id) } },
@@ -827,7 +920,6 @@ module.exports = (db) => {
 
       // Then delete the spot
       const result = await spotsCollection.deleteOne({ _id: new ObjectId(id) });
-
       if (result.deletedCount === 0) {
         return res.status(404).json({ error: 'Spot not found' });
       }
@@ -855,6 +947,62 @@ module.exports = (db) => {
       res.status(200).json(spotLists);
     } catch (error) {
       console.error('Error retrieving spot lists', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  // One-tap save: add a spot to the user's default "Saved Spots" bucket.
+  // Frictionless (no free-tier limit) so saving from the map is always easy.
+  router.post('/:id/save', [auth], async (req, res) => {
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid spot ID' });
+    }
+    try {
+      const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
+      if (!spot) {
+        return res.status(404).json({ error: 'Spot not found' });
+      }
+      // Ensure the default saved list exists (atomic upsert; spotIds untouched here).
+      await spotListsCollection.updateOne(
+        { userId: req.user.userId, isDefaultSaved: true },
+        {
+          $setOnInsert: {
+            userId: req.user.userId,
+            isDefaultSaved: true,
+            name: SAVED_LIST_NAME,
+            description: '',
+            spotIds: [],
+            createdAt: new Date(),
+          },
+        },
+        { upsert: true },
+      );
+      await spotListsCollection.updateOne(
+        { userId: req.user.userId, isDefaultSaved: true },
+        { $addToSet: { spotIds: new ObjectId(id) }, $set: { updatedAt: new Date() } },
+      );
+      res.status(200).json({ saved: true });
+    } catch (error) {
+      console.error('Error saving spot', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Remove a spot from the user's default "Saved Spots" bucket.
+  router.delete('/:id/save', [auth], async (req, res) => {
+    const id = req.params.id;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid spot ID' });
+    }
+    try {
+      await spotListsCollection.updateOne(
+        { userId: req.user.userId, isDefaultSaved: true },
+        { $pull: { spotIds: new ObjectId(id) }, $set: { updatedAt: new Date() } },
+      );
+      res.status(200).json({ saved: false });
+    } catch (error) {
+      console.error('Error unsaving spot', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });

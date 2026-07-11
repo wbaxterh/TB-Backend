@@ -44,10 +44,13 @@ module.exports = (db) => {
   // Get user's current usage
   router.get('/usage', [auth], subscriptionMiddleware.getUserUsage);
 
-  // Get all spot lists for the authenticated user
+  // Get all spot lists for the authenticated user (excluding the hidden
+  // default "Saved Spots" bucket, which powers one-tap save / My Spots).
   router.get('/', [auth], async (req, res) => {
     try {
-      const spotLists = await spotListsCollection.find({ userId: req.user.userId }).toArray();
+      const spotLists = await spotListsCollection
+        .find({ userId: req.user.userId, isDefaultSaved: { $ne: true } })
+        .toArray();
 
       // Add spotCount to each list
       const listsWithCount = spotLists.map((list) => ({
