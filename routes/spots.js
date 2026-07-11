@@ -745,6 +745,10 @@ module.exports = (db) => {
           return res.status(404).json({ error: 'Spot not found' });
         }
       }
+      // Hide community-reported photos from the public response.
+      if (Array.isArray(spot.userPhotos)) {
+        spot.userPhotos = spot.userPhotos.filter((p) => !p.hidden);
+      }
       res.status(200).json(spot);
     } catch (error) {
       console.error('Error retrieving spot', error);
@@ -1094,7 +1098,7 @@ module.exports = (db) => {
 
       const photos = {
         googlePhotos: spot.googlePhotos || [],
-        userPhotos: spot.userPhotos || [],
+        userPhotos: (spot.userPhotos || []).filter((p) => !p.hidden),
         mainImage: spot.imageURL,
       };
 
@@ -1197,6 +1201,60 @@ module.exports = (db) => {
       res.json({ message: 'Photo deleted successfully' });
     } catch (error) {
       console.error('Error deleting photo:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  /**
+   * POST /api/spots/:id/photos/:photoKey/report
+   * Community moderation for user-contributed photos (Google-Maps-style: photos
+   * are public immediately, but any user can report one). A photo is auto-hidden
+   * once enough DISTINCT users report it; an admin can still hard-delete it.
+   */
+  const PHOTO_REPORT_HIDE_THRESHOLD = 3;
+  router.post('/:id/photos/:photoKey/report', [auth], async (req, res) => {
+    const { id, photoKey } = req.params;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    try {
+      const spot = await spotsCollection.findOne({ _id: new ObjectId(id) });
+      if (!spot) {
+        return res.status(404).json({ error: 'Spot not found' });
+      }
+      const photo = (spot.userPhotos || []).find((p) => p.key === photoKey);
+      if (!photo) {
+        return res.status(404).json({ error: 'Photo not found' });
+      }
+
+      // Record this reporter once (idempotent per user).
+      await spotsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $addToSet: { 'userPhotos.$[p].reportedBy': req.user.userId } },
+        { arrayFilters: [{ 'p.key': photoKey }] },
+      );
+
+      // Auto-hide once distinct reports reach the threshold.
+      const updated = await spotsCollection.findOne(
+        { _id: new ObjectId(id) },
+        { projection: { userPhotos: 1 } },
+      );
+      const updatedPhoto = (updated.userPhotos || []).find((p) => p.key === photoKey);
+      const reportCount = (updatedPhoto?.reportedBy || []).length;
+      if (reportCount >= PHOTO_REPORT_HIDE_THRESHOLD && !updatedPhoto.hidden) {
+        await spotsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { 'userPhotos.$[p].hidden': true } },
+          { arrayFilters: [{ 'p.key': photoKey }] },
+        );
+        console.log(
+          `[Spots] Photo ${photoKey} on spot ${id} auto-hidden after ${reportCount} reports`,
+        );
+      }
+
+      res.json({ reported: true });
+    } catch (error) {
+      console.error('Error reporting photo:', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
