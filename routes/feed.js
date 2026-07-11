@@ -97,11 +97,29 @@ module.exports = (db) => {
       userMap[u._id.toString()] = u;
     });
 
+    // Batch-enrich linked spots so a tagged spot shows on posts EVERYWHERE (feed
+    // lists, profile, etc.) — not just on the single-post view.
+    const spotIds = [...new Set(posts.map((p) => p.spotId).filter(Boolean))];
+    const spotMap = {};
+    if (spotIds.length > 0) {
+      const spots = await spotsCollection
+        .find({ _id: { $in: spotIds.map((id) => new ObjectId(id)) } })
+        .project({ name: 1, city: 1, state: 1, imageURL: 1, category: 1 })
+        .toArray();
+      spots.forEach((s) => {
+        spotMap[s._id.toString()] = s;
+      });
+    }
+
     return posts.map((post) => {
       const enrichedPost = {
         ...post,
         user: userMap[post.userId] || { name: 'Unknown' },
       };
+
+      if (post.spotId && spotMap[String(post.spotId)]) {
+        enrichedPost.spot = spotMap[String(post.spotId)];
+      }
 
       // Add signed video URLs for video posts
       if (post.mediaType === 'video' && post.bunnyVideoId) {
