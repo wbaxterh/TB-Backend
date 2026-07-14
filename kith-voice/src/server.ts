@@ -39,8 +39,7 @@ const ROOT = path.dirname(Bun.fileURLToPath(import.meta.url));
 // Env vars still override (e.g. a shared venv on the EC2 box).
 const PYTHON_VENV =
   process.env.PIPECAT_PYTHON_PATH || path.resolve(ROOT, '../python-sidecar/.venv/bin/python');
-const PYTHON_CWD =
-  process.env.PIPECAT_PYTHON_CWD || path.resolve(ROOT, '../python-sidecar');
+const PYTHON_CWD = process.env.PIPECAT_PYTHON_CWD || path.resolve(ROOT, '../python-sidecar');
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
 const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'klHOJHbGA89BjwulA7MN';
