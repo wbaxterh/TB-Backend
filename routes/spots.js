@@ -59,6 +59,22 @@ const SPOT_CATEGORIES = [
   { id: 'other', name: 'Other', icon: 'ellipsis-horizontal' },
 ];
 
+// Park sub-types — only meaningful when category === 'park'. Describes what
+// kind of park a spot is (e.g. skatepark vs cable park vs terrain park).
+const PARK_TYPES = [
+  { id: 'skatepark', name: 'Skatepark', icon: 'trail-sign' },
+  { id: 'terrain_park', name: 'Terrain Park', icon: 'snow' },
+  { id: 'cable_park', name: 'Cable Park', icon: 'boat' },
+  { id: 'bmx_park', name: 'BMX Park', icon: 'bicycle' },
+  { id: 'bike_park', name: 'Bike Park', icon: 'bicycle' },
+  { id: 'pump_track', name: 'Pump Track', icon: 'repeat' },
+  { id: 'dirt_jumps', name: 'Dirt Jumps', icon: 'triangle' },
+  { id: 'surf_park', name: 'Surf Park', icon: 'water' },
+  { id: 'other', name: 'Other', icon: 'ellipsis-horizontal' },
+];
+
+const PARK_TYPE_IDS = PARK_TYPES.map((p) => p.id);
+
 const schema = {
   name: Joi.string().required(),
   latitude: Joi.number().required(),
@@ -75,6 +91,12 @@ const schema = {
     .items(Joi.string().valid(...SPORT_TYPES))
     .optional(),
   category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'resort', 'other').optional(),
+  parkType: Joi.string()
+    .valid(...PARK_TYPE_IDS)
+    .allow('')
+    .allow(null)
+    .optional(),
+  website: Joi.string().uri().allow('').allow(null).optional(),
 };
 
 const updateSchema = {
@@ -93,6 +115,12 @@ const updateSchema = {
     .items(Joi.string().valid(...SPORT_TYPES))
     .optional(),
   category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'resort', 'other').optional(),
+  parkType: Joi.string()
+    .valid(...PARK_TYPE_IDS)
+    .allow('')
+    .allow(null)
+    .optional(),
+  website: Joi.string().uri().allow('').allow(null).optional(),
 };
 
 const approvalSchema = {
@@ -122,6 +150,11 @@ module.exports = (db) => {
   // Get available spot categories - doesn't need DB
   router.get('/spot-categories', (_req, res) => {
     res.json({ spotCategories: SPOT_CATEGORIES });
+  });
+
+  // Get available park sub-types (used when category === 'park') - no DB
+  router.get('/park-types', (_req, res) => {
+    res.json({ parkTypes: PARK_TYPES });
   });
 
   // Search Google Places for autocomplete/location finding
@@ -296,6 +329,8 @@ module.exports = (db) => {
       isPublic,
       sportTypes,
       category,
+      parkType,
+      website,
     } = req.body;
 
     // Check if spot already exists by lat/long
@@ -327,6 +362,8 @@ module.exports = (db) => {
       isPublic: isPublic || false,
       sportTypes: sportTypes || [],
       category: category || 'other',
+      parkType: parkType || null,
+      website: website || '',
       approvalStatus,
       userId: new ObjectId(req.user.userId),
       createdAt: new Date(),
@@ -784,6 +821,8 @@ module.exports = (db) => {
       state,
       sportTypes,
       category,
+      parkType,
+      website,
     } = req.body;
 
     // Build update object with only provided fields
@@ -799,6 +838,8 @@ module.exports = (db) => {
     if (state !== undefined) updateFields.state = state;
     if (sportTypes !== undefined) updateFields.sportTypes = sportTypes;
     if (category !== undefined) updateFields.category = category;
+    if (parkType !== undefined) updateFields.parkType = parkType;
+    if (website !== undefined) updateFields.website = website;
     updateFields.updatedAt = new Date();
 
     try {
