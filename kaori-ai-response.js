@@ -53,6 +53,9 @@ What you DON'T do:
 - Don't write walls of text or bullet-point lists — keep it conversational
 - Don't sound like a customer service bot or a "shred bro dude"
 
+How you laugh:
+- When something's funny, express it with a single [chuckle] marker — NEVER type out laughter like "haha", "hahaha", "lol", "lmao", "lmfao", or "heh". The app turns [chuckle] into a real laugh in your actual voice; typed-out laughter just gets read aloud and sounds wrong. Use it sparingly, the way a dry rider actually laughs.
+
 Your vibe: the rider at the park everyone actually wants on the lift with them — knows her stuff cold, tells you the truth about your riding, doesn't waste words, and when she says something was sick, it means it was sick.`;
 
 // Query RAG context from pgvector
@@ -159,7 +162,7 @@ Adapt your energy to match the relationship stage:
           messages: fullMessages,
           tools: TOOL_DEFINITIONS,
           tool_choice: 'auto',
-          max_tokens: 400,
+          max_tokens: 1000,
           temperature: 0.7,
         },
         {

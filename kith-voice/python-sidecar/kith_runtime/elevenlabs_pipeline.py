@@ -14,7 +14,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import glob
 import os
+import pathlib
+import random
+import re
 import time
 from collections.abc import Awaitable, Callable
 from uuid import uuid4
@@ -53,6 +57,36 @@ def _split_into_sentences(text: str) -> list[str]:
     return [p for p in parts if p]
 
 
+# Laughter markers. `[chuckle]` is what the LLM is instructed to emit; the rest
+# are a safety net for stray typed-out laughter so it becomes a real chuckle
+# clip instead of being read aloud ("haha", "lol", …).
+_CHUCKLE_RE = re.compile(
+    r"\[chuckles?[^\]]*\]"
+    r"|\[laughs?[^\]]*\]"
+    r"|\bha(?:ha)+\b"
+    r"|\bhe(?:he)+\b"
+    r"|\blo+l\b"
+    r"|\blmf?ao\b",
+    re.IGNORECASE,
+)
+
+
+def _tokenize_with_chuckles(text: str) -> list[tuple[str, str]]:
+    """Split text into an ordered list of ('text', str) / ('chuckle', '') segments."""
+    out: list[tuple[str, str]] = []
+    last = 0
+    for m in _CHUCKLE_RE.finditer(text):
+        pre = text[last : m.start()]
+        if pre.strip():
+            out.append(("text", pre))
+        out.append(("chuckle", ""))
+        last = m.end()
+    tail = text[last:]
+    if tail.strip():
+        out.append(("text", tail))
+    return out
+
+
 class ElevenLabsPipeline:
     """Pipeline that synthesizes text via ElevenLabs and streams audio back.
 
@@ -77,6 +111,10 @@ class ElevenLabsPipeline:
         self._queue: asyncio.Queue[tuple[str, str | None]] = asyncio.Queue()
         self._worker: asyncio.Task[None] | None = None
         self._current: asyncio.Task[None] | None = None
+        # Pre-rendered laugh clips (bytes, same audio format as output). A
+        # `[chuckle]` marker in the text emits one of these instead of TTS —
+        # Flash/Turbo can't do v3's expressive laughs, so we splice real ones in.
+        self._chuckle_clips: list[bytes] = []
 
     async def start(self, config: dict) -> None:
         api_key = config.get("apiKey") or os.environ.get("ELEVENLABS_API_KEY")
@@ -105,6 +143,19 @@ class ElevenLabsPipeline:
             "speed": settings.get("speed"),
         }
         self._voice_settings = {k: v for k, v in renamed.items() if v is not None} or None
+
+        # Load laugh clips (mp3, must match output format) from the chuckle dir.
+        chuckle_dir = (
+            config.get("chuckleDir")
+            or os.environ.get("KITH_CHUCKLE_DIR")
+            or str(pathlib.Path(__file__).resolve().parents[2] / "assets" / "chuckles")
+        )
+        self._chuckle_clips = []
+        try:
+            for p in sorted(glob.glob(os.path.join(chuckle_dir, "*.mp3"))):
+                self._chuckle_clips.append(pathlib.Path(p).read_bytes())
+        except OSError:
+            pass
 
         self._worker = asyncio.create_task(self._worker_loop())
 
@@ -163,10 +214,15 @@ class ElevenLabsPipeline:
             await self._emit(
                 TurnStartEvent(timestamp=_now_ms(), turn_id=turn_id, role="assistant"),
             )
-            chunks = _split_into_sentences(text)
-            for i, chunk in enumerate(chunks):
-                chunk_id = f"c-{i}"
-                await self._synthesize_chunk(turn_id, chunk_id, chunk)
+            idx = 0
+            for seg_type, seg_text in _tokenize_with_chuckles(text):
+                if seg_type == "chuckle":
+                    await self._emit_chuckle(turn_id, f"c-{idx}")
+                    idx += 1
+                    continue
+                for sentence in _split_into_sentences(seg_text):
+                    await self._synthesize_chunk(turn_id, f"c-{idx}", sentence)
+                    idx += 1
             await self._emit(
                 TurnEndEvent(timestamp=_now_ms(), turn_id=turn_id, role="assistant"),
             )
@@ -183,6 +239,28 @@ class ElevenLabsPipeline:
                     retriable=False,
                 ),
             )
+
+    async def _emit_chuckle(self, turn_id: str, chunk_id: str) -> None:
+        """Emit a pre-rendered laugh clip as an audio chunk (in place of a
+        `[chuckle]` marker). No-op if no clips are installed."""
+        if not self._chuckle_clips:
+            return
+        clip = random.choice(self._chuckle_clips)
+        await self._emit(
+            TtsStartEvent(timestamp=_now_ms(), turn_id=turn_id, chunk_id=chunk_id),
+        )
+        await self._emit(
+            TtsAudioChunkEvent(
+                timestamp=_now_ms(),
+                turn_id=turn_id,
+                chunk_id=chunk_id,
+                audio_b64=base64.b64encode(clip).decode("ascii"),
+                mime_type="audio/mpeg",
+            ),
+        )
+        await self._emit(
+            TtsEndEvent(timestamp=_now_ms(), turn_id=turn_id, chunk_id=chunk_id),
+        )
 
     async def _synthesize_chunk(self, turn_id: str, chunk_id: str, text: str) -> None:
         assert self._client is not None and self._voice_id is not None
