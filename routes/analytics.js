@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { ObjectId } = require('mongodb');
+const { getIosDownloads, getAndroidDownloads } = require('../services/appStoreDownloads');
 
 module.exports = (db) => {
   const router = express.Router();
@@ -414,6 +415,106 @@ module.exports = (db) => {
     } catch (error) {
       console.error('Referrers error:', error.message);
       res.status(500).json({ error: 'Failed to get referrers' });
+    }
+  });
+
+  // ============================================
+  // App users: DAU/WAU/MAU, signups, latest activity
+  // ============================================
+
+  // A user counts as "active" if they did anything we can attribute to them:
+  // posted, commented, reacted, DMed, logged a trick, touched a tricklist,
+  // chatted with Kaori, or fired an analytics event while logged in.
+  async function activeUserCount(since) {
+    const sets = await Promise.all([
+      db.collection('feed_posts').distinct('userId', { createdAt: { $gte: since } }),
+      db.collection('comments').distinct('userId', { createdAt: { $gte: since } }),
+      db.collection('reactions').distinct('userId', { createdAt: { $gte: since } }),
+      db.collection('dm_messages').distinct('senderId', { createdAt: { $gte: since } }),
+      db.collection('spot_trick_history').distinct('userId', { createdAt: { $gte: since } }),
+      db.collection('tricklists').distinct('userId', { updatedAt: { $gte: since } }),
+      db.collection('bot_chats').distinct('userId', { updatedAt: { $gte: since } }),
+      eventsCollection.distinct('userId', { timestamp: { $gte: since }, userId: { $ne: null } }),
+    ]);
+    return new Set(sets.flat().filter(Boolean).map(String)).size;
+  }
+
+  router.get('/dashboard/app-users', requireAdmin, async (req, res) => {
+    try {
+      const day = 24 * 60 * 60 * 1000;
+      const now = Date.now();
+
+      const [dau, wau, mau, lastUsers, newUsers7d, newUsers30d, totalUsers] = await Promise.all([
+        activeUserCount(new Date(now - day)),
+        activeUserCount(new Date(now - 7 * day)),
+        activeUserCount(new Date(now - 30 * day)),
+        usersCollection
+          .find({}, { projection: { name: 1, createdAt: 1 } })
+          .sort({ _id: -1 })
+          .limit(1)
+          .toArray(),
+        usersCollection.countDocuments({ createdAt: { $gte: new Date(now - 7 * day) } }),
+        usersCollection.countDocuments({ createdAt: { $gte: new Date(now - 30 * day) } }),
+        usersCollection.estimatedDocumentCount(),
+      ]);
+
+      // Most recent item per content type — timestamps only for private content (DMs)
+      const activitySources = [
+        { col: 'feed_posts', field: 'createdAt', label: 'Feed post' },
+        { col: 'comments', field: 'createdAt', label: 'Comment' },
+        { col: 'dm_messages', field: 'createdAt', label: 'Direct message' },
+        { col: 'spot_trick_history', field: 'createdAt', label: 'Trick logged at spot' },
+        { col: 'tricklists', field: 'updatedAt', label: 'Tricklist update' },
+        { col: 'spots', field: 'createdAt', label: 'Spot added' },
+        { col: 'bot_chats', field: 'updatedAt', label: 'Kaori chat' },
+        { col: 'reactions', field: 'createdAt', label: 'Reaction' },
+      ];
+      const latestActivity = (
+        await Promise.all(
+          activitySources.map(async ({ col, field, label }) => {
+            const [doc] = await db
+              .collection(col)
+              .find({ [field]: { $exists: true } }, { projection: { [field]: 1 } })
+              .sort({ [field]: -1 })
+              .limit(1)
+              .toArray();
+            return doc ? { type: label, when: doc[field] } : null;
+          }),
+        )
+      )
+        .filter(Boolean)
+        .sort((a, b) => new Date(b.when) - new Date(a.when));
+
+      res.json({
+        dau,
+        wau,
+        mau,
+        totalUsers,
+        newUsers7d,
+        newUsers30d,
+        lastSignup: lastUsers[0]
+          ? { name: lastUsers[0].name, createdAt: lastUsers[0].createdAt }
+          : null,
+        latestActivity,
+      });
+    } catch (error) {
+      console.error('App users error:', error.message);
+      res.status(500).json({ error: 'Failed to get app user stats' });
+    }
+  });
+
+  // Real store downloads (App Store Connect + Play Console exports)
+  router.get('/dashboard/downloads', requireAdmin, async (req, res) => {
+    try {
+      const days = Math.min(parseInt(req.query.days, 10) || 30, 90);
+      const [ios, android] = await Promise.all([
+        getIosDownloads(days).catch((e) => ({ configured: true, error: e.message })),
+        getAndroidDownloads(days).catch((e) => ({ configured: true, error: e.message })),
+      ]);
+      res.json({ ios, android });
+    } catch (error) {
+      console.error('Downloads error:', error.message);
+      res.status(500).json({ error: 'Failed to get download stats' });
     }
   });
 
