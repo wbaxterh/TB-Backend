@@ -95,11 +95,18 @@ module.exports = (db) => {
           ...newUser,
         };
       } else {
-        // Update existing user with SSO data
-        await usersCollection.updateOne(
-          { _id: user._id },
-          { $set: { name: name, imageUri: picture } },
-        );
+        // Existing user: only BACKFILL SSO fields we don't already have — never
+        // clobber a name or avatar the user has customized in the app. Previously
+        // this $set overwrote imageUri (and name) on every login, so a custom
+        // profile photo reverted to the Google avatar each time you signed in.
+        const backfill = {};
+        if (!user.name) backfill.name = name;
+        if (!user.imageUri) backfill.imageUri = picture;
+        if (Object.keys(backfill).length > 0) {
+          await usersCollection.updateOne({ _id: user._id }, { $set: backfill });
+          // keep the in-memory user (used to sign the JWT below) in sync
+          Object.assign(user, backfill);
+        }
       }
 
       const token = jwt.sign(
