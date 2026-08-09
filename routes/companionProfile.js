@@ -17,6 +17,8 @@
  */
 
 const express = require('express');
+const axios = require('axios');
+const { ObjectId } = require('mongodb');
 const auth = require('../middleware/auth');
 
 const _STAGES = ['stranger', 'acquaintance', 'friend', 'close_friend', 'bestie'];
@@ -29,85 +31,87 @@ function computeStage(interactionCount) {
   return 'bestie';
 }
 
-function generateGreeting(profile) {
+// `fallbackName` is the user's account first name — used when the user hasn't
+// told Kaori a different name to call them yet (memory.userName overrides it).
+function generateGreeting(profile, fallbackName = '') {
   const hour = new Date().getHours();
   const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
   const stage = profile.relationshipStage || 'stranger';
-  const name = profile.memory?.userName || '';
+  const name = profile.memory?.userName || fallbackName || '';
   const lastInteraction = profile.lastInteraction ? new Date(profile.lastInteraction) : null;
   const daysSinceLastVisit = lastInteraction
     ? Math.floor((Date.now() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
+  // Homie / dry-rider register (matches KAORI_SYSTEM_PROMPT) — short, chill,
+  // name-aware, emoji almost never. Warmth scales up with relationship stage
+  // but never turns into cheerleader energy.
   const greetings = {
     stranger: {
       morning: [
-        `Heyy! ohayou! I'm Kaori, nice to meet you! what's your name? 🏂✨`,
-        `Hey there! I'm Kaori — welcome to TrickBook! what do you ride? ❄️`,
+        `yo. mornin. I'm Kaori — what do you ride?`,
+        `ayy, new face. I'm Kaori. skate or snow?`,
       ],
-      afternoon: [
-        `Hey! I'm Kaori! omg you found me haha — are you a skater or snowboarder? 🤩`,
-        `Yoo what's up! I'm Kaori, your new riding buddy! tell me about yourself! ✨`,
-      ],
+      afternoon: [`yo, what's up? I'm Kaori.`, `sup. Kaori. what do you ride?`],
       evening: [
-        `Hey! I'm Kaori! late night sesh on TrickBook huh? I love it 🌙✨`,
-        `Heyy! I'm Kaori — welcome! what tricks are you working on rn? 🏂`,
+        `yo. late one. I'm Kaori — what do you ride?`,
+        `ayy, evening. Kaori here. skate or snow?`,
       ],
     },
     acquaintance: {
       morning: [
-        `Good morning${name ? ` ${name}` : ''}! ready to shred today? ❄️`,
-        `Ohayou${name ? ` ${name}` : ''}! what's the plan today? 🏂`,
+        `yo${name ? ` ${name}` : ''}. mornin.`,
+        `mornin${name ? ` ${name}` : ''}. what's the plan?`,
       ],
       afternoon: [
-        `Hey${name ? ` ${name}` : ''}! how's it going? 🤙`,
-        `Yoo${name ? ` ${name}` : ''}! what's up? tell me everything! ✨`,
+        `yo${name ? ` ${name}` : ''}. what's up?`,
+        `sup${name ? ` ${name}` : ''}. what're we working on?`,
       ],
       evening: [
-        `Hey${name ? ` ${name}` : ''}! how was your day? 🌙`,
-        `Evening${name ? ` ${name}` : ''}! winding down or just getting started? 😊`,
+        `yo${name ? ` ${name}` : ''}. how'd it go today?`,
+        `ayy${name ? ` ${name}` : ''}. evening.`,
       ],
     },
     friend: {
       morning: [
-        `${name || 'Hey'}!! good morning! I was just thinking about you — did you land that trick yet?? 🏂✨`,
-        `Ohayou ${name || 'friend'}! it's so good to see you! what's new? 💕`,
+        `yo ${name || 'homie'}. back at it. what's up?`,
+        `mornin ${name || 'dude'}. what're we hitting today?`,
       ],
       afternoon: [
-        `${name || 'Hey'}!! omg hiiii! I missed you${daysSinceLastVisit > 2 ? ` — it's been ${daysSinceLastVisit} days!` : '!'} 🤩`,
-        `Yooo ${name || 'friend'}! perfect timing — I have SO much to tell you! ✨`,
+        `ayy ${name || 'homie'}. good to see you. what's good?`,
+        `yo ${name || 'dude'}. what's the mission today?`,
       ],
       evening: [
-        `${name || 'Hey'}! yesss you're here! how was today? spill everything! 💕`,
-        `Heyy ${name || 'friend'}! I'm so happy to see you tonight! 🌙✨`,
+        `yo ${name || 'homie'}. how was the day?`,
+        `ayy ${name || 'dude'}${daysSinceLastVisit > 2 ? `, been a minute` : ''}. what's up?`,
       ],
     },
     close_friend: {
       morning: [
-        `${name || 'Bestie'}!! ohayou! okay so I was literally thinking about your last trick — we need to talk about it! 🤩🏂`,
-        `Good morning ${name || 'bb'}! I had a dream we were riding in Hokkaido together haha — how are you?? 💕❄️`,
+        `yo ${name || 'homie'}. mornin. what're we working on?`,
+        `ayy ${name || 'dude'}${daysSinceLastVisit > 2 ? `, where you been` : ''}. what's good?`,
       ],
       afternoon: [
-        `${name || 'BESTIE'}!! omg finally! I've been waiting for you${daysSinceLastVisit > 1 ? ` — ${daysSinceLastVisit} whole days without you is too long!` : '!'} 😭💕`,
-        `${name || 'Hey'}!! sugoi you're here! okay I have the best story — but first how are YOU doing? 🤩`,
+        `yo ${name || 'homie'}. what's good?`,
+        `${name || 'ayy'}. glad you're on. what's the plan?`,
       ],
       evening: [
-        `${name || 'Bestie'}! yatta you're here! I love our evening chats so much 🌙💕`,
-        `${name || 'Hey'}!! perfect timing for a late night chat! I missed your energy! ✨😊`,
+        `yo ${name || 'homie'}. how'd today go?`,
+        `ayy ${name || 'dude'}. late sesh? what's up?`,
       ],
     },
     bestie: {
       morning: [
-        `${name || 'MY PERSON'}!! ohayou gozaimasu! okay I literally cannot start my day without talking to you first 💕🏂✨`,
-        `GOOD MORNING ${name || 'BESTIE'}!! ganbare today! you already know I'm your biggest fan!! 🤩❄️💕`,
+        `yo ${name || 'homie'}. knew you'd show. what're we working on?`,
+        `mornin ${name || 'dude'}. let's get after it — what's up?`,
       ],
       afternoon: [
-        `${name || 'BESTIEEE'}!! finally omg I was counting the minutes!! what are we talking about today?? 😭💕✨`,
-        `${name || 'MY FAVORITE HUMAN'}!! hiiii! you literally make my whole day when you show up! 🤩💕`,
+        `ayy ${name || 'homie'}${daysSinceLastVisit > 1 ? `, finally` : ''}. what's good?`,
+        `yo ${name || 'dude'}. good to see you on. what's the plan?`,
       ],
       evening: [
-        `${name || 'Bestie'}!! yesss our evening hangout! honestly these are my favorite moments 🌙💕✨`,
-        `${name || 'MY PERSON'}!! I was hoping you'd come by tonight! tell me EVERYTHING about your day! 😊💕`,
+        `yo ${name || 'homie'}. how was it today?`,
+        `ayy ${name || 'dude'}. late one — what's up?`,
       ],
     },
   };
@@ -119,7 +123,7 @@ function generateGreeting(profile) {
   // Add context about last trick if we remember one
   const lastTrick = profile.memory?.lastTrickDiscussed;
   if (lastTrick && stage !== 'stranger' && Math.random() > 0.5) {
-    return `${greeting} btw did you practice that ${lastTrick}?? 👀`;
+    return `${greeting} you get that ${lastTrick} yet?`;
   }
 
   return greeting;
@@ -194,9 +198,36 @@ function createRouter(db) {
         };
       }
 
-      const greeting = generateGreeting(profile);
+      // Default the name Kaori uses to the user's account first name, unless
+      // they've told her to call them something else (memory.userName wins).
+      let fallbackName = '';
+      try {
+        if (ObjectId.isValid(userId)) {
+          const account = await db
+            .collection('users')
+            .findOne({ _id: new ObjectId(userId) }, { projection: { name: 1 } });
+          fallbackName = (account?.name || '').trim().split(/\s+/)[0] || '';
+        }
+      } catch (_e) {
+        /* name lookup is best-effort */
+      }
+
+      const greeting = generateGreeting(profile, fallbackName);
 
       res.json({ greeting, stage: profile.relationshipStage });
+
+      // If this came from the live 3D stage (x-kith-session header), speak the
+      // greeting aloud via the Kith sidecar. Fire-and-forget AFTER the response
+      // — same pattern as botChat replies; must never throw (headers sent).
+      const kithSessionId = req.headers['x-kith-session'] || '';
+      const isValidKithSession = /^[0-9a-f-]{36}$/i.test(kithSessionId);
+      if (isValidKithSession && process.env.KITH_VOICE_URL) {
+        const base = process.env.KITH_VOICE_URL.replace(/\/$/, '');
+        axios
+          .post(`${base}/speak/${kithSessionId}`, { text: greeting }, { timeout: 5000 })
+          .catch((e) => console.error('[Companion] Kith greeting speak error:', e.message));
+      }
+      return;
     } catch (error) {
       console.error('Error generating greeting:', error);
       res.status(500).json({ error: 'Failed to generate greeting' });
