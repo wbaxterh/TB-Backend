@@ -105,6 +105,15 @@ async function createSession(sessionId: string, ws: ServerWebSocket<WsData>): Pr
     t = t.replace(/([a-z])\1{3,}/gi, '$1$1');
     // Strip emoji shortcodes like :sparkles:
     t = t.replace(/:[a-z_]+:/g, '');
+    // Strip unicode emoji so v3 TTS never reads them aloud (Kaori's persona uses
+    // emojis in TEXT chat, but they must not reach the voice). The [chuckle]
+    // audio tag is bracketed text, untouched here + handled by the laugh map.
+    t = t.replace(
+      /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{1F1E6}-\u{1F1FF}\u{FE00}-\u{FE0F}\u{200D}]/gu,
+      '',
+    );
+    // Tidy any double spaces left behind by stripping
+    t = t.replace(/\s{2,}/g, ' ').trim();
     return t;
   };
 
