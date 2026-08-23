@@ -45,9 +45,68 @@ module.exports = (db) => {
   const commentsCollection = db.collection('couch_comments');
   const requestsCollection = db.collection('couch_requests');
 
+  const publicFilmProjection = {
+    bunnyVideoId: 0,
+    hlsUrl: 0,
+    driveFileId: 0,
+  };
+
   // ============================================
   // PUBLIC ROUTES
   // ============================================
+
+  // SEO/agent-friendly film catalog. Unlike /videos, this supports external-only
+  // films, pagination, stable slugs, and fields describing provenance/rights.
+  router.get('/films', async (req, res) => {
+    try {
+      const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 24, 1), 100);
+      const query = { isPublished: true, type: 'film' };
+
+      if (req.query.sport && req.query.sport !== 'all') query.sportTypes = req.query.sport;
+      if (req.query.year) query.releaseYear = parseInt(req.query.year, 10);
+      if (req.query.producer) query.producedBy = req.query.producer;
+      if (req.query.q) {
+        const escaped = req.query.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        query.$or = [
+          { title: { $regex: escaped, $options: 'i' } },
+          { description: { $regex: escaped, $options: 'i' } },
+          { producedBy: { $regex: escaped, $options: 'i' } },
+          { riders: { $regex: escaped, $options: 'i' } },
+        ];
+      }
+
+      const [films, total] = await Promise.all([
+        videosCollection
+          .find(query, { projection: publicFilmProjection })
+          .sort({ releaseYear: -1, title: 1 })
+          .skip((page - 1) * limit)
+          .limit(limit)
+          .toArray(),
+        videosCollection.countDocuments(query),
+      ]);
+
+      res.send({ films, page, limit, total, pages: Math.ceil(total / limit) });
+    } catch (error) {
+      console.error('Error fetching film catalog:', error);
+      res.status(500).send({ error: 'Failed to fetch film catalog' });
+    }
+  });
+
+  router.get('/films/:slug', async (req, res) => {
+    try {
+      const film = await videosCollection.findOne(
+        { slug: req.params.slug, isPublished: true, type: 'film' },
+        { projection: publicFilmProjection },
+      );
+      if (!film) return res.status(404).send({ error: 'Film not found' });
+      res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+      res.send(film);
+    } catch (error) {
+      console.error('Error fetching film:', error);
+      res.status(500).send({ error: 'Failed to fetch film' });
+    }
+  });
 
   // Get all videos (with optional filters)
   router.get('/videos', async (req, res) => {
@@ -828,6 +887,8 @@ module.exports = (db) => {
       }
 
       const {
+        slug,
+        type,
         title,
         description,
         sportTypes,
@@ -844,6 +905,14 @@ module.exports = (db) => {
         isPublished,
         isFeatured,
         collectionId,
+        releaseSeason,
+        directors,
+        locations,
+        watchOptions,
+        sourceRecords,
+        rights,
+        availabilityStatus,
+        seo,
       } = req.body;
 
       if (!title) {
@@ -851,6 +920,8 @@ module.exports = (db) => {
       }
 
       const video = {
+        slug: slug || null,
+        type: type || 'film',
         title,
         description: description || '',
         sportTypes: sportTypes || [],
@@ -868,6 +939,14 @@ module.exports = (db) => {
         isFeatured: isFeatured || false,
         viewCount: 0,
         collectionId: collectionId || null,
+        releaseSeason: releaseSeason || '',
+        directors: directors || [],
+        locations: locations || [],
+        watchOptions: watchOptions || [],
+        sourceRecords: sourceRecords || [],
+        rights: rights || { hostingStatus: 'external_only' },
+        availabilityStatus: availabilityStatus || 'unknown',
+        seo: seo || {},
         order: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -892,6 +971,8 @@ module.exports = (db) => {
 
       const { id } = req.params;
       const {
+        slug,
+        type,
         title,
         description,
         sportTypes,
@@ -909,11 +990,21 @@ module.exports = (db) => {
         isFeatured,
         collectionId,
         order,
+        releaseSeason,
+        directors,
+        locations,
+        watchOptions,
+        sourceRecords,
+        rights,
+        availabilityStatus,
+        seo,
       } = req.body;
 
       const updateData = { updatedAt: new Date() };
 
       if (title !== undefined) updateData.title = title;
+      if (slug !== undefined) updateData.slug = slug;
+      if (type !== undefined) updateData.type = type;
       if (description !== undefined) updateData.description = description;
       if (sportTypes !== undefined) updateData.sportTypes = sportTypes;
       if (tags !== undefined) updateData.tags = tags;
@@ -930,6 +1021,14 @@ module.exports = (db) => {
       if (isFeatured !== undefined) updateData.isFeatured = isFeatured;
       if (collectionId !== undefined) updateData.collectionId = collectionId;
       if (order !== undefined) updateData.order = order;
+      if (releaseSeason !== undefined) updateData.releaseSeason = releaseSeason;
+      if (directors !== undefined) updateData.directors = directors;
+      if (locations !== undefined) updateData.locations = locations;
+      if (watchOptions !== undefined) updateData.watchOptions = watchOptions;
+      if (sourceRecords !== undefined) updateData.sourceRecords = sourceRecords;
+      if (rights !== undefined) updateData.rights = rights;
+      if (availabilityStatus !== undefined) updateData.availabilityStatus = availabilityStatus;
+      if (seo !== undefined) updateData.seo = seo;
 
       await videosCollection.updateOne({ _id: new ObjectId(id) }, { $set: updateData });
 
