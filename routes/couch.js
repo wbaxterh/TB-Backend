@@ -51,6 +51,13 @@ module.exports = (db) => {
     driveFileId: 0,
   };
 
+  const videoIdentityQuery = (identifier) => {
+    if (ObjectId.isValid(identifier)) {
+      return { $or: [{ _id: new ObjectId(identifier) }, { slug: identifier }] };
+    }
+    return { slug: identifier };
+  };
+
   // ============================================
   // PUBLIC ROUTES
   // ============================================
@@ -159,7 +166,7 @@ module.exports = (db) => {
     try {
       const { id } = req.params;
       const video = await videosCollection.findOne({
-        _id: new ObjectId(id),
+        ...videoIdentityQuery(id),
         isPublished: true,
       });
 
@@ -168,7 +175,7 @@ module.exports = (db) => {
       }
 
       // Increment view count
-      await videosCollection.updateOne({ _id: new ObjectId(id) }, { $inc: { viewCount: 1 } });
+      await videosCollection.updateOne({ _id: video._id }, { $inc: { viewCount: 1 } });
 
       // Get reaction counts
       const [loveCount, respectCount] = await Promise.all([
@@ -202,7 +209,7 @@ module.exports = (db) => {
     try {
       const { id } = req.params;
       const video = await videosCollection.findOne({
-        _id: new ObjectId(id),
+        ...videoIdentityQuery(id),
         isPublished: true,
       });
 
