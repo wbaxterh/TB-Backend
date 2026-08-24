@@ -174,18 +174,21 @@ module.exports = (db) => {
         return res.status(404).send({ error: 'Video not found' });
       }
 
+      const canonicalVideoId = video._id.toString();
+      const videoIds = id === canonicalVideoId ? [canonicalVideoId] : [canonicalVideoId, id];
+
       // Increment view count
       await videosCollection.updateOne({ _id: video._id }, { $inc: { viewCount: 1 } });
 
       // Get reaction counts
       const [loveCount, respectCount] = await Promise.all([
-        reactionsCollection.countDocuments({ videoId: id, type: 'love' }),
-        reactionsCollection.countDocuments({ videoId: id, type: 'respect' }),
+        reactionsCollection.countDocuments({ videoId: { $in: videoIds }, type: 'love' }),
+        reactionsCollection.countDocuments({ videoId: { $in: videoIds }, type: 'respect' }),
       ]);
 
       // Get comment count
       const commentCount = await commentsCollection.countDocuments({
-        videoId: id,
+        videoId: { $in: videoIds },
         isDeleted: { $ne: true },
       });
 
