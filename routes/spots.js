@@ -53,11 +53,16 @@ const SPORT_TYPES = [
 const SPOT_CATEGORIES = [
   { id: 'park', name: 'Park', icon: 'leaf' },
   { id: 'street', name: 'Street', icon: 'business' },
+  // Backcountry = wild terrain away from civilization (woods/mountains), NOT a
+  // resort or a developed park. Primarily a snow (ski/snowboard) + MTB concept.
+  { id: 'backcountry', name: 'Backcountry', icon: 'trail-sign' },
   { id: 'indoor', name: 'Indoor', icon: 'home' },
   { id: 'diy', name: 'DIY', icon: 'construct' },
   { id: 'resort', name: 'Resort', icon: 'snow' },
   { id: 'other', name: 'Other', icon: 'ellipsis-horizontal' },
 ];
+
+const SPOT_CATEGORY_IDS = SPOT_CATEGORIES.map((c) => c.id);
 
 // Park sub-types — only meaningful when category === 'park'. Describes what
 // kind of park a spot is (e.g. skatepark vs cable park vs terrain park).
@@ -75,6 +80,19 @@ const PARK_TYPES = [
 
 const PARK_TYPE_IDS = PARK_TYPES.map((p) => p.id);
 
+// Build Mongo condition(s) for a spot category filter. Returns an array of
+// clauses to AND into a query (empty when no filter / 'all'). 'park' is
+// special: it ALSO surfaces resort spots that contain a terrain park, since
+// most ski/snowboard resorts have one — so a rider filtering "Park" still
+// finds resort parks (product decision).
+const categoryConditions = (category) => {
+  if (!category || category === 'all') return [];
+  if (category === 'park') {
+    return [{ $or: [{ category: 'park' }, { category: 'resort', parkType: 'terrain_park' }] }];
+  }
+  return [{ category }];
+};
+
 const schema = {
   name: Joi.string().required(),
   latitude: Joi.number().required(),
@@ -90,7 +108,9 @@ const schema = {
   sportTypes: Joi.array()
     .items(Joi.string().valid(...SPORT_TYPES))
     .optional(),
-  category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'resort', 'other').optional(),
+  category: Joi.string()
+    .valid(...SPOT_CATEGORY_IDS)
+    .optional(),
   parkType: Joi.string()
     .valid(...PARK_TYPE_IDS)
     .allow('')
@@ -114,7 +134,9 @@ const updateSchema = {
   sportTypes: Joi.array()
     .items(Joi.string().valid(...SPORT_TYPES))
     .optional(),
-  category: Joi.string().valid('park', 'street', 'indoor', 'diy', 'resort', 'other').optional(),
+  category: Joi.string()
+    .valid(...SPOT_CATEGORY_IDS)
+    .optional(),
   parkType: Joi.string()
     .valid(...PARK_TYPE_IDS)
     .allow('')
@@ -432,6 +454,7 @@ module.exports = (db) => {
       const { minLat, maxLat, minLng, maxLng, sportType, category } = req.query;
 
       const query = { approvalStatus: 'approved' };
+      const andConditions = [];
 
       const hasBounds =
         minLat !== undefined &&
@@ -460,7 +483,9 @@ module.exports = (db) => {
         if (minLngNum <= maxLngNum) {
           query.longitude = { $gte: minLngNum, $lte: maxLngNum };
         } else {
-          query.$or = [{ longitude: { $gte: minLngNum } }, { longitude: { $lte: maxLngNum } }];
+          andConditions.push({
+            $or: [{ longitude: { $gte: minLngNum } }, { longitude: { $lte: maxLngNum } }],
+          });
         }
       } else {
         query.latitude = { $exists: true };
@@ -471,8 +496,10 @@ module.exports = (db) => {
         query.sportTypes = sportType;
       }
 
-      if (category && category !== 'all') {
-        query.category = category;
+      andConditions.push(...categoryConditions(category));
+
+      if (andConditions.length) {
+        query.$and = andConditions;
       }
 
       const pins = await spotsCollection
@@ -523,9 +550,11 @@ module.exports = (db) => {
         query.sportTypes = sportType;
       }
 
-      // Filter by category (park, street, indoor, diy)
-      if (category && category !== 'all') {
-        query.category = category;
+      // Filter by category (park, street, backcountry, indoor, diy, resort,
+      // other). 'park' also pulls in resort spots with a terrain park.
+      const catConditions = categoryConditions(category);
+      if (catConditions.length) {
+        query.$and = [...(query.$and || []), ...catConditions];
       }
 
       // Search by name

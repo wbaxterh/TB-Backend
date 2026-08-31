@@ -108,6 +108,30 @@ const emitNewMessage = (io, recipientId, message, conversation) => {
 };
 
 /**
+ * Emit a new message to MANY recipients (group chats) + the conversation room.
+ * Emits `message:new` once per recipient personal room and once to the shared
+ * conversation room. Clients must dedupe by message._id (a participant with the
+ * thread open is in both rooms).
+ * @param {Server} io - Socket.IO server instance
+ * @param {string[]} recipientIds - Every participant except the sender
+ * @param {Object} message - The message data
+ * @param {Object} conversation - The conversation data
+ */
+const emitNewMessageToRecipients = (io, recipientIds, message, conversation) => {
+  const messagesNs = io.of('/messages');
+  (recipientIds || []).forEach((rid) => {
+    messagesNs.to(`user:${rid}`).emit('message:new', { message, conversation });
+  });
+  messagesNs.to(`conversation:${message.conversationId}`).emit('message:new', {
+    message,
+    conversation,
+  });
+  console.log(
+    `[Messages] Emitted message:new to ${(recipientIds || []).length} recipient(s) + conversation:${message.conversationId}`,
+  );
+};
+
+/**
  * Emit a messages read event to the sender
  * @param {Server} io - Socket.IO server instance
  * @param {string} senderId - The original sender's user ID
@@ -123,4 +147,5 @@ const emitMessagesRead = (io, senderId, conversationId, readBy) => {
 
 module.exports = setupMessageSocket;
 module.exports.emitNewMessage = emitNewMessage;
+module.exports.emitNewMessageToRecipients = emitNewMessageToRecipients;
 module.exports.emitMessagesRead = emitMessagesRead;
