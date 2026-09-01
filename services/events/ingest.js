@@ -6,10 +6,12 @@
 const crypto = require('node:crypto');
 const { fetchXGamesEvents } = require('./xgames');
 const { fetchBoardrEvents } = require('./boardr');
+const { fetchOfficialEvents } = require('./official');
 
 const SOURCES = {
   xgames: fetchXGamesEvents,
   boardr: fetchBoardrEvents,
+  official: fetchOfficialEvents,
 };
 
 function shortHash(s) {
@@ -24,7 +26,7 @@ async function ensureIndexes(collection) {
   await collection.createIndex({ status: 1 }).catch(() => {});
 }
 
-async function ingestEvents(db, { sources = ['xgames', 'boardr'] } = {}) {
+async function ingestEvents(db, { sources = ['xgames', 'boardr', 'official'] } = {}) {
   const collection = db.collection('events');
   await ensureIndexes(collection);
 

@@ -39,16 +39,29 @@ module.exports = (db) => {
   // GET /api/events — filtered, cursor-paginated list
   router.get('/', async (req, res) => {
     try {
-      const { q, sport, discipline, location, date, intent, registration } = req.query;
+      const { q, sport, discipline, location, date, intent, registration, view } = req.query;
       const cursor = Math.max(0, parseInt(req.query.cursor, 10) || 0);
 
       const now = new Date();
 
       const and = [];
-      // No strict upcoming filter: results are ordered by proximity to now
-      // (nearest first), so both upcoming and recently-past events surface —
-      // important while a season's public feed is an archive.
-
+      if (view === 'archive') {
+        and.push({
+          $or: [
+            { endAt: { $lt: now } },
+            { endAt: { $in: [null, ''] }, startAt: { $lt: now } },
+            { endAt: { $exists: false }, startAt: { $lt: now } },
+          ],
+        });
+      } else {
+        and.push({
+          $or: [
+            { endAt: { $gte: now } },
+            { endAt: { $in: [null, ''] }, startAt: { $gte: now } },
+            { endAt: { $exists: false }, startAt: { $gte: now } },
+          ],
+        });
+      }
       if (q) {
         const rx = { $regex: escapeRegex(q), $options: 'i' };
         and.push({ $or: [{ title: rx }, { 'organizer.name': rx }, { series: rx }] });
@@ -78,15 +91,9 @@ module.exports = (db) => {
       const query = and.length ? { $and: and } : {};
 
       const totalCount = await events.countDocuments(query);
+      const sort = view === 'archive' ? { startAt: -1, _id: 1 } : { startAt: 1, _id: 1 };
       const docs = await events
-        .aggregate([
-          { $match: query },
-          { $addFields: { _prox: { $abs: { $subtract: ['$startAt', now] } } } },
-          { $sort: { _prox: 1, _id: 1 } },
-          { $skip: cursor },
-          { $limit: PAGE_SIZE },
-          { $project: { _prox: 0 } },
-        ])
+        .aggregate([{ $match: query }, { $sort: sort }, { $skip: cursor }, { $limit: PAGE_SIZE }])
         .toArray();
 
       const nextCursor = cursor + docs.length < totalCount ? String(cursor + docs.length) : null;
