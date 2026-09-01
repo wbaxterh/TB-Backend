@@ -253,9 +253,13 @@ module.exports = (db) => {
         nextSteps: (trick.progression?.nextSteps || []).filter(visible),
         related: (trick.progression?.related || []).filter(visible),
       };
-      const ids = [...new Set(Object.values(groups).flat().map((edge) => edge.trickId.toString()))].map(
-        (id) => new ObjectId(id),
-      );
+      const ids = [
+        ...new Set(
+          Object.values(groups)
+            .flat()
+            .map((edge) => edge.trickId.toString()),
+        ),
+      ].map((id) => new ObjectId(id));
       const linked = ids.length
         ? await trickipediaCollection
             .find({ _id: { $in: ids } })
