@@ -3,6 +3,144 @@ const { ObjectId } = require('mongodb');
 const auth = require('../middleware/auth');
 const escapeRegex = require('../utils/escapeRegex');
 
+const EDGE_STATUSES = new Set(['draft', 'reviewed', 'published', 'disputed']);
+const EDGE_CONFIDENCE = new Set(['high', 'medium', 'low']);
+const EDGE_STRENGTHS = new Set(['required', 'recommended', 'helpful']);
+const RELATION_TYPES = new Set([
+  'variation',
+  'opposite-direction',
+  'same-family',
+  'combination',
+  'terrain-transfer',
+]);
+
+const optionalArray = (value, field) => {
+  if (value == null) return null;
+  return Array.isArray(value) ? null : `${field} must be an array`;
+};
+
+const validateEdges = (edges, field, { strength = false, relation = false } = {}) => {
+  const arrayError = optionalArray(edges, field);
+  if (arrayError) return arrayError;
+  for (const edge of edges || []) {
+    if (!edge || !ObjectId.isValid(edge.trickId)) return `${field}.trickId must be a valid ID`;
+    if (typeof edge.reason !== 'string' || !edge.reason.trim()) {
+      return `${field}.reason is required`;
+    }
+    if (strength && edge.strength && !EDGE_STRENGTHS.has(edge.strength)) {
+      return `${field}.strength is invalid`;
+    }
+    if (relation && !RELATION_TYPES.has(edge.relation)) return `${field}.relation is invalid`;
+    const research = edge.research;
+    if (research?.status && !EDGE_STATUSES.has(research.status)) {
+      return `${field}.research.status is invalid`;
+    }
+    if (research?.confidence && !EDGE_CONFIDENCE.has(research.confidence)) {
+      return `${field}.research.confidence is invalid`;
+    }
+    if (research?.evidence && !Array.isArray(research.evidence)) {
+      return `${field}.research.evidence must be an array`;
+    }
+  }
+  return null;
+};
+
+const validateProgression = (progression) => {
+  if (progression == null) return null;
+  if (typeof progression !== 'object' || Array.isArray(progression)) {
+    return 'progression must be an object';
+  }
+  return (
+    validateEdges(progression.prerequisites, 'progression.prerequisites', { strength: true }) ||
+    validateEdges(progression.nextSteps, 'progression.nextSteps') ||
+    validateEdges(progression.related, 'progression.related', { relation: true })
+  );
+};
+
+const validateTutorials = (tutorials) => {
+  const arrayError = optionalArray(tutorials, 'tutorials');
+  if (arrayError) return arrayError;
+  for (const tutorial of tutorials || []) {
+    if (!tutorial?.canonicalUrl || typeof tutorial.canonicalUrl !== 'string') {
+      return 'tutorials.canonicalUrl is required';
+    }
+    if (!tutorial.platform || typeof tutorial.platform !== 'string') {
+      return 'tutorials.platform is required';
+    }
+    if (tutorial.instructor?.isProfessional && !tutorial.instructor.credentialSourceUrl) {
+      return 'professional tutorials require instructor.credentialSourceUrl';
+    }
+  }
+  return null;
+};
+
+const normalizeResearch = (research) => ({
+  status: research?.status || 'draft',
+  confidence: research?.confidence || 'low',
+  evidence: (research?.evidence || []).map((item) => ({
+    ...item,
+    checkedAt: item.checkedAt ? new Date(item.checkedAt) : new Date(),
+  })),
+  reviewedBy: research?.reviewedBy || null,
+  reviewedAt: research?.reviewedAt ? new Date(research.reviewedAt) : null,
+});
+
+const normalizeProgression = (progression = {}) => ({
+  prerequisites: (progression.prerequisites || []).map((edge, order) => ({
+    ...edge,
+    trickId: new ObjectId(edge.trickId),
+    strength: edge.strength || 'helpful',
+    order: edge.order ?? order,
+    research: normalizeResearch(edge.research),
+  })),
+  nextSteps: (progression.nextSteps || []).map((edge, order) => ({
+    ...edge,
+    trickId: new ObjectId(edge.trickId),
+    order: edge.order ?? order,
+    research: normalizeResearch(edge.research),
+  })),
+  related: (progression.related || []).map((edge) => ({
+    ...edge,
+    trickId: new ObjectId(edge.trickId),
+    research: normalizeResearch(edge.research),
+  })),
+});
+
+const normalizeTutorials = (tutorials = []) =>
+  tutorials.map((tutorial) => ({
+    ...tutorial,
+    availability: tutorial.availability || 'active',
+    embedAllowed: tutorial.embedAllowed !== false,
+    featured: tutorial.featured === true,
+    lastVerifiedAt: tutorial.lastVerifiedAt ? new Date(tutorial.lastVerifiedAt) : new Date(),
+    transcript: {
+      status: tutorial.transcript?.status || 'pending',
+      ...tutorial.transcript,
+      retrievedAt: tutorial.transcript?.retrievedAt
+        ? new Date(tutorial.transcript.retrievedAt)
+        : null,
+    },
+  }));
+
+const writableFields = (body) => ({
+  name: body.name,
+  category: body.category,
+  difficulty: body.difficulty,
+  description: body.description,
+  steps: body.steps,
+  tips: body.tips || [],
+  commonMistakes: body.commonMistakes || [],
+  safety: body.safety || [],
+  aliases: body.aliases || [],
+  images: body.images || [],
+  videoUrl: body.videoUrl || null,
+  videos: body.videos || [],
+  tutorials: normalizeTutorials(body.tutorials),
+  progression: normalizeProgression(body.progression),
+  source: body.source || null,
+  audit: body.audit || null,
+});
+
 // Utility function to generate a URL slug from the trick name
 const generateSlug = (name) =>
   name
@@ -42,6 +180,11 @@ const validateTrick = (trick) => {
   if (trick.url && typeof trick.url !== 'string')
     return { isValid: false, message: 'URL must be a string' };
 
+  const progressionError = validateProgression(trick.progression);
+  if (progressionError) return { isValid: false, message: progressionError };
+  const tutorialsError = validateTutorials(trick.tutorials);
+  if (tutorialsError) return { isValid: false, message: tutorialsError };
+
   return { isValid: true };
 };
 
@@ -53,24 +196,96 @@ module.exports = (db) => {
   // Get all tricks with optional filtering
   router.get('/', async (req, res) => {
     try {
-      const { category, difficulty, search } = req.query;
+      const { category, difficulty, search, sportType } = req.query;
+      const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 100, 1), 250);
+      const skip = Math.max(Number.parseInt(req.query.skip, 10) || 0, 0);
       const query = {};
 
       if (category) query.category = category;
+      if (sportType) query.$and = [{ $or: [{ sportTypes: sportType }, { category: sportType }] }];
       if (difficulty) query.difficulty = difficulty;
       if (search) {
-        query.$or = [
-          { name: { $regex: escapeRegex(search), $options: 'i' } },
-          { description: { $regex: escapeRegex(search), $options: 'i' } },
-        ];
+        const searchClause = {
+          $or: [
+            { name: { $regex: escapeRegex(search), $options: 'i' } },
+            { description: { $regex: escapeRegex(search), $options: 'i' } },
+          ],
+        };
+        query.$and = [...(query.$and || []), searchClause];
       }
 
-      const tricks = await trickipediaCollection.find(query).sort({ name: 1 }).toArray();
+      const tricks = await trickipediaCollection
+        .find(query)
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray();
 
       res.json(tricks);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Error fetching tricks' });
+    }
+  });
+
+  router.get('/url/:slug', async (req, res) => {
+    try {
+      const trick = await trickipediaCollection.findOne({ url: req.params.slug });
+      if (!trick) return res.status(404).json({ message: 'Trick not found' });
+      res.json(trick);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error fetching trick' });
+    }
+  });
+
+  router.get('/:id/network', async (req, res) => {
+    try {
+      if (!ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid trick ID' });
+      }
+      const trick = await trickipediaCollection.findOne({ _id: new ObjectId(req.params.id) });
+      if (!trick) return res.status(404).json({ message: 'Trick not found' });
+
+      const visible = (edge) => ['reviewed', 'published'].includes(edge.research?.status);
+      const groups = {
+        foundations: (trick.progression?.prerequisites || []).filter(visible),
+        nextSteps: (trick.progression?.nextSteps || []).filter(visible),
+        related: (trick.progression?.related || []).filter(visible),
+      };
+      const ids = [
+        ...new Set(
+          Object.values(groups)
+            .flat()
+            .map((edge) => edge.trickId.toString()),
+        ),
+      ].map((id) => new ObjectId(id));
+      const linked = ids.length
+        ? await trickipediaCollection
+            .find({ _id: { $in: ids } })
+            .project({ name: 1, url: 1, category: 1, difficulty: 1, images: 1 })
+            .toArray()
+        : [];
+      const linkedById = new Map(linked.map((item) => [item._id.toString(), item]));
+      const hydrate = (edges) =>
+        edges
+          .map((edge) => ({ ...edge, trick: linkedById.get(edge.trickId.toString()) }))
+          .filter((edge) => edge.trick)
+          .sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      const tutorials = (trick.tutorials || []).filter(
+        (tutorial) => tutorial.availability === 'active',
+      );
+      res.json({
+        trick: { _id: trick._id, name: trick.name, url: trick.url, category: trick.category },
+        foundations: hydrate(groups.foundations),
+        nextSteps: hydrate(groups.nextSteps),
+        related: hydrate(groups.related),
+        featuredTutorial: tutorials.find((tutorial) => tutorial.featured) || tutorials[0] || null,
+        alternateTutorials: tutorials.filter((tutorial) => !tutorial.featured),
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Error fetching trick network' });
     }
   });
 
@@ -146,15 +361,7 @@ module.exports = (db) => {
 
       const url = generateSlug(req.body.name);
       const trick = {
-        name: req.body.name,
-        category: req.body.category,
-        difficulty: req.body.difficulty,
-        description: req.body.description,
-        steps: req.body.steps,
-        images: req.body.images || [],
-        videoUrl: req.body.videoUrl || null,
-        videos: req.body.videos || [],
-        source: req.body.source || null,
+        ...writableFields(req.body),
         url,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -189,15 +396,7 @@ module.exports = (db) => {
 
       const url = generateSlug(req.body.name);
       const update = {
-        name: req.body.name,
-        category: req.body.category,
-        difficulty: req.body.difficulty,
-        description: req.body.description,
-        steps: req.body.steps,
-        images: req.body.images || [],
-        videoUrl: req.body.videoUrl || null,
-        videos: req.body.videos || [],
-        source: req.body.source || null,
+        ...writableFields(req.body),
         url,
         updatedAt: new Date(),
       };
