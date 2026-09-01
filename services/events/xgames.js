@@ -8,7 +8,15 @@
  */
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { slugify, cleanText, parseDateRange, inferSportsFromDate, dedupeKey } = require('./util');
+const {
+  slugify,
+  cleanText,
+  parseDateRange,
+  inferSportsFromDate,
+  inferDisciplines,
+  defaultEventDisciplines,
+  dedupeKey,
+} = require('./util');
 
 const ENDPOINT = 'https://www.xgames.com/wp-json/xgames/v1/events';
 const UA = 'TrickBookEventsBot/1.0 (+https://thetrickbook.com; events@thetrickbook.com)';
@@ -40,6 +48,8 @@ function parseCards(html) {
     const location = cleanText(title.replace(/\s*\d{4}\s*$/, ''));
     const slugBase = detailsUrl ? detailsUrl.replace(/\/$/, '').split('/').pop() : slugify(title);
 
+    const sports = inferSportsFromDate(startAt);
+    const inferredDisciplines = inferDisciplines(sports, title, card.text());
     events.push({
       source: 'xgames',
       sourceId: `xgames:${slugBase}`,
@@ -47,7 +57,10 @@ function parseCards(html) {
       slug: slugify(`xg-${slugBase}`),
       title: `X Games ${title}`,
       description: '',
-      sports: inferSportsFromDate(startAt),
+      sports,
+      disciplines: inferredDisciplines.length
+        ? inferredDisciplines
+        : defaultEventDisciplines(sports),
       startAt,
       endAt,
       timezone: null,
@@ -58,6 +71,15 @@ function parseCards(html) {
       participation: {}, // invitational / pro — no open registration
       spectating: { inPerson: !isPast, ticketUrl: '', streamUrl: '', streamStatus: '' },
       image,
+      media: { images: image ? [image] : [], videos: [] },
+      socialLinks: [
+        {
+          platform: 'instagram',
+          label: 'X Games on Instagram',
+          url: 'https://www.instagram.com/xgames/',
+        },
+        { platform: 'youtube', label: 'X Games videos', url: 'https://www.youtube.com/@XGames' },
+      ],
       organizer: { name: 'X Games', verified: true },
       series: 'X Games',
       resultsUrl,

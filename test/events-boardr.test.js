@@ -4,6 +4,8 @@ const {
   normalizeBoardrEvent,
   parseBoardrPage,
   splitLocation,
+  parseEventDetail,
+  mergeBoardrDetail,
 } = require('../services/events/boardr');
 
 const RAW_EVENT = {
@@ -25,6 +27,18 @@ test('normalizes a Boardr event into the canonical MVP shape', () => {
   assert.equal(event.venue.city, 'Waldo');
   assert.equal(event.venue.region, 'Florida');
   assert.equal(event.status, 'scheduled');
+});
+
+test('extracts durable event media and social links from detail pages', () => {
+  const detail = parseEventDetail(
+    '<meta property="og:image" content="/event.jpg"><main>Mini ramp jam</main><a href="https://instagram.com/example/">IG</a><a href="https://youtu.be/abc">Video</a>',
+    'https://www.theboardr.com/events/1',
+  );
+  const event = mergeBoardrDetail(normalizeBoardrEvent(RAW_EVENT), detail);
+  assert.equal(event.image, 'https://www.theboardr.com/event.jpg');
+  assert.ok(event.disciplines.includes('dirt'));
+  assert.equal(event.socialLinks[0].platform, 'instagram');
+  assert.equal(event.media.videos[0].url, 'https://youtu.be/abc');
 });
 
 test('parses the server-rendered Next.js event list', () => {

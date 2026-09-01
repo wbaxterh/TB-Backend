@@ -77,6 +77,62 @@ function inferSportsFromDate(startAt) {
   return winter ? ['snowboarding', 'skiing'] : ['skateboarding', 'bmx'];
 }
 
+const DISCIPLINE_RULES = {
+  skateboarding: [
+    ['mini-ramp', /mini[ -]?ramp|halfpipe/i],
+    ['vert', /\bvert\b|mega ramp/i],
+    ['park', /\bpark\b|bowl|transition/i],
+    ['street', /\bstreet\b|streetstyle|spot[s]?\b/i],
+  ],
+  bmx: [
+    ['dirt', /\bdirt\b|swampfest/i],
+    ['park', /\bpark\b|ramp|bowl|transition/i],
+    ['street', /\bstreet\b|streetstyle/i],
+  ],
+  snowboarding: [
+    ['superpipe', /superpipe|halfpipe/i],
+    ['big-air', /big air|knuckle huck/i],
+    ['slopestyle', /slopestyle/i],
+    ['backcountry', /backcountry|freeride/i],
+  ],
+  skiing: [
+    ['superpipe', /superpipe|halfpipe/i],
+    ['big-air', /big air|knuckle huck/i],
+    ['slopestyle', /slopestyle/i],
+    ['backcountry', /backcountry|freeride/i],
+  ],
+};
+
+function inferDisciplines(sports, ...values) {
+  const text = values.filter(Boolean).join(' ');
+  const matches = [];
+  for (const sport of sports || []) {
+    for (const [discipline, rule] of DISCIPLINE_RULES[sport] || []) {
+      if (rule.test(text)) matches.push(discipline);
+    }
+  }
+  return [...new Set(matches)];
+}
+
+function defaultEventDisciplines(sports) {
+  const defaults = {
+    skateboarding: ['street', 'park', 'vert'],
+    bmx: ['street', 'park', 'dirt'],
+    snowboarding: ['slopestyle', 'big-air', 'superpipe'],
+    skiing: ['slopestyle', 'big-air', 'superpipe'],
+  };
+  return [...new Set((sports || []).flatMap((sport) => defaults[sport] || []))];
+}
+
+function absoluteUrl(value, baseUrl) {
+  if (!value) return '';
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch (_error) {
+    return '';
+  }
+}
+
 // A stable key for de-duplication across sources/re-runs.
 function dedupeKey({ title, startAt, city }) {
   return [
@@ -88,4 +144,14 @@ function dedupeKey({ title, startAt, city }) {
     .join('|');
 }
 
-module.exports = { slugify, cleanText, parseDateRange, inferSportsFromDate, dedupeKey, MONTHS };
+module.exports = {
+  slugify,
+  cleanText,
+  parseDateRange,
+  inferSportsFromDate,
+  inferDisciplines,
+  defaultEventDisciplines,
+  absoluteUrl,
+  dedupeKey,
+  MONTHS,
+};
