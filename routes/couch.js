@@ -118,7 +118,7 @@ module.exports = (db) => {
   // Get all videos (with optional filters)
   router.get('/videos', async (req, res) => {
     try {
-      const { sport, collection, type, sort = 'createdAt', limit = 50, page = 1 } = req.query;
+      const { sport, collection, type, sort = 'releaseYear', limit = 50, page = 1 } = req.query;
       const query = { isPublished: true };
 
       if (sport && sport !== 'all') {
