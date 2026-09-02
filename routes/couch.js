@@ -118,7 +118,7 @@ module.exports = (db) => {
   // Get all videos (with optional filters)
   router.get('/videos', async (req, res) => {
     try {
-      const { sport, collection, sort = 'createdAt', limit = 50 } = req.query;
+      const { sport, collection, type, sort = 'createdAt', limit = 50, page = 1 } = req.query;
       const query = { isPublished: true };
 
       if (sport && sport !== 'all') {
@@ -127,17 +127,28 @@ module.exports = (db) => {
       if (collection) {
         query.collectionId = collection;
       }
+      if (type && type !== 'all') {
+        query.type = type;
+      }
 
       const sortOptions = {};
       if (sort === 'title') sortOptions.title = 1;
       else if (sort === 'releaseYear') sortOptions.releaseYear = -1;
+      else if (sort === 'releaseYearAsc') sortOptions.releaseYear = 1;
       else if (sort === 'popular') sortOptions.viewCount = -1;
+      else if (sort === 'rating') sortOptions.avgRating = -1;
       else sortOptions.createdAt = -1;
+
+      // Keep pagination deterministic when several videos share the primary sort value.
+      sortOptions._id = -1;
+      const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+      const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
 
       const videos = await videosCollection
         .find(query)
         .sort(sortOptions)
-        .limit(parseInt(limit, 10))
+        .skip((parsedPage - 1) * parsedLimit)
+        .limit(parsedLimit)
         .toArray();
 
       res.send(videos);
