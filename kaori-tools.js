@@ -306,7 +306,7 @@ async function createTricklist(args, db, senderId) {
       user: new DBRef('users', senderId),
       completed: 0,
       tricks: [],
-      isPublic: false,
+      isPublic: true,
       createdAt: new Date(),
       createdBy: 'kaori',
     };

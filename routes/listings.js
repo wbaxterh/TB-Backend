@@ -171,7 +171,8 @@ module.exports = (db) => {
         user: new DBRef('users', req.user.userId),
         completed: 0,
         tricks: [],
-        isPublic: req.body.isPublic === true,
+        // New lists are public unless the user explicitly chooses private.
+        isPublic: req.body.isPublic !== false,
         createdAt: new Date(),
       };
       console.log(listing);
