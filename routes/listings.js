@@ -50,7 +50,8 @@ module.exports = (db) => {
   const userOwnsList = async (listId, userId) => {
     if (!ObjectId.isValid(listId)) return false;
     const list = await tricksCollection.findOne({ _id: new ObjectId(listId) });
-    return !!list && String(list.user?.$id) === String(userId);
+    const ownerId = list?.user?.oid ?? list?.user?.$id;
+    return !!ownerId && String(ownerId) === String(userId);
   };
 
   //SIMPLE GET TRICKLISTS
