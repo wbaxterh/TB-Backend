@@ -38,6 +38,10 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3002',
   'http://localhost:8081',
+  ...(process.env.CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 ];
 app.use(
   cors({
@@ -103,6 +107,7 @@ async function startServer() {
   app.use('/api/listings', require('./routes/listings')(db));
   app.use('/api/user', require('./routes/user')(db));
   app.use('/api/users', require('./routes/users')(db));
+  app.use('/api/riders', require('./routes/riders')(db));
   app.use('/api/auth', require('./routes/auth')(db));
   app.use('/api/blog', require('./routes/blog')(db));
   app.use('/api/my', require('./routes/my'));
