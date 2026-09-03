@@ -5,6 +5,7 @@ const { OAuth2Client } = require('google-auth-library');
 const appleSignin = require('apple-signin-auth');
 const bcrypt = require('bcrypt');
 const validateWith = require('../middleware/validation');
+const { PROVIDERS, getAuthProvider, providerMismatch } = require('../services/authProvider');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -28,9 +29,16 @@ module.exports = (db) => {
 
       // Check if user has a password (SSO users might not have one)
       if (!userExists.password) {
-        return res
-          .status(400)
-          .send({ error: 'This account uses Google Sign-In. Please log in with Google.' });
+        const provider = getAuthProvider(userExists);
+        return res.status(409).send(
+          provider
+            ? providerMismatch(provider)
+            : {
+                error: 'We could not verify this account’s sign-in method.',
+                code: 'AUTH_RECOVERY_REQUIRED',
+                recoveryPath: '/forgot-password',
+              },
+        );
       }
 
       // Compare the provided password with the hashed password in the database
@@ -95,6 +103,10 @@ module.exports = (db) => {
           ...newUser,
         };
       } else {
+        const existingProvider = getAuthProvider(user);
+        if (existingProvider && existingProvider !== PROVIDERS.GOOGLE) {
+          return res.status(409).send(providerMismatch(existingProvider));
+        }
         // Existing user: only BACKFILL SSO fields we don't already have — never
         // clobber a name or avatar the user has customized in the app. Previously
         // this $set overwrote imageUri (and name) on every login, so a custom
@@ -163,7 +175,10 @@ module.exports = (db) => {
           ...newUser,
         };
       } else if (!user.appleUserId) {
-        // Link existing email account with Apple ID
+        const existingProvider = getAuthProvider(user);
+        if (existingProvider && existingProvider !== PROVIDERS.APPLE) {
+          return res.status(409).send(providerMismatch(existingProvider));
+        }
         await usersCollection.updateOne({ _id: user._id }, { $set: { appleUserId: appleUserId } });
       }
 
