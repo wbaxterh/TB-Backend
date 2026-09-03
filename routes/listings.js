@@ -76,7 +76,9 @@ module.exports = (db) => {
       // else — logged out or viewing another rider — sees public lists only.
       const requesterId = optionalUserId(req);
       const isOwner = requesterId && String(requesterId) === String(req.query.userId);
-      const listQuery = { 'user.$id': req.query.userId };
+      const ownerIds = [req.query.userId];
+      if (ObjectId.isValid(req.query.userId)) ownerIds.push(new ObjectId(req.query.userId));
+      const listQuery = { 'user.$id': { $in: ownerIds } };
       if (!isOwner) listQuery.isPublic = true;
 
       const trickLists = await db.collection('tricklists').find(listQuery).toArray();
@@ -132,9 +134,11 @@ module.exports = (db) => {
 
   router.get('/countTrickLists', async (req, res) => {
     try {
+      const ownerIds = [req.query.userId];
+      if (ObjectId.isValid(req.query.userId)) ownerIds.push(new ObjectId(req.query.userId));
       const trickLists = await db
         .collection('tricklists')
-        .find({ 'user.$id': req.query.userId })
+        .find({ 'user.$id': { $in: ownerIds } })
         .toArray();
       const countTrickLists = trickLists.length;
       res.send({ totalTrickLists: countTrickLists });
