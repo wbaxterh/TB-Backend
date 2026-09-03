@@ -21,8 +21,9 @@ async function connectToDatabase() {
   });
 
   await client.connect();
-  db = client.db('TrickList2');
-  console.log('Connected to MongoDB Atlas (shared connection pool, maxPoolSize: 20)');
+  const databaseName = process.env.MONGODB_DATABASE || 'TrickList2';
+  db = client.db(databaseName);
+  console.log(`Connected to MongoDB Atlas database ${databaseName} (shared connection pool)`);
   return db;
 }
 
