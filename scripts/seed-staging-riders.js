@@ -40,7 +40,10 @@ async function main() {
       );
     }
 
-    await target.deleteMany({ stagingFixture: true, _id: { $nin: riders.map((rider) => rider._id) } });
+    await target.deleteMany({
+      stagingFixture: true,
+      _id: { $nin: riders.map((rider) => rider._id) },
+    });
     console.log(`Seeded ${riders.length} sanitized public rider profiles`);
   } finally {
     await client.close();
