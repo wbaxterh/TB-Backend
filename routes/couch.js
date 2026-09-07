@@ -1,5 +1,6 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const { normalizeIdentityPart } = require('../services/riders/editorialRider');
 const { google } = require('googleapis');
 const { ObjectId } = require('mongodb');
 const path = require('path');
@@ -58,6 +59,32 @@ module.exports = (db) => {
       return { $or: [{ _id: new ObjectId(identifier) }, { slug: identifier }] };
     }
     return { slug: identifier };
+  };
+
+  // Map a film's credited rider names to published editorial profile slugs so
+  // clients can link names to /riders/<slug>. Names without a profile are
+  // simply absent from the result.
+  const resolveRiderProfiles = async (riderNames) => {
+    if (!Array.isArray(riderNames) || riderNames.length === 0) return [];
+    const normalized = [...new Set(riderNames.map(normalizeIdentityPart).filter(Boolean))];
+    if (!normalized.length) return [];
+    const profiles = await db
+      .collection('riders')
+      .find({
+        reviewStatus: 'published',
+        $or: [{ normalizedName: { $in: normalized } }, { normalizedAliases: { $in: normalized } }],
+      })
+      .project({ slug: 1, normalizedName: 1, normalizedAliases: 1 })
+      .toArray();
+    const slugByName = new Map();
+    for (const profile of profiles) {
+      for (const name of [profile.normalizedName, ...(profile.normalizedAliases || [])]) {
+        slugByName.set(name, profile.slug);
+      }
+    }
+    return riderNames
+      .map((name) => ({ name, slug: slugByName.get(normalizeIdentityPart(name)) }))
+      .filter((entry) => entry.slug);
   };
 
   // ============================================
@@ -205,8 +232,11 @@ module.exports = (db) => {
         isDeleted: { $ne: true },
       });
 
+      const riderProfiles = await resolveRiderProfiles(video.riders);
+
       res.send({
         ...video,
+        riderProfiles,
         stats: {
           loveCount,
           respectCount,
