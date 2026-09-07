@@ -3,6 +3,20 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
+test('payments routes load without Stripe credentials', () => {
+  const previousKey = process.env.STRIPE_SECRET_KEY;
+  delete process.env.STRIPE_SECRET_KEY;
+
+  try {
+    delete require.cache[require.resolve('../config/stripe')];
+    delete require.cache[require.resolve('../routes/payments')];
+    assert.doesNotThrow(() => require('../routes/payments')({ collection: () => ({}) }));
+  } finally {
+    if (previousKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = previousKey;
+  }
+});
+
 test('couch routes load without Drive credentials', () => {
   const previousPath = process.env.GOOGLE_DRIVE_CREDENTIALS_PATH;
   process.env.GOOGLE_DRIVE_CREDENTIALS_PATH = path.join(
