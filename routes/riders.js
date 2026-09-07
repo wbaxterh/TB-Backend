@@ -1,6 +1,7 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const { PUBLIC_RIDER_PROJECTION, SUPPORTED_SPORTS } = require('../services/riders/editorialRider');
+const { computeRepScore } = require('../services/riders/repScore');
 const escapeRegex = require('../utils/escapeRegex');
 
 const RIDER_PROJECTION = {
@@ -16,6 +17,30 @@ module.exports = (db) => {
   const router = express.Router();
   const users = db.collection('users');
   const editorialRiders = db.collection('riders');
+  const couchVideos = db.collection('couch_videos');
+
+  // Attach the Couch film slug/title to each credit so clients can link
+  // straight to the film page.
+  async function enrichCouchCredits(rider) {
+    const credits = rider.couchCredits || [];
+    const filmIds = credits
+      .map((credit) => credit.filmId)
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    if (!filmIds.length) return rider;
+    const films = await couchVideos
+      .find({ _id: { $in: filmIds } })
+      .project({ slug: 1, title: 1 })
+      .toArray();
+    const filmsById = new Map(films.map((film) => [film._id.toString(), film]));
+    return {
+      ...rider,
+      couchCredits: credits.map((credit) => {
+        const film = filmsById.get(String(credit.filmId));
+        return film ? { ...credit, filmSlug: film.slug, filmTitle: film.title } : credit;
+      }),
+    };
+  }
 
   router.get('/editorial', async (req, res) => {
     try {
@@ -59,7 +84,13 @@ module.exports = (db) => {
         editorialRiders.countDocuments(filter),
       ]);
 
-      res.send({ items, page, limit, total, pages: Math.ceil(total / limit) });
+      res.send({
+        items: items.map((item) => ({ ...item, rep: computeRepScore(item) })),
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      });
     } catch (error) {
       console.error('Error fetching editorial riders:', error);
       res.status(500).send({ error: 'Unable to load editorial riders' });
@@ -78,7 +109,8 @@ module.exports = (db) => {
         { projection: PUBLIC_RIDER_PROJECTION },
       );
       if (!rider) return res.status(404).send({ error: 'Rider not found' });
-      res.send(rider);
+      const enriched = await enrichCouchCredits(rider);
+      res.send({ ...enriched, rep: computeRepScore(enriched) });
     } catch (error) {
       console.error('Error fetching editorial rider:', error);
       res.status(500).send({ error: 'Unable to load editorial rider' });
