@@ -1,10 +1,10 @@
 const express = require('express');
 const auth = require('../middleware/auth');
-const { google } = require('googleapis');
 const { ObjectId } = require('mongodb');
 const path = require('path');
 const axios = require('axios');
 const multer = require('multer');
+const { getDriveClient } = require('../services/googleDrive');
 const _upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 * 1024 },
@@ -18,21 +18,6 @@ const BUNNY_CDN_HOSTNAME = process.env.BUNNY_CDN_HOSTNAME;
 
 // Import Bunny Stream service for signed URLs
 const { getVideoUrls } = require('../services/bunnyStream');
-
-// Initialize Google Drive API
-const credentials = require(
-  path.resolve(
-    process.env.GOOGLE_DRIVE_CREDENTIALS_PATH || './config/google-drive-credentials.json',
-  ),
-);
-const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
-
-const authClient = new google.auth.GoogleAuth({
-  credentials,
-  scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-});
-
-const drive = google.drive({ version: 'v3', auth: authClient });
 
 // Video file extensions to look for
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
@@ -585,8 +570,23 @@ module.exports = (db) => {
         return res.status(403).send({ error: 'Admin access required' });
       }
 
+      let drive;
+      let folderId;
+      try {
+        ({ drive, folderId } = getDriveClient());
+      } catch (error) {
+        if (error.code === 'DRIVE_CREDENTIALS_MISSING' || error.code === 'DRIVE_FOLDER_MISSING') {
+          return res.status(503).send({
+            error:
+              'Google Drive is not configured. Add config/google-drive-credentials.json and GOOGLE_DRIVE_FOLDER_ID to enable Couch sync.',
+            code: error.code,
+          });
+        }
+        throw error;
+      }
+
       console.log('Starting Google Drive sync...');
-      console.log('Root Folder ID:', FOLDER_ID);
+      console.log('Root Folder ID:', folderId);
 
       // Map folder names to sport types
       const sportFolderMap = {
@@ -604,7 +604,7 @@ module.exports = (db) => {
 
       // First, get all subfolders in the root folder
       const foldersResponse = await drive.files.list({
-        q: `'${FOLDER_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+        q: `'${folderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
         fields: 'files(id, name)',
         pageSize: 100,
       });
