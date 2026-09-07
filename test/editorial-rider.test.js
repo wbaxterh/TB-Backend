@@ -47,6 +47,17 @@ test('rejects unsupported sports and unsafe URL protocols', () => {
   );
 });
 
+test('omits accountId entirely for unclaimed riders', () => {
+  const rider = buildEditorialRider(
+    { canonicalName: 'Unclaimed Rider', primarySport: 'skateboarding' },
+    NOW,
+  );
+  // An explicit undefined is serialized as null by the driver, and the sparse
+  // rider_account_unique index treats null as a value — a second unclaimed
+  // rider would then collide. The key must be absent, not undefined.
+  assert.equal('accountId' in rider, false);
+});
+
 test('requires an account link for claimed identities', () => {
   assert.throws(
     () =>

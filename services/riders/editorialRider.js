@@ -242,7 +242,10 @@ function buildEditorialRider(input, now = new Date()) {
     sourceEvidence,
     profileType,
     claimStatus,
-    accountId,
+    // Spread conditionally: the driver serializes an explicit `undefined` as
+    // null, and the sparse rider_account_unique index treats null as a value —
+    // two unclaimed riders would collide. Absent fields are skipped by sparse.
+    ...(accountId ? { accountId } : {}),
     reviewStatus,
     editorial: normalizeEditorialMetadata(input.editorial, now),
     createdAt: optionalDate(input.createdAt, now),
