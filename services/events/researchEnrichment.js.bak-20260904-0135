@@ -1,0 +1,1155 @@
+const ENRICHMENT = {
+  'xgames:japan-2023': { videos: ['https://www.youtube.com/watch?v=VwAgmNWcmW4'] },
+  'xgames:california-2023': { videos: ['https://www.youtube.com/watch?v=_hqk7vCXbo4'] },
+  'xgames:aspen-2024': { videos: ['https://www.youtube.com/watch?v=LyPbJoVxyRg'] },
+  'xgames:ventura-2024': { videos: ['https://www.youtube.com/watch?v=1mauSm7gFKw'] },
+  'xgames:chiba-2024': { videos: ['https://www.youtube.com/watch?v=qvHYaOAOaHY'] },
+  'xgames:aspen-2025': { videos: ['https://www.youtube.com/watch?v=ag6pzCmNlfM'] },
+  'xgames:osaka-2025': { videos: ['https://www.youtube.com/watch?v=cLVQtB0G0fQ'] },
+  'xgames:salt-lake-city-2025': { videos: ['https://www.youtube.com/watch?v=NBBkL4njpGQ'] },
+  'xgames:aspen-2026': { videos: ['https://www.youtube.com/watch?v=_E4xed5sAMM'] },
+  'xgames:sacramento-2026': {
+    researchVerifiedAt: new Date('2026-09-03T22:58:00Z'),
+    videos: ['https://www.youtube.com/watch?v=MAxxXGwxH_8'],
+    override: {
+      aliases: ['X Games Sacramento 2026', 'Sacramento 2026'],
+      title: 'MoonPay X Games Sacramento 2026',
+      description:
+        'The opening stop of the inaugural MoonPay X Games League summer season brought nearly 100 elite athletes to Cal Expo for 18 Skateboard, BMX, and Moto X competitions, plus live music and a festival village.',
+      sports: ['skateboarding', 'bmx', 'motocross'],
+      disciplines: ['park', 'street', 'vert', 'dirt', 'best-trick', 'best-whip'],
+      eventKinds: ['competition', 'festival', 'concert'],
+      intents: ['spectate_online'],
+      level: ['pro', 'invitational'],
+      startAt: new Date('2026-06-26T22:00:00Z'),
+      endAt: new Date('2026-06-29T04:00:00Z'),
+      timezone: 'America/Los_Angeles',
+      timeTba: false,
+      status: 'completed',
+      venue: {
+        name: 'Cal Expo',
+        address: '1600 Exposition Blvd',
+        city: 'Sacramento',
+        region: 'California',
+        postalCode: '95815',
+        country: 'United States',
+        lat: 38.595337,
+        lng: -121.43423,
+      },
+      organizer: { name: 'X Games', verified: true },
+      series: 'MoonPay X Games League — 2026 Summer Season',
+      participation: {
+        registrationStatus: 'invite_only',
+        registrationUrl: '',
+        eligibilityText:
+          'Professional X Games invitees, X Games League club athletes, and selected free agents; no public athlete registration was offered.',
+        divisions: ['Men', 'Women', 'X Games League clubs', 'Free agents'],
+        skillLevel: 'Elite/professional',
+        registrationNotes:
+          'Athlete entry was invitational. Public attendance required a ticket; this completed event no longer has an active registration or ticket call to action.',
+      },
+      spectating: {
+        inPerson: false,
+        ticketStatus: 'closed',
+        ticketUrl: '',
+        ticketPrice: 'Historical: single-day general admission from $19; concerts from $69',
+        ticketNotes:
+          'Children 5 and under were free with a ticketed adult; concerts were 18+; attendees age 14+ did not require adult supervision.',
+        streamUrl: 'https://www.youtube.com/playlist?list=PLc90xcuAVqBo',
+        streamStatus: 'replay',
+        broadcaster: 'X Games YouTube',
+      },
+      schedule: {
+        timezone: 'America/Los_Angeles',
+        notes: 'Official listings label the schedule PST; June times are normalized to Pacific Daylight Time.',
+        days: [
+          {
+            date: '2026-06-26',
+            venueHours: '3:00 PM–10:00 PM',
+            items: [
+              '5:00 PM Men’s BMX Park',
+              '6:15 PM Women’s Skateboard Park',
+              '7:30 PM Moto X Best Whip',
+              '8:30 PM DJ Elliot Sloan',
+              '9:30 PM Kaskade',
+            ],
+          },
+          {
+            date: '2026-06-27',
+            venueHours: '10:00 AM–10:00 PM',
+            items: [
+              '12:00 PM Men’s Skateboard Vert Best Trick',
+              '1:00 PM Men’s Skateboard Street',
+              '2:30 PM Dave Mirra BMX Park Best Trick',
+              '3:30 PM Women’s Skateboard Vert Best Trick',
+              '4:30 PM Men’s Skateboard Park',
+              '6:00 PM Moto X Best Trick',
+              '7:00 PM Men’s BMX Dirt',
+              '8:30 PM Subtronics',
+              '9:45 PM Mustard',
+            ],
+          },
+          {
+            date: '2026-06-28',
+            venueHours: '9:00 AM–9:00 PM',
+            items: [
+              '11:00 AM Women’s Skateboard Street',
+              '12:15 PM Men’s Skateboard Vert',
+              '1:30 PM Men’s BMX Street',
+              '3:00 PM Women’s BMX Park',
+              '4:15 PM BMX Dirt Best Trick',
+              '5:00 PM Women’s Skateboard Street Best Trick',
+              '6:00 PM Men’s Skateboard Street Best Trick',
+              '6:45 PM Women’s Skateboard Vert',
+            ],
+          },
+        ],
+      },
+      resultsUrl:
+        'https://www.xgames.com/news/sunday-closes-historic-finish-for-moonpay-x-games-sacramento-2026/',
+      image:
+        'https://www.xgames.com/wp-content/uploads/2026/06/MIHARU_OZAWA_WOMENS_BMX_PARK_XGAMES_SACTO_2026_ZIELINSKI_00011.jpg',
+      media: {
+        images: [
+          'https://www.xgames.com/wp-content/uploads/2026/06/MIHARU_OZAWA_WOMENS_BMX_PARK_XGAMES_SACTO_2026_ZIELINSKI_00011.jpg',
+          'https://calexpo.com/wp-content/uploads/2026/05/Event-Graphics-700-x-515-3.jpg',
+        ],
+        videos: [
+          {
+            label: 'Official X Games Sacramento 2026 replay playlist',
+            url: 'https://www.youtube.com/playlist?list=PLc90xcuAVqBo',
+          },
+        ],
+      },
+      socialLinks: [
+        {
+          platform: 'instagram',
+          label: 'X Games on Instagram',
+          url: 'https://www.instagram.com/xgames/',
+        },
+        { platform: 'youtube', label: 'X Games videos', url: 'https://www.youtube.com/@XGames' },
+      ],
+      sourceTrust: 'organizer_and_venue',
+      sourceRefs: [
+        {
+          sourceId: 'xgames:event',
+          externalId: 'sacramento-2026',
+          url: 'https://www.xgames.com/events/sacramento-2026/',
+        },
+        {
+          sourceId: 'xgames:know-before-you-go',
+          externalId: 'Sacramento2026_KBYG',
+          url: 'https://www.xgames.com/wp-content/uploads/2026/06/Sacramento2026_KBYG.pdf',
+        },
+        {
+          sourceId: 'calexpo:event',
+          externalId: 'x-games-sacramento-2026',
+          url: 'https://calexpo.com/event/x-games-sacramento-2026/',
+        },
+        {
+          sourceId: 'calexpo:venue',
+          externalId: 'cal-expo',
+          url: 'https://calexpo.com/contact-us/',
+        },
+      ],
+      externalLinks: [
+        {
+          kind: 'official',
+          label: 'Official X Games Sacramento event page',
+          url: 'https://www.xgames.com/events/sacramento-2026/',
+        },
+        {
+          kind: 'venue',
+          label: 'Cal Expo event details and historical ticket information',
+          url: 'https://calexpo.com/event/x-games-sacramento-2026/',
+        },
+        {
+          kind: 'schedule',
+          label: 'Official know-before-you-go schedule (PDF)',
+          url: 'https://www.xgames.com/wp-content/uploads/2026/06/Sacramento2026_KBYG.pdf',
+        },
+        {
+          kind: 'results',
+          label: 'Day one results',
+          url: 'https://www.xgames.com/news/the-future-of-action-sports-begins-moonpay-x-games-league-opens-2026-season-with-unforgettable-day-one-in-sacramento/',
+        },
+        {
+          kind: 'results',
+          label: 'Day two results',
+          url: 'https://www.xgames.com/news/moonpay-x-games-sacramento-2026-keeps-the-momentum-going-on-day-two/',
+        },
+        {
+          kind: 'results',
+          label: 'Day three results and event recap',
+          url: 'https://www.xgames.com/news/sunday-closes-historic-finish-for-moonpay-x-games-sacramento-2026/',
+        },
+      ],
+      uncertaintyNotes: [
+        'X Games’ past-events card currently shows June 27–29 and links to an unrelated 2023 results record; the event page, venue calendar, and official event guide consistently support June 26–28, so those stale fields were excluded.',
+        'The official event-page social image is a Chiba placeholder; this record uses event-specific X Games and Cal Expo imagery instead.',
+      ],
+      freshness: { lastVerifiedAt: new Date('2026-09-03T22:58:00Z') },
+    },
+  },
+  'xgames:japan-2026': {
+    researchVerifiedAt: new Date('2026-09-03T23:19:00Z'),
+    replaceExistingVideos: true,
+    videos: [],
+    override: {
+      aliases: ['X Games Japan 2026', 'X Games Chiba 2026', 'Xゲームズ千葉2026'],
+      title: 'MoonPay X Games Chiba 2026',
+      description:
+        'The second stop of the inaugural MoonPay X Games League summer season brought 79 finalists from 15 countries to Makuhari Messe for 15 Skateboard, BMX, and Moto X events, alongside live music, art, food, and fan experiences.',
+      sports: ['skateboarding', 'bmx', 'motocross'],
+      disciplines: ['park', 'street', 'vert', 'best-trick'],
+      eventKinds: ['competition', 'festival', 'concert'],
+      intents: ['spectate_online'],
+      level: ['pro', 'invitational'],
+      startAt: new Date('2026-07-04T00:00:00Z'),
+      endAt: new Date('2026-07-05T10:00:00Z'),
+      timezone: 'Asia/Tokyo',
+      timeTba: false,
+      status: 'completed',
+      venue: {
+        name: 'Makuhari Messe — International Exhibition Halls 1–3',
+        address: '2-1 Nakase, Mihama-ku',
+        city: 'Chiba',
+        region: 'Chiba',
+        postalCode: '261-8550',
+        country: 'Japan',
+        lat: 35.648333,
+        lng: 140.034722,
+      },
+      organizer: { name: 'X Games Japan Organizing Committee', verified: true },
+      series: 'MoonPay X Games League — 2026 Summer Season',
+      participation: {
+        registrationStatus: 'invite_only',
+        registrationUrl: '',
+        eligibilityText:
+          'Elite invited competitors, including X Games League club athletes and selected free agents; no public athlete registration was offered.',
+        divisions: ['Men', 'Women', 'X Games League clubs', 'Free agents'],
+        skillLevel: 'Elite/professional',
+        registrationNotes:
+          'Athlete entry was invitational. July 3 was an official practice and invitation day; general public attendance was July 4–5 with a ticket. This completed event has no active registration or ticket call to action.',
+      },
+      spectating: {
+        inPerson: false,
+        ticketStatus: 'closed',
+        ticketUrl: '',
+        ticketPrice:
+          'Historical: general admission ¥6,500 per day or ¥11,000 for two days; family four-pack ¥22,000 per day; premium tiers ranged from ¥16,000 to ¥75,000',
+        ticketNotes:
+          'Children below elementary-school age could sit on a ticketed guardian’s lap at no charge, limited to one child per guardian. Wheelchair users and companions each required a general or family ticket.',
+        streamUrl: 'https://www.youtube.com/playlist?list=PLYfp8ocg6xsA',
+        streamStatus: 'replay',
+        broadcaster: 'X Games YouTube',
+      },
+      schedule: {
+        timezone: 'Asia/Tokyo',
+        notes:
+          'July 3 was a closed official-practice day. Public doors opened at 9:00 AM on July 4 and July 5; all times below are Japan Standard Time.',
+        days: [
+          {
+            date: '2026-07-04',
+            venueHours: '9:00 AM–9:00 PM',
+            items: [
+              '9:30 AM Men’s BMX Street',
+              '10:45 AM Women’s BMX Park',
+              '12:00 PM Women’s Skateboard Street',
+              '1:00 PM Awards ceremony',
+              '1:45 PM Women’s Skateboard Vert',
+              '3:00 PM Men’s Skateboard Street Best Trick',
+              '3:45 PM Men’s BMX Park',
+              '5:00 PM Men’s Skateboard Vert',
+              '6:00 PM Awards ceremony',
+              '6:30 PM DJ party time',
+              '6:45 PM IMP. / CLASS SEVEN live music',
+              '8:00 PM Moto X Best Trick',
+            ],
+          },
+          {
+            date: '2026-07-05',
+            venueHours: '9:00 AM–7:00 PM',
+            items: [
+              '9:15 AM Men’s Skateboard Park',
+              '10:30 AM Women’s Skateboard Vert Best Trick',
+              '11:15 AM Men’s BMX Park Best Trick',
+              '12:00 PM Men’s Skateboard Vert Best Trick',
+              '12:30 PM Awards ceremony',
+              '1:05 PM Women’s Skateboard Street Best Trick',
+              '1:50 PM Women’s Skateboard Park',
+              '3:05 PM Men’s Skateboard Street',
+              '4:20 PM Awards ceremony',
+              '4:50 PM DJ party time and side act',
+              '5:30 PM CHANMINA live music',
+              '6:15 PM Moto X demonstration',
+            ],
+          },
+        ],
+      },
+      resultsUrl: 'https://www.xgames.com/events/japan-2026/',
+      image:
+        'https://xgj-wordpress-media.s3.ap-northeast-1.amazonaws.com/wordpress/wp-content/uploads/2026/07/13160334/Mens-Skateboard-Vert_Ema-Kawakami_XGamesChiba_20260704_YY_YD6_7450-1.jpg',
+      media: {
+        images: [
+          'https://xgj-wordpress-media.s3.ap-northeast-1.amazonaws.com/wordpress/wp-content/uploads/2026/07/13160334/Mens-Skateboard-Vert_Ema-Kawakami_XGamesChiba_20260704_YY_YD6_7450-1.jpg',
+          'https://xgj-wordpress-media.s3.ap-northeast-1.amazonaws.com/wordpress/wp-content/uploads/2026/07/13152528/Mens-BMX-ParkLogan-Martin_XGamesChiba_20260704_YY_Z9N_9970.jpg',
+        ],
+        videos: [
+          {
+            label: 'Official X Games Chiba 2026 highlights',
+            url: 'https://www.youtube.com/watch?v=ZFtq2InOnPs',
+          },
+          {
+            label: 'Official X Games Chiba 2026 replay playlist',
+            url: 'https://www.youtube.com/playlist?list=PLYfp8ocg6xsA',
+          },
+        ],
+      },
+      socialLinks: [
+        {
+          platform: 'instagram',
+          label: 'X Games Japan on Instagram',
+          url: 'https://www.instagram.com/xgamesjapan/',
+        },
+        { platform: 'x', label: 'X Games Japan on X', url: 'https://x.com/XGamesJPN' },
+        {
+          platform: 'youtube',
+          label: 'X Games Japan videos',
+          url: 'https://www.youtube.com/@XGamesJapan',
+        },
+      ],
+      sourceTrust: 'organizer_and_venue',
+      sourceRefs: [
+        {
+          sourceId: 'xgames:event',
+          externalId: 'japan-2026',
+          url: 'https://www.xgames.com/events/japan-2026/',
+        },
+        {
+          sourceId: 'xgames-japan:about',
+          externalId: 'x-games-chiba-2026',
+          url: 'https://xgamesjapan.com/about/',
+        },
+        {
+          sourceId: 'xgames-japan:schedule',
+          externalId: 'x-games-chiba-2026',
+          url: 'https://xgamesjapan.com/schedule/',
+        },
+        {
+          sourceId: 'makuhari-messe:event',
+          externalId: '8755',
+          url: 'https://www.m-messe.co.jp/event/detail/8755',
+        },
+        {
+          sourceId: 'xgames-japan:recap',
+          externalId: '4482',
+          url: 'https://xgamesjapan.com/news/4482/',
+        },
+      ],
+      externalLinks: [
+        {
+          kind: 'official',
+          label: 'Official X Games Chiba event page and standings',
+          url: 'https://www.xgames.com/events/japan-2026/',
+        },
+        {
+          kind: 'official',
+          label: 'X Games Japan organizer event details',
+          url: 'https://xgamesjapan.com/about/',
+        },
+        {
+          kind: 'schedule',
+          label: 'Official detailed schedule',
+          url: 'https://xgamesjapan.com/schedule/',
+        },
+        {
+          kind: 'tickets',
+          label: 'Historical ticket options and attendance rules',
+          url: 'https://xgamesjapan.com/ticket-list/',
+        },
+        {
+          kind: 'venue',
+          label: 'Makuhari Messe event listing and historical prices',
+          url: 'https://www.m-messe.co.jp/event/detail/8755',
+        },
+        {
+          kind: 'results',
+          label: 'X Games day-one results',
+          url: 'https://www.xgames.com/news/moonpay-x-games-chiba-2026-kicks-off-with-a-full-day-of-competition-featuring-the-worlds-best-action-sports-athletes/',
+        },
+        {
+          kind: 'results',
+          label: 'Official event recap and medal highlights',
+          url: 'https://xgamesjapan.com/news/4482/',
+        },
+      ],
+      uncertaintyNotes: [
+        'The official X Games event page uses “Japan 2026,” while the local organizer and venue use the more specific canonical title “X Games Chiba 2026.”',
+        'The X Games page omits several entertainment items and contains inconsistent Pacific-time conversions; schedule times here follow the local organizer’s June 23 update in Japan Standard Time.',
+        'The venue listing shows a planned July 5 end time of 7:45 PM, while the organizer’s final schedule ends programming at 6:45 PM and lists a 7:00 PM close; this record uses the organizer’s 7:00 PM close.',
+      ],
+      freshness: { lastVerifiedAt: new Date('2026-09-03T23:19:00Z') },
+    },
+  },
+  'xgames:japan-2026-2': { videos: ['https://www.youtube.com/watch?v=AcZd-gn98v0'] },
+  'xgames:new-orleans-2026': {
+    researchVerifiedAt: new Date('2026-09-03T23:43:00Z'),
+    replaceExistingVideos: true,
+    videos: [],
+    override: {
+      aliases: [
+        'X Games New Orleans 2026',
+        'X Games NOLA 2026',
+        'X Games Championship New Orleans 2026',
+        'MoonPay X Games Championship New Orleans 2026',
+      ],
+      title: 'MoonPay X Games New Orleans 2026 Championship',
+      description:
+        'The inaugural MoonPay X Games League summer championship brought more than 80 elite athletes from 16 countries to Caesars Superdome for 20 Skateboard, BMX, Moto X, and Scooter events, plus concerts and fan experiences. XC New York won the first XGL team title by 10 points over XC Tokyo.',
+      sports: ['skateboarding', 'bmx', 'motocross', 'scooter'],
+      disciplines: ['park', 'street', 'vert', 'dirt', 'best-trick', 'best-whip'],
+      eventKinds: ['competition', 'festival', 'concert'],
+      intents: ['spectate_online'],
+      level: ['pro', 'invitational'],
+      startAt: new Date('2026-07-24T20:00:00Z'),
+      endAt: new Date('2026-07-27T00:30:00Z'),
+      timezone: 'America/Chicago',
+      timeTba: false,
+      status: 'completed',
+      venue: {
+        name: 'Caesars Superdome',
+        address: '1500 Sugar Bowl Drive',
+        city: 'New Orleans',
+        region: 'Louisiana',
+        postalCode: '70112',
+        country: 'United States',
+        lat: 29.95103,
+        lng: -90.081111,
+      },
+      organizer: { name: 'X Games', verified: true },
+      series: 'MoonPay X Games League - 2026 Summer Championship',
+      participation: {
+        registrationStatus: 'invite_only',
+        registrationUrl: '',
+        eligibilityText:
+          'Elite invited competitors, including X Games League club athletes, selected free agents, and invited Spotlight Event athletes; no public athlete registration was offered.',
+        divisions: [
+          'Men',
+          'Women',
+          'X Games League clubs',
+          'Free agents',
+          'Spotlight Events',
+        ],
+        skillLevel: 'Elite/professional',
+        registrationNotes:
+          'Athlete entry was invitational, the competition courses were not open to the public, and no public participant waiver or on-site athlete registration was offered. This completed event has no active registration call to action.',
+      },
+      spectating: {
+        inPerson: false,
+        ticketStatus: 'closed',
+        ticketUrl: '',
+        ticketPrice:
+          'Historical: single-day competition and concert tickets plus three-day, Silver, and Gold packages were sold; exact organizer face values are no longer published.',
+        ticketNotes:
+          'The event was all ages. Children under 5 did not need a general-admission ticket; children 5 and under were free in the Gold and Silver premium areas. Tickets were mobile-only through Ticketmaster, with event-day box-office sales subject to availability. Historical ticket links are retained only as source context, with no active purchase call to action.',
+        streamUrl: 'https://www.youtube.com/watch?v=boi4Uq1AJTw',
+        streamStatus: 'replay',
+        broadcaster: 'X Games YouTube',
+      },
+      schedule: {
+        timezone: 'America/Chicago',
+        notes:
+          'The organizer labels July times CST; they are normalized here to America/Chicago, which observed Central Daylight Time. Venue hours run from gates opening through the final listed competition or concert doors.',
+        days: [
+          {
+            date: '2026-07-24',
+            venueHours: '3:00 PM-9:15 PM+',
+            items: [
+              '3:00 PM Venue gates open',
+              '5:15-6:00 PM Men\'s BMX Street',
+              '6:15-6:45 PM Moto X Best Whip',
+              '7:00-7:30 PM Men\'s Scooter Park Best Trick',
+              '8:00-8:45 PM Women\'s Skateboard Vert',
+              '8:50-9:15 PM Men\'s Skateboard Street Best Trick',
+              '9:15 PM Metro Boomin and J.I.D. concert doors at Smoothie King Center',
+            ],
+          },
+          {
+            date: '2026-07-25',
+            venueHours: '11:00 AM-9:00 PM+',
+            items: [
+              '11:00 AM Venue gates open',
+              '1:00-2:00 PM Women\'s Skateboard Vert Best Trick',
+              '2:00-2:30 PM Dave Mirra BMX Park Best Trick',
+              '2:30-3:00 PM Men\'s Skateboard Vert Best Trick',
+              '3:00-4:00 PM Men\'s Skateboard Street',
+              '4:30-5:00 PM Moto X Best Trick',
+              '6:00-7:00 PM Men\'s BMX Dirt',
+              '7:15-8:00 PM Men\'s Skateboard Park',
+              '8:15-9:00 PM Women\'s Skateboard Street',
+              '8:45 PM Subtronics and BUNT. concert doors at Smoothie King Center',
+            ],
+          },
+          {
+            date: '2026-07-26',
+            venueHours: '10:00 AM-7:30 PM',
+            items: [
+              '10:00 AM Venue gates open',
+              '11:45 AM-12:30 PM Women\'s BMX Park',
+              '1:00-2:00 PM Men\'s Skateboard Vert',
+              '2:00-3:00 PM Women\'s Skateboard Park',
+              '3:30-4:30 PM BMX Dirt Best Trick',
+              '5:00-5:30 PM Men\'s Skateboard Park Best Trick',
+              '5:45-6:15 PM Women\'s Skateboard Street Best Trick',
+              '6:30-7:30 PM Men\'s BMX Park',
+            ],
+          },
+        ],
+      },
+      resultsUrl: 'https://www.xgames.com/results/?event_id=1192',
+      image: 'https://www.xgames.com/wp-content/uploads/2026/06/XGLNOLA_SEO.jpg',
+      media: {
+        images: [
+          'https://www.xgames.com/wp-content/uploads/2026/06/XGLNOLA_SEO.jpg',
+          'https://www.xgames.com/wp-content/uploads/2026/07/WYATT-FONTENOT_FMX_XGAMES_NEW-ORLEANS_2026_SWANBERG_RS11027.NEF-1.jpg',
+          'https://www.xgames.com/wp-content/uploads/2026/07/Team_XC_NY_Awards_Championship_xgames_NO_2026_Dillon-03115-1-2.jpeg',
+        ],
+        videos: [
+          {
+            label: 'Official X Games New Orleans 2026 Day 1 replay',
+            url: 'https://www.youtube.com/watch?v=FIfhoWltkZk',
+          },
+          {
+            label: 'Official X Games New Orleans 2026 Day 2 replay',
+            url: 'https://www.youtube.com/watch?v=CDK0KdHFhkI',
+          },
+          {
+            label: 'Official X Games New Orleans 2026 Day 3 replay',
+            url: 'https://www.youtube.com/watch?v=boi4Uq1AJTw',
+          },
+        ],
+      },
+      socialLinks: [
+        {
+          platform: 'instagram',
+          label: 'X Games on Instagram',
+          url: 'https://www.instagram.com/xgames/',
+        },
+        { platform: 'youtube', label: 'X Games videos', url: 'https://www.youtube.com/@XGames' },
+      ],
+      sourceTrust: 'organizer_and_venue',
+      sourceRefs: [
+        {
+          sourceId: 'xgames:event',
+          externalId: 'new-orleans-2026',
+          url: 'https://www.xgames.com/events/new-orleans-2026/',
+        },
+        {
+          sourceId: 'xgames:faq',
+          externalId: 'new-orleans-2026-faq',
+          url: 'https://www.xgames.com/new-orleans-2026-faq/',
+        },
+        {
+          sourceId: 'caesars-superdome:event',
+          externalId: 'xgames',
+          url: 'https://www.caesarssuperdome.com/events/detail/xgames',
+        },
+        {
+          sourceId: 'xgames:results',
+          externalId: '1192',
+          url: 'https://www.xgames.com/results/?event_id=1192',
+        },
+        {
+          sourceId: 'xgames:final-recap',
+          externalId: 'new-orleans-2026',
+          url: 'https://www.xgames.com/news/history-made-xc-new-york-captures-the-inaugural-moonpay-x-games-league-championship-in-new-orleans/',
+        },
+      ],
+      externalLinks: [
+        {
+          kind: 'official',
+          label: 'Official X Games New Orleans event page',
+          url: 'https://www.xgames.com/events/new-orleans-2026/',
+        },
+        {
+          kind: 'schedule',
+          label: 'Official event schedule and historical ticket rules',
+          url: 'https://www.xgames.com/new-orleans-2026-faq/',
+        },
+        {
+          kind: 'venue',
+          label: 'Caesars Superdome event details and visitor policies',
+          url: 'https://www.caesarssuperdome.com/events/detail/xgames',
+        },
+        {
+          kind: 'results',
+          label: 'Official full competition results',
+          url: 'https://www.xgames.com/results/?event_id=1192',
+        },
+        {
+          kind: 'results',
+          label: 'Day one results and event recap',
+          url: 'https://www.xgames.com/news/moonpay-x-games-new-orleans-2026-championship-takes-over-caesars-superdome-and-brings-the-worlds-best-action-sports-competition-to-the-big-easy/',
+        },
+        {
+          kind: 'results',
+          label: 'Day two results and standings',
+          url: 'https://www.xgames.com/news/the-moonpay-x-games-league-championship-goes-down-to-the-wire-in-new-orleans/',
+        },
+        {
+          kind: 'results',
+          label: 'Day three results and championship recap',
+          url: 'https://www.xgames.com/news/history-made-xc-new-york-captures-the-inaugural-moonpay-x-games-league-championship-in-new-orleans/',
+        },
+      ],
+      uncertaintyNotes: [
+        'The event page hero is mislabeled ASPEN Games driven by Jeep even though its URL, venue, dates, standings, schedule, and FAQ are for New Orleans; the stale hero label was excluded.',
+        'The X Games schedule labels July times CST, while New Orleans observed daylight time; America/Chicago is used so stored timestamps resolve to CDT (UTC-05).',
+        'The venue summary says Sunday competition ended at 7:15 PM, while the organizer schedule lists Men\'s BMX Park through 7:30 PM; the more detailed organizer schedule is used.',
+        'Ticket products and child-admission rules remain documented, but exact organizer face values are no longer published; resale-market prices were excluded.',
+      ],
+      freshness: { lastVerifiedAt: new Date('2026-09-03T23:43:00Z') },
+    },
+  },
+  'official:crankworx-mont-sainte-anne-2026': {
+    researchVerifiedAt: new Date('2026-09-04T00:19:00Z'),
+    replaceExistingVideos: true,
+    videos: [],
+    override: {
+      aliases: [
+        'Crankworx MSA 2026',
+        'Crankworx World Tour Mont-Sainte-Anne 2026',
+        'Circuit mondial Crankworx Mont-Sainte-Anne',
+      ],
+      title: 'Crankworx Mont-Sainte-Anne 2026',
+      description:
+        'The inaugural Crankworx Mont-Sainte-Anne is the five-day 2026 World Tour finale, combining elite and amateur mountain-bike racing, the first Slopestyle Super League Finals, Downhill, Air DH, Dual Slalom, Pump Track, XCO/XCC, Kidsworx, the North American Whip-Off Championships, expo activities, and nightly music.',
+      sports: ['mtb'],
+      disciplines: [
+        'slopestyle',
+        'downhill',
+        'air-dh',
+        'dual-slalom',
+        'pump-track',
+        'cross-country-olympic',
+        'cross-country-short-track',
+        'whip-off',
+      ],
+      eventKinds: ['competition', 'festival', 'clinic', 'concert'],
+      intents: ['spectate_in_person', 'spectate_online', 'community'],
+      level: ['elite', 'pro', 'amateur', 'youth', 'invitational'],
+      startAt: new Date('2026-09-03T12:30:00Z'),
+      endAt: new Date('2026-09-07T20:30:00Z'),
+      timezone: 'America/Toronto',
+      timeTba: false,
+      status: 'ongoing',
+      venue: {
+        name: 'Mont-Sainte-Anne Resort',
+        address: '2000 Boulevard du Beau-Pré',
+        city: 'Beaupré',
+        region: 'Quebec',
+        postalCode: 'G0A 1E0',
+        country: 'Canada',
+        lat: 47.0734625,
+        lng: -70.904934,
+      },
+      organizer: {
+        name: 'Crankworx',
+        verified: true,
+        localOrganizer: 'Corporation Événements d’Été de Québec',
+      },
+      series: 'Crankworx World Tour - 2026 Finale',
+      participation: {
+        registrationStatus: 'closed',
+        registrationUrl: 'https://www.crankworx.com/account/',
+        registrationDeadlineAt: new Date('2026-09-01T03:59:00Z'),
+        registrationPrice:
+          'Race fees varied by discipline; an FQSC event license cost CA$20 when required.',
+        registrationProcess:
+          'Athletes created one Crankworx account and athlete profile, selected races, joined a waitlist if a category was full, and purchased the required FQSC/UCI license where applicable.',
+        eligibilityText:
+          'A mix of invitation-only elite fields and public age/category racing. Slopestyle and Whip-Off were invitation only; other races included Elite, U19, U17, U15, U13, Open, Senior, Masters/Veteran, and Kidsworx divisions. UCI licensing rules vary by race.',
+        divisions: [
+          'Elite',
+          'U19',
+          'U17',
+          'U15',
+          'U13',
+          'Open 17+',
+          'Open 19+',
+          'Senior 19-34',
+          'Masters 35+',
+          'Veteran 40+',
+          'Kidsworx ages 2-12',
+        ],
+        skillLevel: 'Elite/pro through amateur and youth',
+        waiverRequired: null,
+        waiverUrl: '',
+        waiverNotes:
+          'No separate public waiver URL was found. The athlete page publishes mandatory protection, medical-insurance, and image-release conditions.',
+        ageGuardianRules:
+          'A parent may create a profile and add competitors age 17 or younger. Kidsworx XC is ages 2-12, Kidsworx Dual Slalom ages 7-12, and its clinic ages 5-12.',
+        registrationNotes:
+          'Online registration closed August 31 at 11:59 PM Quebec time and the organizer explicitly says no on-site registration is available. Registered athletes receive festival access; Kidsworx riders need a separate festival pass to enter other Crankworx competitions.',
+      },
+      spectating: {
+        inPerson: true,
+        ticketStatus: 'open',
+        ticketUrl: 'https://www.crankworx.com/mont-sainte-anne/festival-access/',
+        ticketPrice:
+          'General mountain access is free. Optional Fan Zone: CA$20 adult / CA$12 age 7-17 per day, or CA$35 / CA$20 for three days; ages 0-6 free. Family passes CA$55/day or CA$95/three days. VIP from CA$495.',
+        ticketNotes:
+          'Paid parking and a separate Mont-Sainte-Anne gondola ticket may be required. Fan Zone and VIP passes remain on sale; the official pop-up campground is sold out.',
+        streamUrl: 'https://www.youtube.com/watch?v=hOnMYCBOttE',
+        streamStatus: 'scheduled',
+        broadcaster: 'Crankworx YouTube',
+        streamNotes:
+          'Official streams are scheduled for Downhill on September 5 at 3:30 PM EDT and the Slopestyle Super League Finals on September 6 at 4:00 PM EDT.',
+      },
+      schedule: {
+        timezone: 'America/Toronto',
+        notes:
+          'Day-of organizer schedule verified in controlled Chrome on September 3; it supersedes earlier news posts and remains subject to change.',
+        days: [
+          {
+            date: '2026-09-03',
+            venueHours: '8:30 AM-8:00 PM',
+            items: [
+              '8:30 AM-5:00 PM Athlete Registration / Race Office',
+              '3:00-5:00 PM Crankworx DH athlete course walk',
+              '5:00-7:30 PM Pump Track',
+              '7:30-8:00 PM Pump Track awards',
+            ],
+          },
+          {
+            date: '2026-09-04',
+            venueHours: '8:15 AM-1:00 AM',
+            items: [
+              '8:15-11:15 AM Crankworx DH Group B training',
+              '8:30 AM-6:00 PM Athlete Registration / Race Office',
+              '8:30-10:00 AM Kidsworx Dual Slalom clinic',
+              '10:30 AM-12:30 PM Kidsworx Dual Slalom race',
+              '11:45 AM-12:45 PM Crankworx DH Group B U17 seeding',
+              '12:45-3:45 PM Crankworx DH Group A training',
+              '4:15-5:45 PM Crankworx DH Group A seeding',
+              '5:30-7:30 PM XCO training',
+              '4:00 PM-1:00 AM Boréale After-Races music',
+            ],
+          },
+          {
+            date: '2026-09-05',
+            venueHours: '8:00 AM-1:00 AM',
+            items: [
+              '8:00 AM-5:00 PM Athlete Registration / Race Office',
+              '8:30-9:45 AM Crankworx DH Group B training',
+              '10:00-10:45 AM Crankworx DH Group B U17 finals',
+              '10:45-11:45 AM Crankworx DH Group B Open 17+ finals',
+              '12:00-1:30 PM Crankworx DH Group A training',
+              '12:00-3:00 PM XCO training',
+              '12:30-3:30 PM Crankworx Slopestyle training',
+              '12:00-3:30 PM Amateur Dual Slalom training, qualifying and finals',
+              '1:45-3:15 PM Crankworx DH Group A-2 finals',
+              '3:30-5:30 PM Crankworx DH Group A-1 finals',
+              '6:00-7:30 PM Official North American Whip-Off Championships presented by RAG',
+              '4:00 PM-1:00 AM Boréale After-Races music',
+            ],
+          },
+          {
+            date: '2026-09-06',
+            venueHours: '8:00 AM-1:00 AM',
+            items: [
+              '8:00-9:15 AM Air DH Group A training',
+              '8:30-11:00 AM XCO/XCC training',
+              '8:30 AM-5:00 PM Athlete Registration / Race Office',
+              '9:30-11:00 AM Air DH Group A finals',
+              '11:30 AM-1:15 PM Air DH Group B training',
+              '11:30 AM-3:30 PM Elite/U19 Dual Slalom training and finals',
+              '1:30-3:15 PM Air DH Group B finals',
+              '3:30-3:50 PM XCC training',
+              '4:00-6:30 PM Slopestyle Super League Finals',
+              '4:00-7:00 PM Crankworx XCC finals',
+              '7:15-7:30 PM XCC awards',
+              '4:00 PM-1:00 AM Boréale After-Races music',
+            ],
+          },
+          {
+            date: '2026-09-07',
+            venueHours: '8:00 AM-4:30 PM',
+            items: [
+              '8:00 AM-12:00 PM Athlete Registration / Race Office',
+              '8:15 AM-4:30 PM Crankworx XCO finals',
+              '9:00-11:30 AM Kidsworx XC',
+            ],
+          },
+        ],
+      },
+      resultsUrl: 'https://www.crankworx.com/results/',
+      image: 'https://i.ytimg.com/vi/hOnMYCBOttE/maxresdefault.jpg',
+      media: {
+        images: [
+          'https://i.ytimg.com/vi/hOnMYCBOttE/maxresdefault.jpg',
+          'https://i.ytimg.com/vi/yWzasBsw7hk/maxresdefault.jpg',
+          'https://media-crankworx.s3.amazonaws.com/uploads/2025/09/Crankworx_MSA-Logo.jpg',
+        ],
+        videos: [
+          {
+            label: '2026 Slopestyle Super League Finals live broadcast',
+            url: 'https://www.youtube.com/watch?v=hOnMYCBOttE',
+          },
+          {
+            label: '2026 Crankworx Mont-Sainte-Anne Downhill live broadcast',
+            url: 'https://www.youtube.com/watch?v=yWzasBsw7hk',
+          },
+        ],
+      },
+      socialLinks: [
+        {
+          platform: 'instagram',
+          label: 'Crankworx Mont-Sainte-Anne on Instagram',
+          url: 'https://www.instagram.com/crankworxmsa/',
+        },
+        {
+          platform: 'instagram',
+          label: 'Crankworx on Instagram',
+          url: 'https://www.instagram.com/crankworx/',
+        },
+        {
+          platform: 'youtube',
+          label: 'Crankworx live broadcasts and videos',
+          url: 'https://www.youtube.com/@Crankworx',
+        },
+      ],
+      sourceTrust: 'organizer_governing_body_and_venue',
+      sourceRefs: [
+        {
+          sourceId: 'crankworx:event',
+          externalId: 'mont-sainte-anne-2026',
+          url: 'https://www.crankworx.com/mont-sainte-anne/',
+        },
+        {
+          sourceId: 'crankworx:athlete-info',
+          externalId: 'mont-sainte-anne-2026',
+          url: 'https://www.crankworx.com/athletes/locations/mont-sainte-anne/',
+        },
+        {
+          sourceId: 'crankworx:schedule',
+          externalId: 'mont-sainte-anne-2026',
+          url: 'https://www.crankworx.com/schedule/',
+        },
+        {
+          sourceId: 'crankworx:tickets',
+          externalId: 'mont-sainte-anne-2026',
+          url: 'https://www.crankworx.com/mont-sainte-anne/festival-access/',
+        },
+        {
+          sourceId: 'mont-sainte-anne:venue',
+          externalId: 'mont-sainte-anne-resort',
+          url: 'https://mont-sainte-anne.com/en/contact/',
+        },
+        {
+          sourceId: 'fqsc:event',
+          externalId: '2026-crankworx-mont-sainte-anne',
+          url: 'https://fqsc.net/montagne/evenements/2026-crankworx-mont-sainte-anne',
+        },
+        {
+          sourceId: 'cycling-canada:event',
+          externalId: 'crankworx-world-tour-mont-sainte-anne',
+          url: 'https://cyclingcanada.ca/fr/event/crankworx-world-tour-mont-sainte-anne/',
+        },
+      ],
+      externalLinks: [
+        {
+          kind: 'official',
+          label: 'Official Crankworx Mont-Sainte-Anne event page',
+          url: 'https://www.crankworx.com/mont-sainte-anne/',
+        },
+        {
+          kind: 'schedule',
+          label: 'Current official schedule',
+          url: 'https://www.crankworx.com/schedule/',
+        },
+        {
+          kind: 'tickets',
+          label: 'Fan Zone and VIP ticket options',
+          url: 'https://www.crankworx.com/mont-sainte-anne/festival-access/',
+        },
+        {
+          kind: 'registration',
+          label: 'Athlete rules, licensing and closed registration details',
+          url: 'https://www.crankworx.com/athletes/locations/mont-sainte-anne/',
+        },
+        {
+          kind: 'official',
+          label: 'Spectator access, parking and accessibility information',
+          url: 'https://www.crankworx.com/mont-sainte-anne/spectator-info/',
+        },
+        {
+          kind: 'start-lists',
+          label: 'Official rider and start lists',
+          url: 'https://www.crankworx.com/results/start-lists/',
+        },
+        {
+          kind: 'results',
+          label: 'Official results hub',
+          url: 'https://www.crankworx.com/results/',
+        },
+        {
+          kind: 'venue',
+          label: 'Mont-Sainte-Anne venue address',
+          url: 'https://mont-sainte-anne.com/en/contact/',
+        },
+      ],
+      uncertaintyNotes: [
+        'The day-of schedule and both scheduled YouTube broadcasts now place Downhill on September 5 and the Slopestyle Super League Finals on September 6; older August 25-31 Crankworx news posts still show the reverse dates, so this record follows the live schedule.',
+        'A recent organizer news post says last-minute athlete registration was open, but the dedicated athlete page gives an August 31 deadline and explicitly says no on-site registration; the dedicated registration policy is treated as authoritative.',
+        'Cycling Canada lists competition dates as September 4-7, while Crankworx, FQSC, and the venue calendar list the festival as September 3-7; this record uses the organizer festival dates.',
+        'No Mont-Sainte-Anne results were posted to the official results hub at verification time; the live results navigation still redirected to the prior Sugarloaf event.',
+        'Venue coordinates are an OpenStreetMap geocode of the resort’s official street address.',
+      ],
+      freshness: { lastVerifiedAt: new Date('2026-09-04T00:19:00Z') },
+    },
+  },
+  'boardr:4370': {
+    researchVerifiedAt: new Date('2026-09-04T00:43:00Z'),
+    replaceExistingVideos: true,
+    videos: [],
+    override: {
+      aliases: [
+        'Finding Vision',
+        'Finding Vision 50th Retrospect',
+        'Vision 50th Anniversary World Tour - Los Angeles',
+      ],
+      title: 'Finding Vision — 50 Years of Vision: A Retrospect',
+      description:
+        'The Los Angeles opening stop of Vision Street Wear’s 50th-anniversary world tour presents more than 450 archival pieces and rare historical materials from 1976 to 2026, including original sketches, vintage skateboard decks, iconic photography, historic video, and never-before-seen memorabilia. The weekend also includes Vision Pro Team appearances, the Look Back Library display, and live grip-tape art by Mark Oblow.',
+      sports: ['skateboarding'],
+      disciplines: [],
+      eventKinds: ['exhibition', 'cultural-event'],
+      intents: ['spectate_in_person', 'community'],
+      level: [],
+      startAt: new Date('2026-09-05T01:00:00Z'),
+      endAt: new Date('2026-09-06T22:00:00Z'),
+      timezone: 'America/Los_Angeles',
+      timeTba: false,
+      venue: {
+        name: 'HVW8 Art + Design Gallery',
+        address: '661 N. Spaulding Ave.',
+        city: 'Los Angeles',
+        region: 'California',
+        postalCode: '90036',
+        country: 'United States',
+        lat: 34.0834222,
+        lng: -118.3575001,
+      },
+      organizer: {
+        name: 'Vision Street Wear',
+        verified: true,
+        venueHost: 'HVW8 Art + Design Gallery',
+      },
+      series: 'Finding Vision - 50th Anniversary World Tour',
+      participation: {
+        registrationStatus: 'not_applicable',
+        registrationUrl: '',
+        eligibilityText:
+          'This is a retrospective exhibition, not a skate contest or open skate session. Friday’s VIP, media, and industry reception is invite-only; Saturday and Sunday viewing hours are open to the public.',
+        divisions: [],
+        skillLevel: 'No athletic skill requirement',
+        registrationNotes:
+          'No athlete registration, public participation entry, waiver, or on-site competition registration applies. The organizer has not published public admission age or guardian rules.',
+      },
+      spectating: {
+        inPerson: true,
+        ticketStatus: 'not_published',
+        ticketUrl: '',
+        ticketPrice: 'No admission price has been published.',
+        ticketNotes:
+          'The public event listing identifies Saturday and Sunday as open to the public but provides no ticket or RSVP link. Free admission is not assumed. Capacity, accessibility, parking, and age conditions were not published at verification time; visitors should check the official event details before travel.',
+        streamUrl: '',
+        streamStatus: '',
+        broadcaster: '',
+      },
+      schedule: {
+        timezone: 'America/Los_Angeles',
+        notes:
+          'All times are Pacific Daylight Time. The public schedule is from The Boardr’s event page; private organizer/skater details are intentionally excluded.',
+        days: [
+          {
+            date: '2026-09-04',
+            venueHours: '6:00 PM-10:00 PM',
+            items: [
+              '6:00-10:00 PM VIP, media, and industry reception',
+              'Invite only; food and drinks served',
+            ],
+          },
+          {
+            date: '2026-09-05',
+            venueHours: '1:00 PM-9:00 PM',
+            items: [
+              'Open to the public',
+              'Look Back Library display',
+              'Live grip-tape art by Mark Oblow',
+              'Vision team riders in attendance',
+            ],
+          },
+          {
+            date: '2026-09-06',
+            venueHours: '12:00 PM-3:00 PM',
+            items: ['Open to the public', 'Final public viewing opportunity'],
+          },
+        ],
+      },
+      resultsUrl: '',
+      image: 'https://theboardr.blob.core.windows.net/graphics/10332.jpg',
+      media: {
+        images: [
+          'https://theboardr.blob.core.windows.net/graphics/10332.jpg',
+          'https://theboardr.blob.core.windows.net/eventsicons/4370hero600.jpg',
+        ],
+        videos: [],
+      },
+      socialLinks: [
+        {
+          platform: 'instagram',
+          label: 'Vision Street Wear on Instagram',
+          url: 'https://www.instagram.com/visionstreetwear/',
+        },
+        {
+          platform: 'instagram',
+          label: 'HVW8 Gallery on Instagram',
+          url: 'https://www.instagram.com/hvw8gallery/',
+        },
+      ],
+      sourceTrust: 'organizer_venue_and_industry_calendar',
+      sourceRefs: [
+        {
+          sourceId: 'visionstreetwear:instagram',
+          externalId: 'Dcrlu8eTOyv',
+          url: 'https://www.instagram.com/visionstreetwear/reel/Dcrlu8eTOyv/',
+        },
+        {
+          sourceId: 'boardr:event',
+          externalId: '4370',
+          url: 'https://www.theboardr.com/events/4370/Finding_Vision',
+        },
+        {
+          sourceId: 'hvw8:venue',
+          externalId: 'los-angeles-gallery',
+          url: 'https://hvw8.com/about/',
+        },
+        {
+          sourceId: 'kickerclub:coverage',
+          externalId: 'finding-vision-la-2026',
+          url: 'https://www.kickerclub.com/2026/08/sep-4th-6th-finding-vision-la/',
+        },
+      ],
+      externalLinks: [
+        {
+          kind: 'official',
+          label: 'Official Vision Street Wear tour announcement',
+          url: 'https://www.instagram.com/visionstreetwear/reel/Dcrlu8eTOyv/',
+        },
+        {
+          kind: 'schedule',
+          label: 'Los Angeles event schedule and public-access details',
+          url: 'https://www.theboardr.com/events/4370/Finding_Vision',
+        },
+        {
+          kind: 'venue',
+          label: 'HVW8 Los Angeles address and gallery information',
+          url: 'https://hvw8.com/about/',
+        },
+        {
+          kind: 'coverage',
+          label: 'Finding Vision world-tour exhibition overview',
+          url: 'https://www.kickerclub.com/2026/08/sep-4th-6th-finding-vision-la/',
+        },
+      ],
+      uncertaintyNotes: [
+        'Vision Street Wear’s official announcement verifies the Los Angeles dates, 1976-2026 retrospective scope, 450-plus archival pieces, and Pro Team appearances but does not identify the Los Angeles venue or hours; the Boardr event listing supplies HVW8 and the three-day schedule, while HVW8’s official site verifies the exact address.',
+        'The Boardr lists Saturday public hours as 1:00-9:00 PM. A derivative calendar incorrectly shortens Saturday to 6:00 PM and places the venue in North Hollywood; those unsupported details were excluded.',
+        'No authoritative source publishes an admission price, ticket or RSVP link, capacity, accessibility/parking instructions, or age/guardian rules, so the record does not claim free entry or unrestricted admission.',
+      ],
+      freshness: { lastVerifiedAt: new Date('2026-09-04T00:43:00Z') },
+    },
+  },
+  'boardr:4273': {
+    registrationUrl: 'https://www.theboardr.com/events/4273/Des_Moines_Streetstyle_Open',
+    officialUrl: 'https://skatedsm.org/streetstyleopen/',
+    videos: ['https://www.youtube.com/watch?v=AdcHOAFhKKQ'],
+  },
+  'boardr:4309': {
+    registrationUrl: 'https://www.theboardr.com/events/4309',
+    officialUrl: 'https://skatedsm.org/streetstyleopen/',
+    videos: ['https://www.youtube.com/watch?v=AdcHOAFhKKQ'],
+  },
+  'boardr:4299': {
+    officialUrl: 'https://exposureskate.org/',
+    videos: ['https://www.youtube.com/watch?v=w4WvpGkmvj4'],
+  },
+  'boardr:4363': {
+    officialUrl: 'https://www.swampfestbmx.com/',
+    registrationUrl: 'https://swampfestwaiver.vercel.app/',
+    videos: ['https://www.youtube.com/watch?v=z36Ad8XVVjQ'],
+  },
+};
+
+function uniqueByUrl(items) {
+  const seen = new Set();
+  return items.filter((item) => item?.url && !seen.has(item.url) && seen.add(item.url));
+}
+
+function applyResearchEnrichment(event) {
+  const data = ENRICHMENT[event.sourceId];
+  const officialLinks = [
+    ...(event.externalLinks || []),
+    { kind: 'official', label: 'Official event details', url: event.sourceUrl },
+  ];
+  if (!data) {
+    return {
+      ...event,
+      externalLinks: uniqueByUrl(officialLinks),
+      researchVerifiedAt: new Date('2026-09-02T22:21:14Z'),
+    };
+  }
+
+  const override = data.override || {};
+  const hasRegistrationUrlOverride = Object.prototype.hasOwnProperty.call(
+    override.participation || {},
+    'registrationUrl',
+  );
+  const registrationUrl = hasRegistrationUrlOverride
+    ? override.participation.registrationUrl
+    : data.registrationUrl || event.participation?.registrationUrl || '';
+  const externalLinks = [
+    ...officialLinks,
+    ...(override.externalLinks || []),
+    ...(data.officialUrl
+      ? [{ kind: 'official', label: 'Organizer event information', url: data.officialUrl }]
+      : []),
+    ...(data.registrationUrl
+      ? [{ kind: 'registration', label: 'Register or complete the participant waiver', url: data.registrationUrl }]
+      : []),
+  ];
+  const videos = [
+    ...(data.replaceExistingVideos ? [] : event.media?.videos || []),
+    ...(override.media?.videos || []),
+    ...(data.videos || []).map((url) => ({ label: 'Previous event video or replay', url })),
+  ];
+  return {
+    ...event,
+    ...override,
+    participation: {
+      ...(event.participation || {}),
+      ...(override.participation || {}),
+      registrationUrl,
+      ...(data.registrationUrl ? { registrationStatus: 'open' } : {}),
+    },
+    spectating: { ...(event.spectating || {}), ...(override.spectating || {}) },
+    media: { ...(event.media || {}), ...(override.media || {}), videos: uniqueByUrl(videos) },
+    externalLinks: uniqueByUrl(externalLinks),
+    researchVerifiedAt: data.researchVerifiedAt || new Date('2026-09-02T22:21:14Z'),
+  };
+}
+
+module.exports = { applyResearchEnrichment };

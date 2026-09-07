@@ -1,0 +1,82 @@
+const ENRICHMENT = {
+  'xgames:japan-2023': { videos: ['https://www.youtube.com/watch?v=VwAgmNWcmW4'] },
+  'xgames:california-2023': { videos: ['https://www.youtube.com/watch?v=_hqk7vCXbo4'] },
+  'xgames:aspen-2024': { videos: ['https://www.youtube.com/watch?v=LyPbJoVxyRg'] },
+  'xgames:ventura-2024': { videos: ['https://www.youtube.com/watch?v=1mauSm7gFKw'] },
+  'xgames:chiba-2024': { videos: ['https://www.youtube.com/watch?v=qvHYaOAOaHY'] },
+  'xgames:aspen-2025': { videos: ['https://www.youtube.com/watch?v=ag6pzCmNlfM'] },
+  'xgames:osaka-2025': { videos: ['https://www.youtube.com/watch?v=cLVQtB0G0fQ'] },
+  'xgames:salt-lake-city-2025': { videos: ['https://www.youtube.com/watch?v=NBBkL4njpGQ'] },
+  'xgames:aspen-2026': { videos: ['https://www.youtube.com/watch?v=_E4xed5sAMM'] },
+  'xgames:sacramento-2026': { videos: ['https://www.youtube.com/watch?v=MAxxXGwxH_8'] },
+  'xgames:japan-2026': { videos: ['https://www.youtube.com/watch?v=Np-2TAWcfJo'] },
+  'xgames:japan-2026-2': { videos: ['https://www.youtube.com/watch?v=AcZd-gn98v0'] },
+  'xgames:new-orleans-2026': { videos: ['https://www.youtube.com/watch?v=boi4Uq1AJTw'] },
+  'boardr:4273': {
+    registrationUrl: 'https://www.theboardr.com/events/4273/Des_Moines_Streetstyle_Open',
+    officialUrl: 'https://skatedsm.org/streetstyleopen/',
+    videos: ['https://www.youtube.com/watch?v=AdcHOAFhKKQ'],
+  },
+  'boardr:4309': {
+    registrationUrl: 'https://www.theboardr.com/events/4309',
+    officialUrl: 'https://skatedsm.org/streetstyleopen/',
+    videos: ['https://www.youtube.com/watch?v=AdcHOAFhKKQ'],
+  },
+  'boardr:4299': {
+    officialUrl: 'https://exposureskate.org/',
+    videos: ['https://www.youtube.com/watch?v=w4WvpGkmvj4'],
+  },
+  'boardr:4363': {
+    officialUrl: 'https://www.swampfestbmx.com/',
+    registrationUrl: 'https://swampfestwaiver.vercel.app/',
+    videos: ['https://www.youtube.com/watch?v=z36Ad8XVVjQ'],
+  },
+};
+
+function uniqueByUrl(items) {
+  const seen = new Set();
+  return items.filter((item) => item?.url && !seen.has(item.url) && seen.add(item.url));
+}
+
+function applyResearchEnrichment(event) {
+  const data = ENRICHMENT[event.sourceId];
+  const officialLinks = [
+    ...(event.externalLinks || []),
+    { kind: 'official', label: 'Official event details', url: event.sourceUrl },
+  ];
+  if (!data) {
+    return {
+      ...event,
+      externalLinks: uniqueByUrl(officialLinks),
+      researchVerifiedAt: new Date('2026-09-02T22:21:14Z'),
+    };
+  }
+
+  const registrationUrl = data.registrationUrl || event.participation?.registrationUrl || '';
+  const externalLinks = [
+    ...officialLinks,
+    ...(data.officialUrl
+      ? [{ kind: 'official', label: 'Organizer event information', url: data.officialUrl }]
+      : []),
+    ...(data.registrationUrl
+      ? [{ kind: 'registration', label: 'Register or complete the participant waiver', url: data.registrationUrl }]
+      : []),
+  ];
+  const videos = [
+    ...(event.media?.videos || []),
+    ...(data.videos || []).map((url) => ({ label: 'Previous event video or replay', url })),
+  ];
+  return {
+    ...event,
+    participation: {
+      ...(event.participation || {}),
+      registrationUrl,
+      ...(data.registrationUrl ? { registrationStatus: 'open' } : {}),
+    },
+    media: { ...(event.media || {}), videos: uniqueByUrl(videos) },
+    externalLinks: uniqueByUrl(externalLinks),
+    researchVerifiedAt: new Date('2026-09-02T22:21:14Z'),
+  };
+}
+
+module.exports = { applyResearchEnrichment };
