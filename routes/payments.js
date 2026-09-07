@@ -7,6 +7,13 @@ module.exports = (db) => {
   const router = express.Router();
   const usersCollection = db.collection('users');
 
+  router.use((_req, res, next) => {
+    if (!stripe) {
+      return res.status(503).send({ error: 'Stripe is not configured' });
+    }
+    next();
+  });
+
   // Create checkout session
   router.post('/create-checkout-session', [auth], async (req, res) => {
     try {
