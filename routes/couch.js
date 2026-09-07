@@ -19,20 +19,22 @@ const BUNNY_CDN_HOSTNAME = process.env.BUNNY_CDN_HOSTNAME;
 // Import Bunny Stream service for signed URLs
 const { getVideoUrls } = require('../services/bunnyStream');
 
-// Initialize Google Drive API
-const credentials = require(
-  path.resolve(
-    process.env.GOOGLE_DRIVE_CREDENTIALS_PATH || './config/google-drive-credentials.json',
-  ),
-);
+let drive = null;
 const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
-
-const authClient = new google.auth.GoogleAuth({
-  credentials,
-  scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-});
-
-const drive = google.drive({ version: 'v3', auth: authClient });
+try {
+  const credentials = require(
+    path.resolve(
+      process.env.GOOGLE_DRIVE_CREDENTIALS_PATH || './config/google-drive-credentials.json',
+    ),
+  );
+  const authClient = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+  });
+  drive = google.drive({ version: 'v3', auth: authClient });
+} catch (error) {
+  console.warn('Google Drive credentials not found; Couch Drive sync disabled:', error.message);
+}
 
 // Video file extensions to look for
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'];
@@ -583,6 +585,10 @@ module.exports = (db) => {
       // Check if admin
       if (req.user.role !== 'admin') {
         return res.status(403).send({ error: 'Admin access required' });
+      }
+
+      if (!drive) {
+        return res.status(503).send({ error: 'Google Drive is not configured' });
       }
 
       console.log('Starting Google Drive sync...');
