@@ -7,10 +7,10 @@ const _store = require('../store/listings');
 // const validateWith = require("../middleware/validation");
 const auth = require('../middleware/auth');
 const authAdmin = require('../middleware/authAdmin');
-const jwt = require('jsonwebtoken');
 const _delay = require('../middleware/delay');
 const _listingMapper = require('../mappers/listings');
 const _config = require('config');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 
 const _upload = multer({
   dest: 'uploads/',
@@ -39,13 +39,8 @@ module.exports = (db) => {
   const isAdmin = (req) => req.user?.role === 'admin';
   // Returns the userId string from the x-auth-token if present and valid, else null.
   const optionalUserId = (req) => {
-    const token = req.header('x-auth-token');
-    if (!token) return null;
-    try {
-      return jwt.verify(token, process.env.JWT_SECRET).userId;
-    } catch (_err) {
-      return null;
-    }
+    const payload = verifyTokenWithGrace(req.header('x-auth-token'));
+    return payload ? payload.userId : null;
   };
   const userOwnsList = async (listId, userId) => {
     if (!ObjectId.isValid(listId)) return false;

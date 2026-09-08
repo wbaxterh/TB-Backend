@@ -1,7 +1,7 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const { ObjectId } = require('mongodb');
 const { getIosDownloads, getAndroidDownloads } = require('../services/appStoreDownloads');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 
 module.exports = (db) => {
   const router = express.Router();
@@ -19,7 +19,8 @@ module.exports = (db) => {
     if (!token) return res.status(401).json({ error: 'No token provided' });
 
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
+      const payload = verifyTokenWithGrace(token);
+      if (!payload) return res.status(400).json({ error: 'Invalid token' });
 
       const user = await usersCollection.findOne({ _id: new ObjectId(payload.userId) });
       if (!user || user.role !== 'admin') {

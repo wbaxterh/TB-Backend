@@ -12,6 +12,7 @@ const { emitNewComment, emitCommentDeleted, emitCommentLoved } = require('../soc
 
 // Bunny Stream for signed video URLs
 const { getVideoUrls } = require('../services/bunnyStream');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 
 // Sport types enum
 const SPORT_TYPES = [
@@ -155,11 +156,8 @@ module.exports = (db) => {
       let userId = null;
       if (req.headers['x-auth-token']) {
         try {
-          const jwt = require('jsonwebtoken');
-          const decoded = jwt.verify(
-            req.headers['x-auth-token'],
-            process.env.JWT_SECRET || 'jwtPrivateKey',
-          );
+          const decoded = verifyTokenWithGrace(req.headers['x-auth-token']);
+          if (!decoded) throw new Error('invalid token');
           userId = decoded.userId;
           userHomies = await getHomieIds(userId);
         } catch (_e) {
@@ -378,11 +376,8 @@ module.exports = (db) => {
       let requesterId = null;
       if (req.headers['x-auth-token']) {
         try {
-          const jwt = require('jsonwebtoken');
-          const decoded = jwt.verify(
-            req.headers['x-auth-token'],
-            process.env.JWT_SECRET || 'jwtPrivateKey',
-          );
+          const decoded = verifyTokenWithGrace(req.headers['x-auth-token']);
+          if (!decoded) throw new Error('invalid token');
           requesterId = decoded.userId;
         } catch (_e) {}
       }

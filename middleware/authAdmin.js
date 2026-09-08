@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
 const { ObjectId } = require('mongodb');
+const { verifyTokenWithGrace } = require('./auth');
 
 const authAdmin = () => {
   return (req, res, next) => {
@@ -12,7 +12,8 @@ const authAdmin = () => {
     token = token.trim();
 
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
+      const payload = verifyTokenWithGrace(token);
+      if (!payload) return res.status(400).send({ error: 'Invalid token.' });
       req.user = payload;
       const db = require('../db').getDb();
       const usersCollection = db.collection('users');
