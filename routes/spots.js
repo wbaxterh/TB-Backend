@@ -1,7 +1,6 @@
 const express = require('express');
 const Joi = require('joi');
 const axios = require('axios');
-const jwt = require('jsonwebtoken');
 const { ObjectId } = require('mongodb');
 const validateWith = require('../middleware/validation');
 const auth = require('../middleware/auth');
@@ -10,18 +9,13 @@ const authAdmin = require('../middleware/authAdmin');
 // Returns the { userId, role } from a valid x-auth-token if present, else null.
 // Used by public routes that reveal extra data (e.g. a private spot) to its owner.
 const optionalUser = (req) => {
-  const token = req.header('x-auth-token');
-  if (!token) return null;
-  try {
-    return jwt.verify(token, process.env.JWT_SECRET);
-  } catch (_err) {
-    return null;
-  }
+  return verifyTokenWithGrace(req.header('x-auth-token'));
 };
 const escapeRegex = require('../utils/escapeRegex');
 const multer = require('multer');
 const googlePlaces = require('../services/googlePlaces');
 const s3Upload = require('../services/s3Upload');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 
 // Configure multer for memory storage (for S3 upload)
 const upload = multer({

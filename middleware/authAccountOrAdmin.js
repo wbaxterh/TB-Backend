@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const { verifyTokenWithGrace } = require('./auth');
 
 // Allow the request only if the caller is an admin OR is acting on their own
 // account (:id === their own userId). Reads the same x-auth-token header every
@@ -13,10 +13,8 @@ function authAccountOrAdmin() {
       return res.status(401).send({ error: 'Access denied. No token provided.' });
     }
 
-    let payload;
-    try {
-      payload = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (_err) {
+    const payload = verifyTokenWithGrace(token);
+    if (!payload) {
       return res.status(400).send({ error: 'Invalid token.' });
     }
 

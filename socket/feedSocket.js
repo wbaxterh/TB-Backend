@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 
 /**
  * Setup the /feed namespace for real-time comment updates
@@ -18,7 +18,8 @@ const setupFeedSocket = (io) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = verifyTokenWithGrace(token);
+      if (!decoded) return next(new Error('Authentication error'));
       socket.userId = decoded.userId;
       socket.authenticated = true;
       next();

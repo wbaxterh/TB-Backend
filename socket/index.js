@@ -1,7 +1,7 @@
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
 const setupFeedSocket = require('./feedSocket');
 const setupMessageSocket = require('./messageSocket');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 
 /**
  * Initialize Socket.IO server with JWT authentication
@@ -31,7 +31,8 @@ const initializeSocket = (server) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = verifyTokenWithGrace(token);
+      if (!decoded) return next(new Error('Authentication error'));
       socket.userId = decoded.userId;
       socket.authenticated = true;
       next();

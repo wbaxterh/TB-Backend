@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 
 /**
  * Setup the /messages namespace for real-time direct messaging
@@ -16,7 +16,8 @@ const setupMessageSocket = (io) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = verifyTokenWithGrace(token);
+      if (!decoded) return next(new Error('Authentication error'));
       socket.userId = decoded.userId;
       socket.authenticated = true;
       next();
