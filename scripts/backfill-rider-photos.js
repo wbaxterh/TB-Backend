@@ -26,7 +26,9 @@ async function getJson(url) {
 }
 
 function stripHtml(s) {
-  return String(s || '').replace(/<[^>]*>/g, '').trim();
+  return String(s || '')
+    .replace(/<[^>]*>/g, '')
+    .trim();
 }
 
 async function findPhoto(name, sport) {
@@ -91,7 +93,12 @@ async function main() {
     await sleep(120);
   }
   console.log(
-    JSON.stringify({ database: db.databaseName, candidates: targets.length, found, applied: apply }),
+    JSON.stringify({
+      database: db.databaseName,
+      candidates: targets.length,
+      found,
+      applied: apply,
+    }),
   );
   await closeDatabase();
 }
