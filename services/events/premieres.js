@@ -59,12 +59,24 @@ function normalizePremiereEvent(raw) {
     organizer: { name: raw.organizer, verified: false },
     sourceTrust: 'community_source',
     externalLinks: [
-      raw.sourceUrl && { kind: 'official', label: `${raw.organizer} announcement`, url: raw.sourceUrl },
+      raw.sourceUrl && {
+        kind: 'official',
+        label: `${raw.organizer} announcement`,
+        url: raw.sourceUrl,
+      },
       raw.ticketUrl && { kind: 'tickets', label: 'Tickets / entry', url: raw.ticketUrl },
     ].filter(Boolean),
     socialLinks: [
-      raw.instagram && { platform: 'instagram', label: `${raw.organizer} on Instagram`, url: raw.instagram },
-      raw.youtube && { platform: 'youtube', label: `${raw.organizer} on YouTube`, url: raw.youtube },
+      raw.instagram && {
+        platform: 'instagram',
+        label: `${raw.organizer} on Instagram`,
+        url: raw.instagram,
+      },
+      raw.youtube && {
+        platform: 'youtube',
+        label: `${raw.organizer} on YouTube`,
+        url: raw.youtube,
+      },
     ].filter(Boolean),
     media: {
       images: [],

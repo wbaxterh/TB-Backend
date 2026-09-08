@@ -61,7 +61,8 @@ const ENRICHMENT = {
       },
       schedule: {
         timezone: 'America/Los_Angeles',
-        notes: 'Official listings label the schedule PST; June times are normalized to Pacific Daylight Time.',
+        notes:
+          'Official listings label the schedule PST; June times are normalized to Pacific Daylight Time.',
         days: [
           {
             date: '2026-06-26',
@@ -243,7 +244,13 @@ function applyResearchEnrichment(event) {
       ? [{ kind: 'official', label: 'Organizer event information', url: data.officialUrl }]
       : []),
     ...(data.registrationUrl
-      ? [{ kind: 'registration', label: 'Register or complete the participant waiver', url: data.registrationUrl }]
+      ? [
+          {
+            kind: 'registration',
+            label: 'Register or complete the participant waiver',
+            url: data.registrationUrl,
+          },
+        ]
       : []),
   ];
   const videos = [
