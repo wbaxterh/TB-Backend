@@ -6,10 +6,15 @@
 const crypto = require('node:crypto');
 const { fetchXGamesEvents } = require('./xgames');
 const { fetchBoardrEvents } = require('./boardr');
+const { fetchOfficialEvents } = require('./official');
+const { fetchPremieresEvents } = require('./premieres');
+const { applyResearchEnrichment } = require('./researchEnrichment');
 
 const SOURCES = {
   xgames: fetchXGamesEvents,
   boardr: fetchBoardrEvents,
+  official: fetchOfficialEvents,
+  premieres: fetchPremieresEvents,
 };
 
 function shortHash(s) {
@@ -24,7 +29,7 @@ async function ensureIndexes(collection) {
   await collection.createIndex({ status: 1 }).catch(() => {});
 }
 
-async function ingestEvents(db, { sources = ['xgames', 'boardr'] } = {}) {
+async function ingestEvents(db, { sources = ['xgames', 'boardr', 'official', 'premieres'] } = {}) {
   const collection = db.collection('events');
   await ensureIndexes(collection);
 
@@ -45,7 +50,8 @@ async function ingestEvents(db, { sources = ['xgames', 'boardr'] } = {}) {
 
   const now = new Date();
   let upserted = 0;
-  for (const ev of all) {
+  for (const rawEvent of all) {
+    const ev = applyResearchEnrichment(rawEvent);
     // Deterministic unique slug (base + hash of dedupeKey) → stable detail URLs.
     const slug = `${ev.slug}-${shortHash(ev.dedupeKey)}`;
     const { dedupeKey, ...rest } = ev;
