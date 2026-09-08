@@ -9,7 +9,10 @@ const DAY = 24 * 60 * 60;
 
 function tokenExpiredDaysAgo(days, payload = { userId: 'u1' }) {
   const now = Math.floor(Date.now() / 1000);
-  return jwt.sign({ ...payload, iat: now - 60 * DAY, exp: now - days * DAY }, process.env.JWT_SECRET);
+  return jwt.sign(
+    { ...payload, iat: now - 60 * DAY, exp: now - days * DAY },
+    process.env.JWT_SECRET,
+  );
 }
 
 test('accepts a live token', () => {
