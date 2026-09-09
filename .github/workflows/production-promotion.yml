@@ -1,0 +1,26 @@
+name: Production Promotion
+
+# Emits the required "production-promotion" status check on PRs targeting
+# master (the production-source-staging ruleset requires it). It passes ONLY
+# when the PR promotes the staging branch — enforcing the staging → production
+# flow. Feature work must merge to staging first.
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  production-promotion:
+    name: production-promotion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the PR promotes staging
+        run: |
+          echo "head: ${{ github.head_ref }} → base: ${{ github.base_ref }}"
+          if [ "${{ github.head_ref }}" = "staging" ]; then
+            echo "✅ staging → master promotion"
+          else
+            echo "❌ Only the staging branch may be promoted to master."
+            echo "Merge this work into staging first (the production-source-staging ruleset enforces this flow)."
+            exit 1
+          fi
