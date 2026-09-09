@@ -1,6 +1,15 @@
 const { ObjectId, DBRef } = require('mongodb');
 const KNOWLEDGE = require('./kaori-knowledge.json');
 
+// Canonical public URLs so every recommendation links back INTO TrickBook
+// instead of the open web. Verified against the frontend routes + llms.txt:
+//   trick  -> /trickipedia/<category-lowercased>/<url-slug>
+//   film   -> /media/couch/<slug>
+const WEB_BASE = 'https://thetrickbook.com';
+const trickUrl = (t) =>
+  t?.url ? `${WEB_BASE}/trickipedia/${(t.category || '').toLowerCase()}/${t.url}` : null;
+const filmUrl = (f) => (f?.slug ? `${WEB_BASE}/media/couch/${f.slug}` : null);
+
 // ============================================
 // TOOL DEFINITIONS (OpenAI-compatible format)
 // ============================================
@@ -39,6 +48,51 @@ const TOOL_DEFINITIONS = [
           search: { type: 'string', description: 'Trick name or keyword' },
           category: { type: 'string', description: 'Trick category (e.g. "flatground", "rail")' },
           difficulty: { type: 'string', description: 'Difficulty level' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_films',
+      description:
+        "Search TrickBook's film catalog (full snowboard/skate/surf videos, edits, and parts). Use when a user asks what to watch, wants film recommendations, or asks about a rider's parts or a specific movie. ALWAYS prefer these over recommending videos from the open web.",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Title, rider name, or producer/filmmaker to search for',
+          },
+          sport: {
+            type: 'string',
+            enum: ['snowboarding', 'skateboarding', 'skiing', 'bmx', 'surfing', 'wakeboarding'],
+            description: 'Sport type to filter by',
+          },
+          year: { type: 'number', description: 'Release year to filter by' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'recommend_next_trick',
+      description:
+        "Recommend what trick the user should learn next, using TrickBook's trick-progression graph (prerequisites/next-steps) and the tricks they've already landed. Use when a user asks 'what should I learn next', 'what's after X', or wants a personalized suggestion. This is smarter than a generic guess because it walks the actual relationships in TrickBook's data.",
+      parameters: {
+        type: 'object',
+        properties: {
+          trick_name: {
+            type: 'string',
+            description:
+              'Optional: base the recommendation on progressing FROM this specific trick. If omitted, uses the tricks the user has already completed.',
+          },
+          sport: {
+            type: 'string',
+            description: 'Optional sport/category hint (e.g. "snowboarding", "flatground")',
+          },
         },
       },
     },
@@ -204,6 +258,61 @@ async function searchSpots(args, db) {
   }
 }
 
+// Pull the curated, still-live tutorials TrickBook has vetted for a trick.
+// Prefers the structured tutorials[] (featured/professional-verified) and
+// falls back to legacy videos[]/videoUrl. Returns TrickBook-curated links so
+// Kaori never has to reach for a random YouTube result (which risks surfacing
+// banned content).
+function curatedTutorials(t) {
+  const out = [];
+  for (const tut of t.tutorials || []) {
+    if (tut.availability && tut.availability !== 'active') continue;
+    if (!tut.canonicalUrl) continue;
+    out.push({
+      title: tut.title || tut.instructor?.name || tut.platform || 'Tutorial',
+      platform: tut.platform || '',
+      url: tut.canonicalUrl,
+      featured: tut.featured === true,
+      professional: tut.instructor?.isProfessional === true,
+    });
+  }
+  for (const v of t.videos || []) {
+    const url = typeof v === 'string' ? v : v?.url || v?.canonicalUrl;
+    if (url) out.push({ title: v?.title || 'Video', platform: v?.platform || '', url });
+  }
+  if (out.length === 0 && t.videoUrl) out.push({ title: 'Video', platform: '', url: t.videoUrl });
+  // Featured first, cap so results stay compact.
+  return out.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0)).slice(0, 4);
+}
+
+// Resolve a progression edge list ([{trickId,...}]) into names + deep links.
+async function resolveProgression(db, edges) {
+  const ids = (edges || [])
+    .map((e) => e.trickId)
+    .filter((id) => id && ObjectId.isValid(id))
+    .map((id) => new ObjectId(id));
+  if (ids.length === 0) return [];
+  const docs = await db
+    .collection('trickipedia')
+    .find({ _id: { $in: ids } })
+    .project({ name: 1, url: 1, category: 1, difficulty: 1 })
+    .toArray();
+  const byId = {};
+  for (const d of docs) byId[d._id.toString()] = d;
+  return (edges || [])
+    .map((e) => {
+      const d = e.trickId && byId[e.trickId.toString()];
+      if (!d) return null;
+      return {
+        name: d.name,
+        difficulty: d.difficulty || '',
+        strength: e.strength || undefined,
+        url: trickUrl(d),
+      };
+    })
+    .filter(Boolean);
+}
+
 async function searchTrickipedia(args, db) {
   try {
     const query = {};
@@ -211,8 +320,11 @@ async function searchTrickipedia(args, db) {
     if (args.category) query.category = args.category;
     if (args.difficulty) query.difficulty = args.difficulty;
     if (args.search) {
+      // Match name, description, AND aliases so "back one" / "backspin" still
+      // find "Backside 180". Aliases are a real field on the trick docs.
       query.$or = [
         { name: { $regex: args.search, $options: 'i' } },
+        { aliases: { $regex: args.search, $options: 'i' } },
         { description: { $regex: args.search, $options: 'i' } },
       ];
     }
@@ -228,20 +340,192 @@ async function searchTrickipedia(args, db) {
       return { results: [], message: 'No tricks found matching that search' };
     }
 
-    return {
-      results: tricks.map((t) => ({
+    const results = [];
+    for (const t of tricks) {
+      const [prerequisites, nextSteps] = await Promise.all([
+        resolveProgression(db, t.progression?.prerequisites),
+        resolveProgression(db, t.progression?.nextSteps),
+      ]);
+      results.push({
         id: t._id.toString(),
         name: t.name,
+        aliases: (t.aliases || []).slice(0, 4),
         category: t.category || '',
         difficulty: t.difficulty || '',
         description: t.description ? t.description.substring(0, 200) : '',
         steps: t.steps ? t.steps.slice(0, 3) : [],
-      })),
+        tutorials: curatedTutorials(t),
+        prerequisites,
+        nextSteps,
+        webUrl: trickUrl(t),
+      });
+    }
+
+    return {
+      results,
       total: tricks.length,
+      important:
+        "These tricks, tutorials, and prerequisite/next-step links are from TrickBook's own database. Recommend the curated tutorials here (with their links) and the trickipedia webUrl — do NOT suggest random tutorials from the open web.",
     };
   } catch (err) {
     console.error('Tool search_trickipedia error:', err.message);
     return { error: 'Could not search tricks right now' };
+  }
+}
+
+async function searchFilms(args, db) {
+  try {
+    const query = { isPublished: true, type: 'film' };
+    if (args.sport) query.sportTypes = args.sport;
+    if (args.year) query.releaseYear = parseInt(args.year, 10);
+    if (args.query) {
+      const escaped = String(args.query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { title: { $regex: escaped, $options: 'i' } },
+        { description: { $regex: escaped, $options: 'i' } },
+        { producedBy: { $regex: escaped, $options: 'i' } },
+        { riders: { $regex: escaped, $options: 'i' } },
+      ];
+    }
+
+    const films = await db
+      .collection('couch_videos')
+      .find(query, { projection: { bunnyVideoId: 0, hlsUrl: 0, driveFileId: 0 } })
+      .sort({ releaseYear: -1, title: 1 })
+      .limit(5)
+      .toArray();
+
+    if (films.length === 0) {
+      return {
+        results: [],
+        message:
+          'No films in the TrickBook catalog matched that. Tell the user there is nothing in TrickBook for this yet — you MAY mention a film you know but you MUST say "this one isn\'t on TrickBook yet".',
+      };
+    }
+
+    return {
+      results: films.map((f) => ({
+        id: f._id.toString(),
+        title: f.title,
+        producedBy: f.producedBy || '',
+        riders: (f.riders || []).slice(0, 6),
+        releaseYear: f.releaseYear || '',
+        sportTypes: f.sportTypes || [],
+        description: f.description ? f.description.substring(0, 180) : '',
+        webUrl: filmUrl(f),
+      })),
+      total: films.length,
+      important:
+        "These are TrickBook films — recommend them by title and include the webUrl so the user can watch on TrickBook. Don't point them to the open web when there's a match here.",
+    };
+  } catch (err) {
+    console.error('Tool search_films error:', err.message);
+    return { error: 'Could not search films right now' };
+  }
+}
+
+async function recommendNextTrick(args, db, senderId) {
+  try {
+    // Path A: progress FROM a named trick — walk its next-step edges.
+    if (args.trick_name) {
+      const base = await db.collection('trickipedia').findOne({
+        $or: [
+          { name: { $regex: `^${args.trick_name}$`, $options: 'i' } },
+          { aliases: { $regex: `^${args.trick_name}$`, $options: 'i' } },
+        ],
+      });
+      if (base) {
+        const nextSteps = await resolveProgression(db, base.progression?.nextSteps);
+        if (nextSteps.length > 0) {
+          return {
+            basis: `next steps after ${base.name}`,
+            recommendations: nextSteps.slice(0, 4),
+            source: 'trickbook_progression_graph',
+          };
+        }
+      }
+    }
+
+    // Path B: personalized — use the tricks the user has already landed.
+    const completedNames = new Set();
+    if (senderId) {
+      const lists = await db
+        .collection('tricklists')
+        .find({ 'user.$id': senderId })
+        .project({ tricks: 1 })
+        .toArray();
+      const trickIds = lists
+        .flatMap((tl) => (tl.tricks || []).map((t) => t._id))
+        .filter(Boolean);
+      if (trickIds.length > 0) {
+        const userTricks = await db
+          .collection('tricks')
+          .find({ _id: { $in: trickIds } })
+          .project({ name: 1, checked: 1 })
+          .toArray();
+        for (const t of userTricks) {
+          if ((t.checked === 'Complete' || t.checked === true) && t.name) {
+            completedNames.add(t.name.toLowerCase());
+          }
+        }
+      }
+    }
+
+    if (completedNames.size > 0) {
+      // Find trickipedia entries matching completed tricks, gather their nextSteps,
+      // and drop anything the user already has.
+      const landed = await db
+        .collection('trickipedia')
+        .find({
+          $or: [...completedNames].map((n) => ({
+            name: { $regex: `^${n}$`, $options: 'i' },
+          })),
+        })
+        .project({ name: 1, progression: 1 })
+        .toArray();
+      const edges = landed.flatMap((t) => t.progression?.nextSteps || []);
+      const resolved = await resolveProgression(db, edges);
+      const seen = new Set();
+      const recs = resolved.filter((r) => {
+        const key = r.name.toLowerCase();
+        if (completedNames.has(key) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (recs.length > 0) {
+        return {
+          basis: `based on ${landed.length} trick(s) you've landed`,
+          recommendations: recs.slice(0, 5),
+          source: 'trickbook_progression_graph',
+        };
+      }
+    }
+
+    // Path C: cold start — suggest beginner-friendly tricks from the catalog.
+    const beginnerQuery = { difficulty: { $regex: 'beginner|easy|1', $options: 'i' } };
+    if (args.sport) beginnerQuery.category = { $regex: args.sport, $options: 'i' };
+    const starters = await db
+      .collection('trickipedia')
+      .find(beginnerQuery)
+      .project({ name: 1, url: 1, category: 1, difficulty: 1 })
+      .limit(5)
+      .toArray();
+    return {
+      basis: 'starter tricks (no landed tricks on record yet)',
+      recommendations: starters.map((t) => ({
+        name: t.name,
+        difficulty: t.difficulty || '',
+        url: trickUrl(t),
+      })),
+      source: 'trickbook_catalog',
+      note:
+        starters.length === 0
+          ? "Nothing matched — ask the user what they can already do so you can use TrickBook's progression graph next time."
+          : undefined,
+    };
+  } catch (err) {
+    console.error('Tool recommend_next_trick error:', err.message);
+    return { error: 'Could not build a recommendation right now' };
   }
 }
 
@@ -482,6 +766,10 @@ async function executeToolCall(toolName, args, db, senderId) {
       return await searchSpots(args, db);
     case 'search_trickipedia':
       return await searchTrickipedia(args, db);
+    case 'search_films':
+      return await searchFilms(args, db);
+    case 'recommend_next_trick':
+      return await recommendNextTrick(args, db, senderId);
     case 'get_user_tricklists':
       return await getUserTricklists(db, senderId);
     case 'create_tricklist':
