@@ -26,7 +26,17 @@ function queryTerms(query) {
   ].filter((term) => term.length >= 3 && !STOP_WORDS.has(term));
 }
 
-async function keywordSearch(collection, query, limit) {
+function querySourceTypes(query) {
+  const value = String(query).toLowerCase();
+  if (/\b(films?|movies?|videos?|parts?)\b/.test(value)) return ['film'];
+  if (/\b(spots?|parks?|resorts?|breaks?)\b/.test(value)) return ['spot'];
+  if (/\b(events?|contests?|competitions?|jams?)\b/.test(value)) return ['event'];
+  if (/\b(tricks?|learn|teach|how to)\b/.test(value)) return ['trick'];
+  if (/\b(riders?|athletes?|skaters?|snowboarders?|surfers?)\b/.test(value)) return ['rider'];
+  return [];
+}
+
+async function keywordSearch(collection, query, limit, sourceTypes = []) {
   const terms = queryTerms(query);
   if (!terms.length) return [];
   const patterns = terms.map(
@@ -37,7 +47,10 @@ async function keywordSearch(collection, query, limit) {
   const batches = await Promise.all(
     patterns.map((pattern) =>
       collection
-        .find({ $or: [{ title: pattern }, { content: pattern }] })
+        .find({
+          ...(sourceTypes.length ? { sourceType: { $in: sourceTypes } } : {}),
+          $or: [{ title: pattern }, { content: pattern }],
+        })
         .project({ _id: 0, embedding: 0, contentHash: 0, embeddingModel: 0 })
         .limit(limit)
         .toArray(),
@@ -60,7 +73,8 @@ async function keywordSearch(collection, query, limit) {
 async function search(db, query, limit = 5) {
   if (!db || !query || process.env.KAORI_RAG_ENABLED === 'false') return [];
   const collection = db.collection(COLLECTION);
-  const keywordsPromise = keywordSearch(collection, query, limit);
+  const sourceTypes = querySourceTypes(query);
+  const keywordsPromise = keywordSearch(collection, query, limit, sourceTypes);
   const queryVector = await embed(query);
   const vectorResults = await collection
     .aggregate([
@@ -70,7 +84,7 @@ async function search(db, query, limit = 5) {
           path: 'embedding',
           queryVector,
           numCandidates: Math.max(50, limit * 10),
-          limit,
+          limit: sourceTypes.length ? Math.max(25, limit * 5) : limit,
         },
       },
       {
@@ -88,9 +102,13 @@ async function search(db, query, limit = 5) {
     ])
     .toArray();
   const keywords = await keywordsPromise;
-  const semantic = vectorResults.filter(
-    (result) => result.score >= Number(process.env.KAORI_RAG_MIN_SCORE || 0.35),
-  );
+  const semantic = vectorResults
+    .filter(
+      (result) =>
+        result.score >= Number(process.env.KAORI_RAG_MIN_SCORE || 0.35) &&
+        (!sourceTypes.length || sourceTypes.includes(result.sourceType)),
+    )
+    .slice(0, limit);
   const combined = new Map();
   for (const result of [...keywords, ...semantic]) {
     const key = `${result.sourceType}:${result.sourceId}`;
@@ -99,4 +117,4 @@ async function search(db, query, limit = 5) {
   return [...combined.values()].slice(0, limit);
 }
 
-module.exports = { COLLECTION, INDEX, queryTerms, search };
+module.exports = { COLLECTION, INDEX, querySourceTypes, queryTerms, search };
