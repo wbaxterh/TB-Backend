@@ -12,5 +12,12 @@ module.exports = {
       autorestart: false,
       watch: false,
     },
+    {
+      name: 'companion-graph-builder',
+      script: 'scripts/build-companion-graph.js',
+      cron_restart: '30 3 * * *',
+      autorestart: false,
+      watch: false,
+    },
   ],
 };
