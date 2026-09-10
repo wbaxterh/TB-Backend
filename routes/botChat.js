@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const axios = require('axios');
+const { hasCompanion } = require('../companion-registry');
 require('dotenv').config();
 
 module.exports = (db) => {
@@ -117,16 +118,18 @@ module.exports = (db) => {
       // ElizaOS hop always 401s and only added a wasted roundtrip + long
       // timeout); other bot characters keep the Eliza path so they aren't
       // silently rerouted through the Kaori persona + Kaori's history.
-      const isKaori = (bot.botCharacter || 'kaori') === 'kaori';
+      const characterId = bot.botCharacter || 'kaori';
+      const isRegisteredCompanion = hasCompanion(characterId);
+      const isKaori = characterId === 'kaori';
       let botResponse;
-      if (!isKaori || process.env.BOTCHAT_USE_ELIZA === 'true') {
+      if (!isRegisteredCompanion || process.env.BOTCHAT_USE_ELIZA === 'true') {
         try {
           const elizaResponse = await axios.post(
             'http://localhost:3001/api/chat',
             {
               userId: userId,
               message: message,
-              character: bot.botCharacter || 'kaori',
+              character: characterId,
             },
             {
               timeout: 10000,
@@ -137,13 +140,15 @@ module.exports = (db) => {
           console.error('ElizaOS API error:', elizaError.message);
         }
       }
-      if (!botResponse && isKaori) {
+      if (!botResponse && isRegisteredCompanion) {
         try {
-          const { generateKaoriResponse } = require('../kaori-ai-response');
+          const { generateCompanionResponse } = require('../kaori-ai-response');
           // A kith session means the user is on the live 3D stage — Kaori
           // structures demo replies so her body can act them out.
-          botResponse = await generateKaoriResponse(message, db, null, userId, {
-            onStage: Boolean(kithSessionId),
+          botResponse = await generateCompanionResponse(message, db, null, userId, {
+            botId,
+            characterId,
+            onStage: isKaori && Boolean(kithSessionId),
           });
         } catch (fallbackErr) {
           console.error('Kaori fallback error:', fallbackErr.message);

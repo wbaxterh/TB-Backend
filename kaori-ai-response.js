@@ -3,6 +3,7 @@ const { ObjectId } = require('mongodb');
 const { TOOL_DEFINITIONS, executeToolCall } = require('./kaori-tools');
 
 const kaoriCharacter = require('./kaori-character.json');
+const { getCompanion } = require('./companion-registry');
 
 // Compose the system prompt from the structured character file. To change
 // Kaori's persona, edit kaori-character.json — not a giant inline string. The
@@ -10,7 +11,9 @@ const kaoriCharacter = require('./kaori-character.json');
 // sections, same order, same wording), just sourced from typed fields.
 function buildSystemPrompt(c) {
   const bullets = (arr) => arr.map((s) => `- ${s}`).join('\n');
-  const examples = c.messageExamples.map((ex) => `User: "${ex.user}" → "${ex.kaori}"`).join('\n');
+  const examples = c.messageExamples
+    .map((ex) => `User: "${ex.user}" → "${ex.assistant || ex[c.id] || ex.kaori}"`)
+    .join('\n');
   return [
     c.intro,
     '',
@@ -64,8 +67,6 @@ async function queryRAGContext(userMessage, db) {
 // Call OpenRouter with tool-calling loop
 // Appended to the system prompt when the user is on the 3D stage with
 // voice — Kaori's body performs what she says, cued by these keywords.
-const STAGE_DEMO_PROMPT = kaoriCharacter.stageDemo;
-
 // Tool execution. By DEFAULT tools run in-process (fast, no extra service).
 // Set KAORI_USE_MCP=true to route them through the trickbook-mcp server instead
 // (dogfoods the MCP layer / shares tools with other clients). Either way, ANY
@@ -109,6 +110,7 @@ async function callOpenRouter(
   senderId,
   extraSystemPrompt = '',
   accountFirstName = '',
+  character = kaoriCharacter,
 ) {
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -116,7 +118,7 @@ async function callOpenRouter(
     return null;
   }
 
-  let systemPrompt = KAORI_SYSTEM_PROMPT;
+  let systemPrompt = buildSystemPrompt(character);
 
   // Inject relationship context. Even with no profile yet, still tell Kaori the
   // user's name (from their account) so she can greet/address them naturally.
@@ -176,7 +178,7 @@ ${ragContext}`;
       const response = await axios.post(
         'https://openrouter.ai/api/v1/chat/completions',
         {
-          model: 'google/gemini-3.5-flash',
+          model: character.model || process.env.COMPANION_MODEL || 'google/gemini-3.5-flash',
           messages: fullMessages,
           tools: TOOL_DEFINITIONS,
           tool_choice: 'auto',
@@ -188,7 +190,7 @@ ${ragContext}`;
             'Content-Type': 'application/json',
             Authorization: `Bearer ${apiKey}`,
             'HTTP-Referer': 'https://thetrickbook.com',
-            'X-Title': 'TrickBook Kaori',
+            'X-Title': `TrickBook ${character.displayName || character.id || 'Companion'}`,
           },
           timeout: 25000,
         },
@@ -251,8 +253,11 @@ ${ragContext}`;
   return 'hmm that got a bit complicated, can you ask me again? 🙈';
 }
 
-async function generateKaoriResponse(userMessage, db, conversationId, senderId, options = {}) {
-  const kaoriBotId = '69c15e55c7ebe2c6884f1267';
+async function generateCompanionResponse(userMessage, db, conversationId, senderId, options = {}) {
+  const characterId = options.characterId || 'kaori';
+  const character = getCompanion(characterId);
+  if (!character) throw new Error(`Unknown companion character: ${characterId}`);
+  const companionBotId = options.botId || character.botId || '69c15e55c7ebe2c6884f1267';
 
   // Unified conversation memory: Kaori sees recent context from EVERY
   // surface — web Kaori Live / DMs (dm_messages) AND the mobile chat +
@@ -269,7 +274,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
       // rules) — take the most recently active one.
       const convos = await db
         .collection('conversations')
-        .find({ participants: { $all: [senderId, kaoriBotId] } })
+        .find({ participants: { $all: [senderId, companionBotId] } })
         .project({ _id: 1 })
         .sort({ updatedAt: -1 })
         .limit(1)
@@ -287,7 +292,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
       for (const msg of dmMessages) {
         if (msg.content?.trim()) {
           history.push({
-            role: msg.senderId === kaoriBotId ? 'assistant' : 'user',
+            role: msg.senderId === companionBotId ? 'assistant' : 'user',
             content: msg.content.trim(),
             createdAt: msg.createdAt || new Date(0),
           });
@@ -305,8 +310,8 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
         .collection('bot_chats')
         .find({
           $or: [
-            { fromUserId: senderId, toUserId: kaoriBotId },
-            { fromUserId: kaoriBotId, toUserId: senderId },
+            { fromUserId: senderId, toUserId: companionBotId },
+            { fromUserId: companionBotId, toUserId: senderId },
           ],
         })
         .project({ message: 1, type: 1, createdAt: 1 })
@@ -346,7 +351,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
   try {
     relationshipProfile = await db
       .collection('companion_profiles')
-      .findOne({ userId: senderId, companionId: kaoriBotId });
+      .findOne({ userId: senderId, companionId: companionBotId });
   } catch (_err) {
     // Profile not found is fine
   }
@@ -357,7 +362,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
     const { computeStage } = require('./routes/companionProfile');
     const newStage = computeStage(newCount);
     await db.collection('companion_profiles').updateOne(
-      { userId: senderId, companionId: kaoriBotId },
+      { userId: senderId, companionId: companionBotId },
       {
         $set: {
           interactionCount: newCount,
@@ -411,7 +416,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
     if (m && senderId && !STOP.has(m[1].toLowerCase())) {
       const newName = m[1].charAt(0).toUpperCase() + m[1].slice(1);
       await db.collection('companion_profiles').updateOne(
-        { userId: senderId, companionId: kaoriBotId },
+        { userId: senderId, companionId: companionBotId },
         {
           $set: { 'memory.userName': newName },
           $setOnInsert: {
@@ -439,8 +444,9 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
     relationshipProfile,
     db,
     senderId,
-    options.onStage ? STAGE_DEMO_PROMPT : '',
+    options.onStage ? character.stageDemo || '' : '',
     accountFirstName,
+    character,
   );
   if (response) {
     return response;
@@ -449,4 +455,16 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
   return 'ahh my brain is glitching rn, try again in a sec 🙈';
 }
 
-module.exports = { generateKaoriResponse, KAORI_SYSTEM_PROMPT };
+function generateKaoriResponse(userMessage, db, conversationId, senderId, options = {}) {
+  return generateCompanionResponse(userMessage, db, conversationId, senderId, {
+    ...options,
+    characterId: 'kaori',
+  });
+}
+
+module.exports = {
+  buildSystemPrompt,
+  generateCompanionResponse,
+  generateKaoriResponse,
+  KAORI_SYSTEM_PROMPT,
+};
