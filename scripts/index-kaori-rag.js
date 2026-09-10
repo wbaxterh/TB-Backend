@@ -47,7 +47,9 @@ async function indexSource(db, target, source) {
   }
 
   let indexed = 0;
-  const batchSize = Number(process.env.KAORI_RAG_BATCH_SIZE || 16);
+  // Four keeps peak ONNX memory safe on the production t2.micro while still
+  // amortizing tokenizer/model overhead. Operators on larger hosts can raise it.
+  const batchSize = Number(process.env.KAORI_RAG_BATCH_SIZE || 4);
   for (let offset = 0; offset < documents.length; offset += batchSize) {
     const batch = documents.slice(offset, offset + batchSize);
     const vectors = await embedMany(batch.map((doc) => doc.content));
