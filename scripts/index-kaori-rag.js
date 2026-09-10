@@ -98,10 +98,13 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error('[Kaori RAG] failed:', error);
-    process.exitCode = 1;
-  });
+  main().then(
+    () => process.exit(0),
+    (error) => {
+      console.error('[Kaori RAG] failed:', error);
+      process.exit(1);
+    },
+  );
 }
 
 module.exports = { ensureVectorIndex, indexSource };
