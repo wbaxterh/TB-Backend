@@ -3,7 +3,7 @@ const test = require('node:test');
 
 const { DIMENSIONS, embed, embedMany } = require('../kaori-rag/embedding');
 const { SOURCES, makeDocument } = require('../kaori-rag/documents');
-const { queryTerms } = require('../kaori-rag/kaori-query');
+const { querySourceTypes, queryTerms } = require('../kaori-rag/kaori-query');
 
 test('knowledge documents have stable identity, content, and hashes', () => {
   const first = makeDocument(
@@ -42,6 +42,13 @@ test('hybrid retrieval keeps meaningful platform search terms', () => {
     'forest',
     'bailey',
   ]);
+});
+
+test('retrieval infers source intent before ranking broad lexical matches', () => {
+  assert.deepEqual(querySourceTypes('What TrickBook films feature Forest Bailey?'), ['film']);
+  assert.deepEqual(querySourceTypes('Find a skate spot in Brooklyn'), ['spot']);
+  assert.deepEqual(querySourceTypes('Show me an upcoming contest'), ['event']);
+  assert.deepEqual(querySourceTypes('Tell me about Forest Bailey'), []);
 });
 
 test('embedding model returns normalized Atlas-compatible vectors', async () => {
