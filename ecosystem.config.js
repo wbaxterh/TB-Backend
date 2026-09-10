@@ -5,5 +5,12 @@ module.exports = {
       script: 'node index.js',
       version: '1.0.0',
     },
+    {
+      name: 'kaori-rag-indexer',
+      script: 'scripts/index-kaori-rag.js',
+      cron_restart: '15 3 * * *',
+      autorestart: false,
+      watch: false,
+    },
   ],
 };
