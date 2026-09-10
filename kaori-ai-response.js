@@ -42,18 +42,21 @@ function buildSystemPrompt(c) {
 
 const KAORI_SYSTEM_PROMPT = buildSystemPrompt(kaoriCharacter);
 
-// Query RAG context from pgvector
-async function queryRAGContext(userMessage) {
+// Query grounded TrickBook knowledge from MongoDB Atlas Vector Search.
+async function queryRAGContext(userMessage, db) {
   try {
     const ragQuery = require('./kaori-rag/kaori-query');
     if (ragQuery?.search) {
-      const results = await ragQuery.search(userMessage, 3);
+      const results = await ragQuery.search(db, userMessage, 5);
       if (results && results.length > 0) {
-        return results.map((r) => r.content || r.chunk_text).join('\n\n');
+        return results
+          .map((r) => `[${r.sourceType}] ${r.title}\n${r.content}\nTrickBook URL: ${r.webUrl}`)
+          .join('\n\n');
       }
     }
-  } catch (_err) {
-    // RAG not set up yet, that's fine
+  } catch (err) {
+    // Retrieval must never take down chat while an Atlas index is building.
+    console.error('[Kaori RAG] retrieval unavailable:', err.message);
   }
   return '';
 }
@@ -147,7 +150,9 @@ Adapt your energy to match the relationship stage:
   }
 
   if (ragContext) {
-    systemPrompt += `\n\nRecent snowboard news/articles you know about:\n${ragContext}`;
+    systemPrompt += `\n\n--- RELEVANT TRICKBOOK KNOWLEDGE ---
+Use this retrieved first-party TrickBook context when it answers the user's request. Prefer it over general model knowledge, accurately represent what it says, and include its TrickBook URLs. Do not invent missing relationships or claim an item is on TrickBook unless it appears here or in tool results.
+${ragContext}`;
   }
 
   if (extraSystemPrompt) {
@@ -425,7 +430,7 @@ async function generateKaoriResponse(userMessage, db, conversationId, senderId, 
   }
 
   // Try RAG context
-  const ragContext = await queryRAGContext(userMessage);
+  const ragContext = await queryRAGContext(userMessage, db);
 
   // Call OpenRouter with tools
   const response = await callOpenRouter(

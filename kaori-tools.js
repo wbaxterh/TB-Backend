@@ -1,5 +1,6 @@
 const { ObjectId, DBRef } = require('mongodb');
 const KNOWLEDGE = require('./kaori-knowledge.json');
+const companionGraph = require('./companion-graph/graph');
 
 // Canonical public URLs so every recommendation links back INTO TrickBook
 // instead of the open web. Verified against the frontend routes + llms.txt:
@@ -94,6 +95,66 @@ const TOOL_DEFINITIONS = [
             description: 'Optional sport/category hint (e.g. "snowboarding", "flatground")',
           },
         },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'films_featuring_trick',
+      description:
+        "Find films whose own TrickBook metadata explicitly mentions a trick. Use for questions like 'which films feature this trick?' Never infer a film/trick relationship when this tool returns none.",
+      parameters: {
+        type: 'object',
+        properties: {
+          trick_name: { type: 'string', description: 'Canonical or alternate trick name' },
+        },
+        required: ['trick_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'tricks_at_spot',
+      description:
+        'Traverse verified and community TrickBook graph records to find tricks performed at a named spot, including the rider and evidence link when available.',
+      parameters: {
+        type: 'object',
+        properties: { spot_name: { type: 'string', description: 'Spot or skatepark name' } },
+        required: ['spot_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'similar_tricks',
+      description:
+        'Find genuinely related tricks using same-sport semantic similarity edges generated from TrickBook knowledge embeddings.',
+      parameters: {
+        type: 'object',
+        properties: {
+          trick_name: { type: 'string', description: 'Canonical or alternate trick name' },
+          limit: { type: 'number', description: 'Number of related tricks, maximum 10' },
+        },
+        required: ['trick_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'learning_path',
+      description:
+        'Build an ordered prerequisite path toward a target trick and mark steps the user has already completed. Use when they ask how to work up to a trick or want a multi-step progression plan.',
+      parameters: {
+        type: 'object',
+        properties: {
+          target_trick: { type: 'string', description: 'The trick the user wants to learn' },
+          max_depth: { type: 'number', description: 'Maximum prerequisite depth, default 4' },
+        },
+        required: ['target_trick'],
       },
     },
   },
@@ -785,6 +846,19 @@ async function executeToolCall(toolName, args, db, senderId) {
       return await searchFilms(args, db);
     case 'recommend_next_trick':
       return await recommendNextTrick(args, db, senderId);
+    case 'films_featuring_trick':
+      return await companionGraph.filmsFeaturingTrick(db, args.trick_name);
+    case 'tricks_at_spot':
+      return await companionGraph.tricksAtSpot(db, args.spot_name);
+    case 'similar_tricks':
+      return await companionGraph.similarTricks(db, args.trick_name, args.limit);
+    case 'learning_path':
+      return await companionGraph.learningPath(
+        db,
+        args.target_trick,
+        await completedTrickNames(db, senderId),
+        Math.min(Math.max(Number(args.max_depth) || 4, 1), 8),
+      );
     case 'get_user_tricklists':
       return await getUserTricklists(db, senderId);
     case 'create_tricklist':
