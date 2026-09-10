@@ -7,7 +7,7 @@ const { EDGE_COLLECTION } = require('../companion-graph/graph');
 const { normalizeIdentityPart } = require('../services/riders/editorialRider');
 
 const GENERATOR = 'phase3-v1';
-const AMBIGUOUS_FILM_TERMS = new Set(['air', 'drop in', 'impossible', 'ollie', 'search']);
+const AMBIGUOUS_FILM_TERMS = new Set(['air', 'drop-in', 'impossible', 'ollie', 'search']);
 
 function edgeId(from, relation, to, evidenceKey = '') {
   return crypto
