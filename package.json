@@ -9,6 +9,7 @@
     "mcp": "node mcp/trickbook-mcp.js",
     "rag:index": "node scripts/index-kaori-rag.js",
     "rag:query": "node scripts/query-kaori-rag.js",
+    "rag:evaluate": "node scripts/evaluate-companion-rag.js",
     "graph:audit": "node scripts/audit-companion-graph.js",
     "graph:build": "node scripts/build-companion-graph.js",
     "graph:query": "node scripts/query-companion-graph.js",

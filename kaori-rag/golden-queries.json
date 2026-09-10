@@ -1,0 +1,27 @@
+[
+  {
+    "id": "trick-backside-boardslide",
+    "query": "How do I slide backwards on a rail?",
+    "expected": { "sourceTypes": ["trick"], "anyText": ["backside boardslide"] }
+  },
+  {
+    "id": "trick-backside-360",
+    "query": "Teach me a back three on a snowboard",
+    "expected": { "sourceTypes": ["trick"], "anyText": ["backside 360"] }
+  },
+  {
+    "id": "film-forest-bailey",
+    "query": "What TrickBook films feature Forest Bailey?",
+    "expected": { "sourceTypes": ["film"], "anyText": ["forest bailey"] }
+  },
+  {
+    "id": "spot-brooklyn",
+    "query": "Find a skate spot in Brooklyn",
+    "expected": { "sourceTypes": ["spot"], "anyText": ["brooklyn"] }
+  },
+  {
+    "id": "event-skate-contest",
+    "query": "Show me an upcoming skateboarding contest",
+    "expected": { "sourceTypes": ["event"], "anyText": ["skate", "skateboard"] }
+  }
+]
