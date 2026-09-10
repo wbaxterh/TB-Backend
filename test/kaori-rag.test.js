@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { DIMENSIONS, embed } = require('../kaori-rag/embedding');
+const { DIMENSIONS, embed, embedMany } = require('../kaori-rag/embedding');
 const { SOURCES, makeDocument } = require('../kaori-rag/documents');
 
 test('knowledge documents have stable identity, content, and hashes', () => {
@@ -38,4 +38,11 @@ test('embedding model returns normalized Atlas-compatible vectors', async () => 
   assert.equal(vector.length, DIMENSIONS);
   const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
   assert.ok(Math.abs(magnitude - 1) < 0.001);
+});
+
+test('embedding model batches documents without changing vector shape', async () => {
+  const vectors = await embedMany(['backside boardslide', 'Forest Bailey snowboard film']);
+  assert.equal(vectors.length, 2);
+  assert.equal(vectors[0].length, DIMENSIONS);
+  assert.equal(vectors[1].length, DIMENSIONS);
 });

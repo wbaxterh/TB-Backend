@@ -10,9 +10,16 @@ function getExtractor() {
 }
 
 async function embed(text) {
-  const extractor = await getExtractor();
-  const output = await extractor(String(text), { pooling: 'mean', normalize: true });
-  return Array.from(output.data);
+  const [vector] = await embedMany([text]);
+  return vector;
 }
 
-module.exports = { DIMENSIONS, MODEL, embed };
+async function embedMany(texts) {
+  if (!texts.length) return [];
+  const extractor = await getExtractor();
+  const output = await extractor(texts.map(String), { pooling: 'mean', normalize: true });
+  const flat = Array.from(output.data);
+  return texts.map((_, index) => flat.slice(index * DIMENSIONS, (index + 1) * DIMENSIONS));
+}
+
+module.exports = { DIMENSIONS, MODEL, embed, embedMany };

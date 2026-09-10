@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const { MongoClient } = require('mongodb');
 const { COLLECTION, INDEX } = require('../kaori-rag/kaori-query');
-const { DIMENSIONS, MODEL, embed } = require('../kaori-rag/embedding');
+const { DIMENSIONS, MODEL, embedMany } = require('../kaori-rag/embedding');
 const { SOURCES } = require('../kaori-rag/documents');
 
 async function ensureVectorIndex(db, collection) {
@@ -26,32 +26,51 @@ async function ensureVectorIndex(db, collection) {
 }
 
 async function indexSource(db, target, source) {
+  const existing = await target
+    .find({ sourceType: source.sourceType })
+    .project({ sourceId: 1, contentHash: 1, embeddingModel: 1 })
+    .toArray();
+  const existingById = new Map(existing.map((doc) => [doc.sourceId, doc]));
+  const documents = [];
+  const validIds = [];
   const cursor = db.collection(source.collection).find(source.query);
-  let indexed = 0;
   for await (const raw of cursor) {
     const doc = source.transform(raw);
-    if (!doc.content.trim()) continue;
-    const current = await target.findOne(
-      { sourceType: doc.sourceType, sourceId: doc.sourceId },
-      { projection: { contentHash: 1, embeddingModel: 1 } },
-    );
-    if (current?.contentHash === doc.contentHash && current?.embeddingModel === MODEL) continue;
-    const vector = await embed(doc.content);
-    await target.updateOne(
-      { sourceType: doc.sourceType, sourceId: doc.sourceId },
-      {
-        $set: { ...doc, embedding: vector, embeddingModel: MODEL, indexedAt: new Date() },
-        $setOnInsert: { createdAt: new Date() },
-      },
-      { upsert: true },
-    );
-    indexed += 1;
-    if (indexed % 25 === 0) console.log(`[Kaori RAG] ${source.sourceType}: ${indexed} indexed`);
+    validIds.push(doc.sourceId);
+    const current = existingById.get(doc.sourceId);
+    if (
+      doc.content.trim() &&
+      (current?.contentHash !== doc.contentHash || current?.embeddingModel !== MODEL)
+    ) {
+      documents.push(doc);
+    }
   }
-  const validIds = await db.collection(source.collection).distinct('_id', source.query);
+
+  let indexed = 0;
+  const batchSize = Number(process.env.KAORI_RAG_BATCH_SIZE || 16);
+  for (let offset = 0; offset < documents.length; offset += batchSize) {
+    const batch = documents.slice(offset, offset + batchSize);
+    const vectors = await embedMany(batch.map((doc) => doc.content));
+    const now = new Date();
+    await target.bulkWrite(
+      batch.map((doc, index) => ({
+        updateOne: {
+          filter: { sourceType: doc.sourceType, sourceId: doc.sourceId },
+          update: {
+            $set: { ...doc, embedding: vectors[index], embeddingModel: MODEL, indexedAt: now },
+            $setOnInsert: { createdAt: now },
+          },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    );
+    indexed += batch.length;
+    console.log(`[Kaori RAG] ${source.sourceType}: ${indexed}/${documents.length} indexed`);
+  }
   const deleted = await target.deleteMany({
     sourceType: source.sourceType,
-    sourceId: { $nin: validIds.map(String) },
+    sourceId: { $nin: validIds },
   });
   return { indexed, deleted: deleted.deletedCount };
 }
