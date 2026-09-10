@@ -7,6 +7,7 @@ const { EDGE_COLLECTION } = require('../companion-graph/graph');
 const { normalizeIdentityPart } = require('../services/riders/editorialRider');
 
 const GENERATOR = 'phase3-v1';
+const AMBIGUOUS_FILM_TERMS = new Set(['air', 'drop in', 'impossible', 'ollie', 'search']);
 
 function edgeId(from, relation, to, evidenceKey = '') {
   return crypto
@@ -62,12 +63,25 @@ async function buildEdges(db) {
 
   const edges = [];
   const trickById = new Map(tricks.map((trick) => [String(trick._id), trick]));
-  const trickByName = new Map();
+  const tricksByName = new Map();
   for (const trick of tricks) {
     for (const name of [trick.name, ...(trick.aliases || [])]) {
-      trickByName.set(normalizeIdentityPart(name), trick);
+      const normalized = normalizeIdentityPart(name);
+      const matches = tricksByName.get(normalized) || [];
+      matches.push(trick);
+      tricksByName.set(normalized, matches);
     }
   }
+  const resolveTrickName = (name, preferredCategory) => {
+    const matches = tricksByName.get(normalizeIdentityPart(name)) || [];
+    return (
+      matches.find(
+        (trick) =>
+          preferredCategory &&
+          String(trick.category).toLowerCase() === preferredCategory.toLowerCase(),
+      ) || matches[0]
+    );
+  };
 
   for (const trick of tricks) {
     const to = { type: 'Trick', id: String(trick._id), label: trick.name };
@@ -141,9 +155,11 @@ async function buildEdges(db) {
       .filter(Boolean)
       .join(' ');
     for (const trick of tricks) {
-      const matchedName = [trick.name, ...(trick.aliases || [])].find((name) =>
-        mentions(searchable, name),
-      );
+      const canonical = normalizeIdentityPart(trick.name);
+      const matchedName =
+        !AMBIGUOUS_FILM_TERMS.has(canonical) && mentions(searchable, trick.name)
+          ? trick.name
+          : null;
       if (!matchedName) continue;
       edges.push(
         edge(
@@ -162,7 +178,7 @@ async function buildEdges(db) {
   for (const rider of riders) {
     for (const signature of rider.signatureTricks || []) {
       const name = typeof signature === 'string' ? signature : signature.name;
-      const trick = trickByName.get(normalizeIdentityPart(name));
+      const trick = resolveTrickName(name, rider.primarySport);
       if (!trick) continue;
       edges.push(
         edge(
@@ -190,7 +206,9 @@ async function buildEdges(db) {
   }
 
   for (const record of history) {
-    const trick = trickByName.get(normalizeIdentityPart(record.trickName));
+    // Spot trick history is currently a skateboarding dataset. Prefer that
+    // node when names such as "Ollie" exist in multiple sport taxonomies.
+    const trick = resolveTrickName(record.trickName, 'Skateboarding');
     if (!trick || !record.spotId) continue;
     edges.push(
       edge(

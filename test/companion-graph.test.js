@@ -18,6 +18,7 @@ test('explicit trick mentions require word boundaries and useful names', () => {
   assert.equal(mentions('The rider was airing over the hip', 'air'), false);
   assert.equal(mentions('A frontside boardslide', 'boardslide'), true);
   assert.equal(mentions('A dashboard slide', 'boardslide'), false);
+  assert.equal(mentions('A trip through Japan', 'Japan Grab'), false);
 });
 
 test('cosine scores normalized embedding similarity', () => {
