@@ -81,7 +81,7 @@ module.exports = (db) => {
       });
 
       const payload = ticket.getPayload();
-      const { email, name, picture } = payload;
+      const { email, name, picture, email_verified } = payload;
 
       let user = await usersCollection.findOne({ email: email });
       if (!user) {
@@ -103,9 +103,20 @@ module.exports = (db) => {
           ...newUser,
         };
       } else {
-        const existingProvider = getAuthProvider(user);
-        if (existingProvider && existingProvider !== PROVIDERS.GOOGLE) {
-          return res.status(409).send(providerMismatch(existingProvider));
+        // Account linking (SSO ↔ SSO only): if this email already has an
+        // account under a different SSO provider (Apple), link Google to it
+        // instead of rejecting — but ONLY when Google has verified the email,
+        // and NEVER auto-link into a password account.
+        if (!user.isGoogleSSO) {
+          const existingProvider = getAuthProvider(user);
+          if (existingProvider === PROVIDERS.PASSWORD) {
+            return res.status(409).send(providerMismatch(existingProvider));
+          }
+          if (!email_verified) {
+            return res.status(409).send(providerMismatch(existingProvider || PROVIDERS.GOOGLE));
+          }
+          await usersCollection.updateOne({ _id: user._id }, { $set: { isGoogleSSO: true } });
+          user.isGoogleSSO = true;
         }
         // Existing user: only BACKFILL SSO fields we don't already have — never
         // clobber a name or avatar the user has customized in the app. Previously
@@ -175,11 +186,15 @@ module.exports = (db) => {
           ...newUser,
         };
       } else if (!user.appleUserId) {
+        // Account linking (SSO ↔ SSO only): link Apple to an existing Google
+        // account (Apple always verifies the email). Never auto-link into a
+        // password account.
         const existingProvider = getAuthProvider(user);
-        if (existingProvider && existingProvider !== PROVIDERS.APPLE) {
+        if (existingProvider === PROVIDERS.PASSWORD) {
           return res.status(409).send(providerMismatch(existingProvider));
         }
         await usersCollection.updateOne({ _id: user._id }, { $set: { appleUserId: appleUserId } });
+        user.appleUserId = appleUserId;
       }
 
       const token = jwt.sign(

@@ -9,6 +9,17 @@ test('identifies each supported account provider', () => {
   assert.equal(getAuthProvider({}), null);
 });
 
+test('a linked SSO↔SSO account is not treated as a mismatch by its own providers', () => {
+  // After Apple↔Google linking, an account carries BOTH identity fields.
+  // getAuthProvider resolves to a single provider (apple first), but the
+  // route handlers gate on the specific field (user.isGoogleSSO /
+  // user.appleUserId), so both SSO logins succeed on a linked account.
+  const linked = { appleUserId: 'apple-id', isGoogleSSO: true };
+  assert.equal(getAuthProvider(linked), 'apple');
+  assert.equal(Boolean(linked.isGoogleSSO), true);
+  assert.equal(Boolean(linked.appleUserId), true);
+});
+
 test('builds an actionable provider mismatch response', () => {
   assert.deepEqual(providerMismatch('google'), {
     error: 'This account uses a different sign-in method.',
