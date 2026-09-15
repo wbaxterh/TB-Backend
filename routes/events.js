@@ -39,7 +39,18 @@ module.exports = (db) => {
   // GET /api/events — filtered, cursor-paginated list
   router.get('/', async (req, res) => {
     try {
-      const { q, sport, discipline, location, date, intent, registration, view } = req.query;
+      const {
+        q,
+        sport,
+        discipline,
+        location,
+        date,
+        intent,
+        registration,
+        view,
+        organizer,
+        series,
+      } = req.query;
       const cursor = Math.max(0, parseInt(req.query.cursor, 10) || 0);
 
       const now = new Date();
@@ -68,6 +79,8 @@ module.exports = (db) => {
       }
       if (sport && sport !== 'all') and.push({ sports: sport });
       if (discipline && discipline !== 'all') and.push({ disciplines: discipline });
+      if (organizer) and.push({ 'organizer.name': organizer });
+      if (series) and.push({ series });
       if (location) {
         const rx = { $regex: escapeRegex(location), $options: 'i' };
         and.push({
@@ -100,6 +113,21 @@ module.exports = (db) => {
       res.json({ events: docs, nextCursor, totalCount });
     } catch (err) {
       console.error('Error listing events', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  // GET /api/events/saved — saved event IDs for the current user
+  router.get('/saved', auth, async (req, res) => {
+    try {
+      const docs = await saves
+        .find({ userId: req.user.userId })
+        .project({ _id: 0, eventId: 1 })
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.json({ eventIds: docs.map((save) => save.eventId) });
+    } catch (err) {
+      console.error('Error listing saved events', err);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
