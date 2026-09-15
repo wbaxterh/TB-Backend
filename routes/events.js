@@ -39,7 +39,18 @@ module.exports = (db) => {
   // GET /api/events — filtered, cursor-paginated list
   router.get('/', async (req, res) => {
     try {
-      const { q, sport, discipline, location, date, intent, registration, view } = req.query;
+      const {
+        q,
+        sport,
+        discipline,
+        location,
+        date,
+        intent,
+        registration,
+        view,
+        organizer,
+        series,
+      } = req.query;
       const cursor = Math.max(0, parseInt(req.query.cursor, 10) || 0);
 
       const now = new Date();
@@ -68,6 +79,8 @@ module.exports = (db) => {
       }
       if (sport && sport !== 'all') and.push({ sports: sport });
       if (discipline && discipline !== 'all') and.push({ disciplines: discipline });
+      if (organizer) and.push({ 'organizer.name': organizer });
+      if (series) and.push({ series });
       if (location) {
         const rx = { $regex: escapeRegex(location), $options: 'i' };
         and.push({
