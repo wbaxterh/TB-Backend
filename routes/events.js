@@ -104,6 +104,21 @@ module.exports = (db) => {
     }
   });
 
+  // GET /api/events/saved — saved event IDs for the current user
+  router.get('/saved', auth, async (req, res) => {
+    try {
+      const docs = await saves
+        .find({ userId: req.user.userId })
+        .project({ _id: 0, eventId: 1 })
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.json({ eventIds: docs.map((save) => save.eventId) });
+    } catch (err) {
+      console.error('Error listing saved events', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
   // GET /api/events/:slugOrId — single event
   router.get('/:slugOrId', async (req, res) => {
     try {
