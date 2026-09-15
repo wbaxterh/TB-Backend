@@ -125,6 +125,7 @@ async function startServer() {
   app.use('/api/spots', require('./routes/spots')(db));
   app.use('/api/spotlists', require('./routes/spotlists')(db));
   app.use('/api/events', require('./routes/events')(db));
+  app.use('/api/shops', require('./routes/shops')(db));
   app.use('/api/payments', require('./routes/payments')(db));
   app.use('/api/media', require('./routes/media')(db));
   app.use('/api/feed', require('./routes/feed')(db));
