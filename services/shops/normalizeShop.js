@@ -98,6 +98,10 @@ const schema = Joi.object({
         imageUrl: Joi.string()
           .uri({ scheme: ['http', 'https'] })
           .allow(''),
+        riderSlug: Joi.string()
+          .lowercase()
+          .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+          .optional(),
       }),
     )
     .max(30)

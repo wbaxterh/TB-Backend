@@ -160,3 +160,64 @@ test('rejects teamRiders with invalid URL schemes', () => {
     (error) => error.code === 'INVALID_SHOP',
   );
 });
+
+test('normalizes a shop with teamRiders including optional riderSlug', () => {
+  const shop = normalizeShop({
+    name: 'Linked Rider Shop',
+    slug: 'linked-rider-shop',
+    sports: ['skateboarding'],
+    address: { city: 'San Diego', country: 'USA' },
+    sourceUrl: 'https://example.com/linked',
+    teamRiders: [
+      {
+        name: 'Tony Hawk',
+        role: 'legend',
+        riderSlug: 'tony-hawk-skateboarding',
+      },
+      {
+        name: 'Unknown Rider',
+        role: 'amateur',
+      },
+    ],
+  });
+  assert.equal(shop.teamRiders.length, 2);
+  assert.equal(shop.teamRiders[0].riderSlug, 'tony-hawk-skateboarding');
+  assert.equal(shop.teamRiders[1].riderSlug, undefined);
+});
+
+test('rejects teamRiders with invalid riderSlug format', () => {
+  assert.throws(
+    () =>
+      normalizeShop({
+        name: 'Bad Slug Shop',
+        slug: 'bad-slug-shop',
+        sports: ['skateboarding'],
+        address: { city: 'Phoenix', country: 'USA' },
+        sourceUrl: 'https://example.com',
+        teamRiders: [
+          {
+            name: 'Bad Slug Rider',
+            riderSlug: 'Invalid Slug With Spaces',
+          },
+        ],
+      }),
+    (error) => error.code === 'INVALID_SHOP',
+  );
+});
+
+test('accepts valid kebab-case riderSlug', () => {
+  const shop = normalizeShop({
+    name: 'Valid Slug Shop',
+    slug: 'valid-slug-shop',
+    sports: ['skateboarding'],
+    address: { city: 'Austin', country: 'USA' },
+    sourceUrl: 'https://example.com',
+    teamRiders: [
+      {
+        name: 'Test Rider',
+        riderSlug: 'test-rider-skateboarding-2026',
+      },
+    ],
+  });
+  assert.equal(shop.teamRiders[0].riderSlug, 'test-rider-skateboarding-2026');
+});

@@ -2,6 +2,11 @@ const express = require('express');
 const { ObjectId } = require('mongodb');
 const escapeRegex = require('../utils/escapeRegex');
 const auth = require('../middleware/auth');
+const {
+  fetchPublishedRiderSlugMap,
+  enrichShopsTeamRiders,
+  enrichShopTeamRiders,
+} = require('../services/shops/riderMatcher');
 
 const DEFAULT_LIMIT = 24;
 const MAX_LIMIT = 60;
@@ -61,6 +66,7 @@ module.exports = (db) => {
   const shops = db.collection('shops');
   const shopComments = db.collection('shop_comments');
   const users = db.collection('users');
+  const riders = db.collection('riders');
 
   shops.createIndex({ slug: 1 }, { unique: true, background: true }).catch(() => {});
   shops.createIndex({ status: 1, featured: -1, name: 1 }, { background: true }).catch(() => {});
@@ -133,18 +139,22 @@ module.exports = (db) => {
       }
 
       const filter = { $and: and };
-      const totalCount = await shops.countDocuments(filter);
-      const docs = await shops
-        .find(filter)
-        .project(PUBLIC_SHOP_PROJECTION)
-        .sort({ featured: -1, name: 1, _id: 1 })
-        .skip(parsed.cursor)
-        .limit(parsed.limit)
-        .toArray();
+      const [totalCount, docs, riderSlugMap] = await Promise.all([
+        shops.countDocuments(filter),
+        shops
+          .find(filter)
+          .project(PUBLIC_SHOP_PROJECTION)
+          .sort({ featured: -1, name: 1, _id: 1 })
+          .skip(parsed.cursor)
+          .limit(parsed.limit)
+          .toArray(),
+        fetchPublishedRiderSlugMap(riders),
+      ]);
+      const enrichedShops = enrichShopsTeamRiders(docs, riderSlugMap);
       const nextCursor =
         parsed.cursor + docs.length < totalCount ? String(parsed.cursor + docs.length) : null;
 
-      res.json({ shops: docs, nextCursor, totalCount });
+      res.json({ shops: enrichedShops, nextCursor, totalCount });
     } catch (error) {
       console.error('Error listing shops', error);
       res.status(500).json({ error: 'Internal Server Error' });
@@ -157,12 +167,13 @@ module.exports = (db) => {
       const { slugOrId } = req.params;
       const or = [{ slug: slugOrId }];
       if (ObjectId.isValid(slugOrId)) or.push({ _id: new ObjectId(slugOrId) });
-      const shop = await shops.findOne(
-        { status: 'published', $or: or },
-        { projection: PUBLIC_SHOP_PROJECTION },
-      );
+      const [shop, riderSlugMap] = await Promise.all([
+        shops.findOne({ status: 'published', $or: or }, { projection: PUBLIC_SHOP_PROJECTION }),
+        fetchPublishedRiderSlugMap(riders),
+      ]);
       if (!shop) return res.status(404).json({ error: 'Shop not found' });
-      res.json({ shop });
+      const enrichedShop = enrichShopTeamRiders(shop, riderSlugMap);
+      res.json({ shop: enrichedShop });
     } catch (error) {
       console.error('Error fetching shop', error);
       res.status(500).json({ error: 'Internal Server Error' });
