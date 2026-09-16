@@ -40,10 +40,12 @@ function createDb(items, capture = {}) {
     collection(name) {
       assert.equal(name, 'shops');
       return {
-        dropIndex() {
+        dropIndex(name) {
+          capture.droppedIndex = name;
           return Promise.resolve();
         },
-        createIndex() {
+        createIndex(specification) {
+          capture.createdIndexes = [...(capture.createdIndexes || []), specification];
           return Promise.resolve();
         },
         countDocuments(filter) {
@@ -110,6 +112,9 @@ test('shop list applies public filters, pagination, and safe projection', async 
   assert.deepEqual(capture.filter.$and[2], { services: 'gear' });
   assert.deepEqual(capture.projection, PUBLIC_SHOP_PROJECTION);
   assert.equal(capture.limit, 10);
+  assert.equal(capture.droppedIndex, 'sports_1_services_1');
+  assert.ok(capture.createdIndexes.some((index) => index.sports === 1));
+  assert.ok(capture.createdIndexes.some((index) => index.services === 1));
 });
 
 test('shop list rejects unsupported sport and service values', async () => {
