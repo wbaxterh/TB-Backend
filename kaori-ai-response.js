@@ -102,6 +102,67 @@ async function callTool(toolName, args, db, senderId) {
   return executeToolCall(toolName, args, db, senderId);
 }
 
+// Max cards attached to a single reply, and per card type, to avoid spamming
+// the chat when the model runs several searches.
+const MAX_CARDS = 6;
+const MAX_PER_TYPE = 4;
+
+/**
+ * Map a tool's structured result into in-app richContent cards and append them
+ * to `out` (deduped by type+id, capped). The mobile RichContentCard renderer
+ * turns these into tappable previews that deep-link into the app:
+ *   video_card → /(tabs)/media/video/:id
+ *   trick_card → /(tabs)/trickbook/:id
+ *   spot_card  → /(tabs)/spots/:id
+ */
+function accumulateCards(out, toolName, result) {
+  if (!result || result.error) return;
+  const has = (type, id) => out.some((c) => c.type === type && c.data?._id === id);
+  const countOfType = (type) => out.filter((c) => c.type === type).length;
+  const add = (type, data) => {
+    if (!data?._id) return;
+    if (out.length >= MAX_CARDS || countOfType(type) >= MAX_PER_TYPE) return;
+    if (has(type, data._id)) return;
+    out.push({ type, data });
+  };
+
+  if (toolName === 'search_films') {
+    for (const f of result.results || []) {
+      add('video_card', {
+        _id: f.id,
+        title: f.title,
+        thumbnailUrl: f.thumbnailUrl || undefined,
+        producedBy: f.producedBy || undefined,
+        releaseYear: f.releaseYear || undefined,
+        sportTypes: f.sportTypes || undefined,
+      });
+    }
+  } else if (toolName === 'search_trickipedia') {
+    for (const t of result.results || []) {
+      add('trick_card', {
+        _id: t.id,
+        name: t.name,
+        difficulty: t.difficulty || undefined,
+        description: t.description || undefined,
+      });
+    }
+  } else if (toolName === 'recommend_next_trick') {
+    for (const t of result.recommendations || []) {
+      add('trick_card', { _id: t.id, name: t.name, difficulty: t.difficulty || undefined });
+    }
+  } else if (toolName === 'search_spots') {
+    for (const s of result.results || []) {
+      add('spot_card', {
+        _id: s.id,
+        name: s.name,
+        category: s.category || undefined,
+        rating: s.rating,
+        address: [s.city, s.state].filter(Boolean).join(', ') || undefined,
+      });
+    }
+  }
+}
+
 async function callOpenRouter(
   messages,
   ragContext,
@@ -111,6 +172,7 @@ async function callOpenRouter(
   extraSystemPrompt = '',
   accountFirstName = '',
   character = kaoriCharacter,
+  richContentOut = null,
 ) {
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -232,6 +294,11 @@ ${ragContext}`;
             tool_call_id: toolCall.id,
             content: JSON.stringify(result),
           });
+
+          // Accumulate in-app cards from the tool's structured result so the
+          // mobile chat can deep-link into films/tricks/spots instead of the
+          // model typing raw website URLs into the message body.
+          if (richContentOut) accumulateCards(richContentOut, toolCall.function.name, result);
         }
 
         // Continue loop — model will see tool results and either call more tools or respond
@@ -447,6 +514,7 @@ async function generateCompanionResponse(userMessage, db, conversationId, sender
     options.onStage ? character.stageDemo || '' : '',
     accountFirstName,
     character,
+    options.richContentOut || null,
   );
   if (response) {
     return response;
