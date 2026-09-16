@@ -49,9 +49,15 @@ const PUBLIC_TOOLS = [
     'Search upcoming action-sports competitions, premieres, community events, and sessions in TrickBook.',
     {
       query: { type: 'string', description: 'Event, series, or organizer name' },
-      sport: { type: 'string', description: 'Sport, such as snowboarding, skateboarding, surfing, BMX, or skiing' },
+      sport: {
+        type: 'string',
+        description: 'Sport, such as snowboarding, skateboarding, surfing, BMX, or skiing',
+      },
       location: { type: 'string', description: 'City, state/region, or country' },
-      registration_open: { type: 'boolean', description: 'Only return events with open registration' },
+      registration_open: {
+        type: 'boolean',
+        description: 'Only return events with open registration',
+      },
       limit: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
     },
   ),
@@ -68,10 +74,12 @@ const jsonSafe = (value) => JSON.parse(JSON.stringify(value));
 
 async function getSpot(args, db) {
   if (!ObjectId.isValid(args.id)) throw new Error('Invalid spot ID');
-  const spot = await db.collection('spots').findOne(
-    { _id: new ObjectId(args.id), approvalStatus: 'approved' },
-    { projection: { userId: 0, userPhotos: 0, submittedBy: 0, submittedAt: 0 } },
-  );
+  const spot = await db
+    .collection('spots')
+    .findOne(
+      { _id: new ObjectId(args.id), approvalStatus: 'approved' },
+      { projection: { userId: 0, userPhotos: 0, submittedBy: 0, submittedAt: 0 } },
+    );
   if (!spot) throw new Error('Spot not found');
   return { spot: jsonSafe(spot), source_url: `${API_BASE}/spots/${spot._id}` };
 }
@@ -92,7 +100,15 @@ async function getTrick(args, db) {
 
 async function searchEvents(args, db) {
   const now = new Date();
-  const and = [{ $or: [{ endAt: { $gte: now } }, { endAt: null, startAt: { $gte: now } }, { endAt: { $exists: false }, startAt: { $gte: now } }] }];
+  const and = [
+    {
+      $or: [
+        { endAt: { $gte: now } },
+        { endAt: null, startAt: { $gte: now } },
+        { endAt: { $exists: false }, startAt: { $gte: now } },
+      ],
+    },
+  ];
   const query = clean(args.query);
   if (query) {
     const rx = { $regex: escapeRegex(query), $options: 'i' };
@@ -107,7 +123,12 @@ async function searchEvents(args, db) {
   }
   if (args.registration_open === true) and.push({ 'participation.registrationStatus': 'open' });
   const limit = Math.min(10, Math.max(1, Number.parseInt(args.limit, 10) || 5));
-  const events = await db.collection('events').find({ $and: and }).sort({ startAt: 1 }).limit(limit).toArray();
+  const events = await db
+    .collection('events')
+    .find({ $and: and })
+    .sort({ startAt: 1 })
+    .limit(limit)
+    .toArray();
   return {
     results: events.map((event) => ({
       id: String(event._id),
@@ -119,7 +140,9 @@ async function searchEvents(args, db) {
       venue: event.venue || null,
       organizer: event.organizer || null,
       registrationStatus: event.participation?.registrationStatus || null,
-      source_url: event.slug ? `${WEB_BASE}/events/${event.slug}` : `${API_BASE}/events/${event._id}`,
+      source_url: event.slug
+        ? `${WEB_BASE}/events/${event.slug}`
+        : `${API_BASE}/events/${event._id}`,
     })),
     total_returned: events.length,
   };
