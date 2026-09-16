@@ -141,6 +141,8 @@ async function startServer() {
   app.use('/api/stats', require('./routes/stats')(db));
   app.use('/api/analytics', require('./routes/analytics')(db));
   app.use('/api/recommendations', require('./routes/recommendations')(db));
+  // Public, read-only Streamable HTTP MCP endpoint for ChatGPT, Claude, and other agents.
+  app.use('/mcp', require('./mcp/public-router')(db));
 
   // Notification subsystem — initialize sender/planner (creates indexes) and
   // start the receipts poller + reminder sender workers.
