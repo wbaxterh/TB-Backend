@@ -372,6 +372,7 @@ async function resolveProgression(db, edges) {
       const d = e.trickId && byId[e.trickId.toString()];
       if (!d) return null;
       return {
+        id: d._id.toString(),
         name: d.name,
         difficulty: d.difficulty || '',
         strength: e.strength || undefined,
@@ -480,6 +481,7 @@ async function searchFilms(args, db) {
         releaseYear: f.releaseYear || '',
         sportTypes: f.sportTypes || [],
         description: f.description ? f.description.substring(0, 180) : '',
+        thumbnailUrl: f.thumbnails?.poster || f.thumbnails?.backdrop || '',
         webUrl: filmUrl(f),
       })),
       total: films.length,
@@ -589,6 +591,7 @@ async function recommendNextTrick(args, db, senderId) {
     return {
       basis: 'starter tricks (no landed tricks on record yet)',
       recommendations: starters.map((t) => ({
+        id: t._id.toString(),
         name: t.name,
         difficulty: t.difficulty || '',
         url: trickUrl(t),

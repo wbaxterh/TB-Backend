@@ -2,6 +2,7 @@ const express = require('express');
 const { ObjectId } = require('mongodb');
 const auth = require('../middleware/auth');
 const escapeRegex = require('../utils/escapeRegex');
+const { enqueueGraphEventBestEffort } = require('../services/graph/outbox');
 
 const EDGE_STATUSES = new Set(['draft', 'reviewed', 'published', 'disputed']);
 const EDGE_CONFIDENCE = new Set(['high', 'medium', 'low']);
@@ -369,6 +370,12 @@ module.exports = (db) => {
 
       const result = await trickipediaCollection.insertOne(trick);
       trick._id = result.insertedId;
+      await enqueueGraphEventBestEffort(db, {
+        type: 'trick.upserted',
+        aggregateType: 'Trick',
+        aggregateId: trick._id,
+        version: trick.updatedAt.toISOString(),
+      });
 
       res.status(201).json(trick);
     } catch (error) {
@@ -411,6 +418,13 @@ module.exports = (db) => {
         return res.status(404).json({ message: 'Trick not found' });
       }
 
+      await enqueueGraphEventBestEffort(db, {
+        type: 'trick.upserted',
+        aggregateType: 'Trick',
+        aggregateId: req.params.id,
+        version: update.updatedAt.toISOString(),
+      });
+
       res.json(result.value);
     } catch (error) {
       console.error(error);
@@ -437,6 +451,13 @@ module.exports = (db) => {
       if (result.deletedCount === 0) {
         return res.status(404).json({ message: 'Trick not found' });
       }
+
+      await enqueueGraphEventBestEffort(db, {
+        type: 'trick.deleted',
+        aggregateType: 'Trick',
+        aggregateId: req.params.id,
+        version: new Date().toISOString(),
+      });
 
       res.json({ message: 'Trick deleted successfully' });
     } catch (error) {
