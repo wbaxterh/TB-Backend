@@ -52,7 +52,11 @@ module.exports = (db) => {
 
   shops.createIndex({ slug: 1 }, { unique: true, background: true }).catch(() => {});
   shops.createIndex({ status: 1, featured: -1, name: 1 }, { background: true }).catch(() => {});
-  shops.createIndex({ sports: 1, services: 1 }, { background: true }).catch(() => {});
+  // MongoDB cannot maintain a compound index when both fields are arrays.
+  // Remove the original empty-collection index and index each filter separately.
+  shops.dropIndex('sports_1_services_1').catch(() => {});
+  shops.createIndex({ sports: 1 }, { background: true }).catch(() => {});
+  shops.createIndex({ services: 1 }, { background: true }).catch(() => {});
   shops.createIndex({ 'address.location': '2dsphere' }, { background: true }).catch(() => {});
 
   // GET /api/shops - public, filtered, cursor-paginated shop directory.

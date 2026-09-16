@@ -40,6 +40,9 @@ function createDb(items, capture = {}) {
     collection(name) {
       assert.equal(name, 'shops');
       return {
+        dropIndex() {
+          return Promise.resolve();
+        },
         createIndex() {
           return Promise.resolve();
         },
