@@ -7,6 +7,7 @@ const authAdmin = require('../middleware/authAdmin');
 const _listingMapper = require('../mappers/listings');
 
 const ObjectId = require('mongodb').ObjectId;
+const { enqueueGraphEventBestEffort } = require('../services/graph/outbox');
 
 module.exports = (db) => {
   const router = express.Router();
@@ -214,7 +215,33 @@ module.exports = (db) => {
     const filter2 = { _id: new ObjectId(req.body._id) };
     const update = { $set: { checked: req.body.checked, updatedAt: new Date() } };
     try {
-      const _updateResult = await trickCollection.findOneAndUpdate(filter2, update);
+      await trickCollection.findOneAndUpdate(filter2, update);
+      const personalTrick = await trickCollection.findOne(filter2, { projection: { name: 1 } });
+      const canonical = personalTrick?.name
+        ? await db.collection('trickipedia').findOne(
+            {
+              name: {
+                $regex: `^${personalTrick.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+                $options: 'i',
+              },
+            },
+            { projection: { _id: 1, name: 1 } },
+          )
+        : null;
+      if (canonical) {
+        await enqueueGraphEventBestEffort(db, {
+          type: 'rider.trick-status-changed',
+          aggregateType: 'Rider',
+          aggregateId: req.user.userId,
+          version: `${req.body._id}:${update.$set.updatedAt.toISOString()}`,
+          payload: {
+            riderId: String(req.user.userId),
+            trickId: String(canonical._id),
+            trickName: canonical.name,
+            landed: String(req.body.checked).toLowerCase() === 'landed',
+          },
+        });
+      }
       return res.status(200).send('Success!');
     } catch (error) {
       console.log(error);

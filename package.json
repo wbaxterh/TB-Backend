@@ -19,8 +19,9 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "test": "node --test test",
+    "test": "node --test test/*.test.js",
     "smoke": "node --check index.js",
+    "graph:rebuild": "node scripts/rebuild-progression-graph.js --execute",
     "validate": "biome check . && npm test && npm run smoke",
     "prepare": "husky"
   },
