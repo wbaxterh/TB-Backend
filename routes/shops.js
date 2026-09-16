@@ -32,6 +32,7 @@ const PUBLIC_SHOP_PROJECTION = {
   reviewSummary: 1,
   faqs: 1,
   pressFeatures: 1,
+  teamRiders: 1,
   hours: 1,
   socialLinks: 1,
   verified: 1,
