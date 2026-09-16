@@ -140,6 +140,10 @@ module.exports = (db) => {
           console.error('ElizaOS API error:', elizaError.message);
         }
       }
+      // Collects in-app cards (film/trick/spot previews) built from Kaori's
+      // tool results, so the reply deep-links into the app instead of showing
+      // raw website URLs. Populated inside generateCompanionResponse.
+      const richContent = [];
       if (!botResponse && isRegisteredCompanion) {
         try {
           const { generateCompanionResponse } = require('../kaori-ai-response');
@@ -149,6 +153,7 @@ module.exports = (db) => {
             botId,
             characterId,
             onStage: isKaori && Boolean(kithSessionId),
+            richContentOut: richContent,
           });
         } catch (fallbackErr) {
           console.error('Kaori fallback error:', fallbackErr.message);
@@ -168,6 +173,7 @@ module.exports = (db) => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      if (richContent.length > 0) botMessage.richContent = richContent;
 
       const botMessageResult = await db.collection('bot_chats').insertOne(botMessage);
       botMessage._id = botMessageResult.insertedId;
