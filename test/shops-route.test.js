@@ -35,7 +35,20 @@ function createCursor(items, capture) {
   };
 }
 
-function createDb(items, capture = {}) {
+const DEFAULT_RIDERS = [
+  {
+    slug: 'jane-doe-skateboarding',
+    normalizedName: 'jane-doe',
+    normalizedAliases: ['jd', 'jane-d'],
+  },
+  {
+    slug: 'tony-hawk-skateboarding',
+    normalizedName: 'tony-hawk',
+    normalizedAliases: ['the-birdman'],
+  },
+];
+
+function createDb(items, capture = {}, ridersData = DEFAULT_RIDERS) {
   return {
     collection(name) {
       if (name === 'shops') {
@@ -60,6 +73,23 @@ function createDb(items, capture = {}) {
             capture.detailFilter = filter;
             capture.detailProjection = options.projection;
             return items.find((item) => item.slug === filter.$or[0].slug) || null;
+          },
+        };
+      }
+      if (name === 'riders') {
+        return {
+          find(filter) {
+            capture.ridersFilter = filter;
+            return {
+              project(projection) {
+                capture.ridersProjection = projection;
+                return {
+                  async toArray() {
+                    return ridersData;
+                  },
+                };
+              },
+            };
           },
         };
       }
@@ -201,4 +231,125 @@ test('shop list includes teamRiders in public projection', async () => {
   });
 
   assert.equal(capture.projection.teamRiders, 1);
+});
+
+test('shop list enriches teamRiders with riderSlug for matched riders', async () => {
+  const capture = {};
+  const db = createDb(
+    [
+      {
+        _id: 'shop-1',
+        name: 'Enriched Shop',
+        slug: 'enriched-shop',
+        sports: ['skateboarding'],
+        status: 'published',
+        teamRiders: [
+          { name: 'Jane Doe', role: 'team rider' },
+          { name: 'Unknown Rider', role: 'ambassador' },
+          { name: 'Tony Hawk', role: 'legend' },
+        ],
+      },
+    ],
+    capture,
+  );
+
+  await withServer(db, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/shops`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+
+    assert.equal(body.shops[0].teamRiders[0].name, 'Jane Doe');
+    assert.equal(body.shops[0].teamRiders[0].riderSlug, 'jane-doe-skateboarding');
+    assert.equal(body.shops[0].teamRiders[0].role, 'team rider');
+
+    assert.equal(body.shops[0].teamRiders[1].name, 'Unknown Rider');
+    assert.equal(body.shops[0].teamRiders[1].riderSlug, undefined);
+
+    assert.equal(body.shops[0].teamRiders[2].name, 'Tony Hawk');
+    assert.equal(body.shops[0].teamRiders[2].riderSlug, 'tony-hawk-skateboarding');
+  });
+
+  assert.deepEqual(capture.ridersFilter, { reviewStatus: 'published' });
+});
+
+test('shop detail enriches teamRiders with riderSlug for matched riders', async () => {
+  const capture = {};
+  const db = createDb(
+    [
+      {
+        _id: 'shop-1',
+        name: 'Detail Shop',
+        slug: 'detail-shop',
+        sports: ['skateboarding'],
+        status: 'published',
+        teamRiders: [
+          { name: 'Jane Doe', role: 'pro' },
+          { name: 'No Match', role: 'am' },
+        ],
+      },
+    ],
+    capture,
+  );
+
+  await withServer(db, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/shops/detail-shop`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+
+    assert.equal(body.shop.teamRiders[0].name, 'Jane Doe');
+    assert.equal(body.shop.teamRiders[0].riderSlug, 'jane-doe-skateboarding');
+
+    assert.equal(body.shop.teamRiders[1].name, 'No Match');
+    assert.equal(body.shop.teamRiders[1].riderSlug, undefined);
+  });
+});
+
+test('shop enrichment matches aliases (case-insensitive)', async () => {
+  const db = createDb([
+    {
+      _id: 'shop-1',
+      name: 'Alias Shop',
+      slug: 'alias-shop',
+      sports: ['skateboarding'],
+      status: 'published',
+      teamRiders: [
+        { name: 'The Birdman', role: 'legend' },
+        { name: 'JD', role: 'team' },
+      ],
+    },
+  ]);
+
+  await withServer(db, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/shops/alias-shop`);
+    const body = await response.json();
+
+    assert.equal(body.shop.teamRiders[0].riderSlug, 'tony-hawk-skateboarding');
+    assert.equal(body.shop.teamRiders[1].riderSlug, 'jane-doe-skateboarding');
+  });
+});
+
+test('shop enrichment does NOT fuzzy match close names', async () => {
+  const db = createDb([
+    {
+      _id: 'shop-1',
+      name: 'No Fuzzy Shop',
+      slug: 'no-fuzzy-shop',
+      sports: ['skateboarding'],
+      status: 'published',
+      teamRiders: [
+        { name: 'Jane Does', role: 'close but not exact' },
+        { name: 'Tony', role: 'partial name' },
+        { name: 'Tony Hawk Jr', role: 'extra text' },
+      ],
+    },
+  ]);
+
+  await withServer(db, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/shops/no-fuzzy-shop`);
+    const body = await response.json();
+
+    assert.equal(body.shop.teamRiders[0].riderSlug, undefined);
+    assert.equal(body.shop.teamRiders[1].riderSlug, undefined);
+    assert.equal(body.shop.teamRiders[2].riderSlug, undefined);
+  });
 });
