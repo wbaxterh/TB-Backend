@@ -70,3 +70,93 @@ test('rejects unsafe or incomplete shop records', () => {
     (error) => error.code === 'INVALID_SHOP',
   );
 });
+
+test('normalizes a shop with teamRiders', () => {
+  const shop = normalizeShop({
+    name: 'Team Skate Shop',
+    slug: 'team-skate-shop',
+    sports: ['skateboarding'],
+    address: { city: 'Los Angeles', country: 'USA' },
+    sourceUrl: 'https://example.com/team',
+    teamRiders: [
+      {
+        name: 'Jane Doe',
+        role: 'team rider',
+        profileUrl: 'https://example.com/riders/jane',
+        sourceUrl: 'https://example.com/team',
+        imageUrl: 'https://example.com/images/jane.jpg',
+      },
+      {
+        name: 'John Smith',
+        role: 'ambassador',
+      },
+    ],
+  });
+  assert.equal(shop.teamRiders.length, 2);
+  assert.equal(shop.teamRiders[0].name, 'Jane Doe');
+  assert.equal(shop.teamRiders[0].role, 'team rider');
+  assert.equal(shop.teamRiders[0].profileUrl, 'https://example.com/riders/jane');
+  assert.equal(shop.teamRiders[1].name, 'John Smith');
+  assert.equal(shop.teamRiders[1].role, 'ambassador');
+});
+
+test('teamRiders defaults to empty array when omitted', () => {
+  const shop = normalizeShop({
+    name: 'Simple Shop',
+    slug: 'simple-shop',
+    sports: ['skateboarding'],
+    address: { city: 'Chicago', country: 'USA' },
+    sourceUrl: 'https://example.com',
+  });
+  assert.deepEqual(shop.teamRiders, []);
+});
+
+test('rejects teamRiders with duplicate names (case-insensitive)', () => {
+  assert.throws(
+    () =>
+      normalizeShop({
+        name: 'Dupe Rider Shop',
+        slug: 'dupe-rider-shop',
+        sports: ['skateboarding'],
+        address: { city: 'Seattle', country: 'USA' },
+        sourceUrl: 'https://example.com',
+        teamRiders: [{ name: 'Alice Walker' }, { name: 'alice walker' }],
+      }),
+    (error) => error.code === 'INVALID_SHOP',
+  );
+});
+
+test('rejects teamRiders with name too short', () => {
+  assert.throws(
+    () =>
+      normalizeShop({
+        name: 'Short Name Shop',
+        slug: 'short-name-shop',
+        sports: ['skateboarding'],
+        address: { city: 'Denver', country: 'USA' },
+        sourceUrl: 'https://example.com',
+        teamRiders: [{ name: 'A' }],
+      }),
+    (error) => error.code === 'INVALID_SHOP',
+  );
+});
+
+test('rejects teamRiders with invalid URL schemes', () => {
+  assert.throws(
+    () =>
+      normalizeShop({
+        name: 'Bad URL Shop',
+        slug: 'bad-url-shop',
+        sports: ['skateboarding'],
+        address: { city: 'Miami', country: 'USA' },
+        sourceUrl: 'https://example.com',
+        teamRiders: [
+          {
+            name: 'Bad Rider',
+            profileUrl: 'ftp://example.com/rider',
+          },
+        ],
+      }),
+    (error) => error.code === 'INVALID_SHOP',
+  );
+});

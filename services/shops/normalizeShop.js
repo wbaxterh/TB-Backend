@@ -84,6 +84,25 @@ const schema = Joi.object({
     .max(20)
     .unique('url')
     .default([]),
+  teamRiders: Joi.array()
+    .items(
+      Joi.object({
+        name: Joi.string().trim().min(2).max(120).required(),
+        role: Joi.string().trim().max(80).allow(''),
+        profileUrl: Joi.string()
+          .uri({ scheme: ['http', 'https'] })
+          .allow(''),
+        sourceUrl: Joi.string()
+          .uri({ scheme: ['http', 'https'] })
+          .allow(''),
+        imageUrl: Joi.string()
+          .uri({ scheme: ['http', 'https'] })
+          .allow(''),
+      }),
+    )
+    .max(30)
+    .unique((a, b) => a.name.toLowerCase() === b.name.toLowerCase())
+    .default([]),
   hours: Joi.alternatives().try(Joi.string().max(1000), Joi.object()).optional(),
   socialLinks: Joi.object().pattern(Joi.string(), Joi.string().uri({ scheme: ['http', 'https'] })),
   verified: Joi.boolean().default(false),

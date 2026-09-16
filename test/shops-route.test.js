@@ -147,3 +147,39 @@ test('shop detail only returns a published record through the public projection'
   assert.equal(capture.detailFilter.status, 'published');
   assert.deepEqual(capture.detailProjection, PUBLIC_SHOP_PROJECTION);
 });
+
+test('PUBLIC_SHOP_PROJECTION includes teamRiders field', () => {
+  assert.equal(PUBLIC_SHOP_PROJECTION.teamRiders, 1);
+});
+
+test('shop list includes teamRiders in public projection', async () => {
+  const capture = {};
+  const db = createDb(
+    [
+      {
+        _id: 'shop-1',
+        name: 'Team Shop',
+        slug: 'team-shop',
+        sports: ['skateboarding'],
+        status: 'published',
+        teamRiders: [
+          { name: 'Jane Doe', role: 'team rider' },
+          { name: 'John Smith', role: 'ambassador' },
+        ],
+        internalNotes: 'private',
+      },
+    ],
+    capture,
+  );
+
+  await withServer(db, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/shops`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.shops[0].teamRiders.length, 2);
+    assert.equal(body.shops[0].teamRiders[0].name, 'Jane Doe');
+    assert.equal(body.shops[0].internalNotes, undefined);
+  });
+
+  assert.equal(capture.projection.teamRiders, 1);
+});
