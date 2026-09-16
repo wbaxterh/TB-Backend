@@ -15,6 +15,7 @@ const notificationSender = require('./services/notificationSender');
 const reminderPlanner = require('./services/reminderPlanner');
 const receiptsPoller = require('./workers/receiptsPoller');
 const reminderSender = require('./workers/reminderSender');
+const graphProjector = require('./workers/graphProjector');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -139,6 +140,7 @@ async function startServer() {
   app.use('/api/spot-tricks', require('./routes/spotTrickHistory')(db));
   app.use('/api/stats', require('./routes/stats')(db));
   app.use('/api/analytics', require('./routes/analytics')(db));
+  app.use('/api/recommendations', require('./routes/recommendations')(db));
 
   // Notification subsystem — initialize sender/planner (creates indexes) and
   // start the receipts poller + reminder sender workers.
@@ -146,6 +148,7 @@ async function startServer() {
   reminderPlanner.init(db);
   receiptsPoller.start(db);
   reminderSender.start(db);
+  await graphProjector.start(db);
 
   const port = process.env.PORT || config.get('port');
   server.listen(port, () => {
@@ -159,6 +162,7 @@ function gracefulShutdown(signal) {
   console.log(`${signal} received. Shutting down gracefully...`);
   receiptsPoller.stop();
   reminderSender.stop();
+  graphProjector.stop();
   server.close(async () => {
     await closeDatabase();
     process.exit(0);
