@@ -38,28 +38,47 @@ function createCursor(items, capture) {
 function createDb(items, capture = {}) {
   return {
     collection(name) {
-      assert.equal(name, 'shops');
+      if (name === 'shops') {
+        return {
+          dropIndex(indexName) {
+            capture.droppedIndex = indexName;
+            return Promise.resolve();
+          },
+          createIndex(specification) {
+            capture.createdIndexes = [...(capture.createdIndexes || []), specification];
+            return Promise.resolve();
+          },
+          countDocuments(filter) {
+            capture.countFilter = filter;
+            return Promise.resolve(items.length);
+          },
+          find(filter) {
+            capture.filter = filter;
+            return createCursor(items, capture);
+          },
+          async findOne(filter, options) {
+            capture.detailFilter = filter;
+            capture.detailProjection = options.projection;
+            return items.find((item) => item.slug === filter.$or[0].slug) || null;
+          },
+        };
+      }
       return {
-        dropIndex(name) {
-          capture.droppedIndex = name;
+        createIndex() {
           return Promise.resolve();
         },
-        createIndex(specification) {
-          capture.createdIndexes = [...(capture.createdIndexes || []), specification];
-          return Promise.resolve();
+        find() {
+          return {
+            project() {
+              return this;
+            },
+            toArray() {
+              return Promise.resolve([]);
+            },
+          };
         },
-        countDocuments(filter) {
-          capture.countFilter = filter;
-          return Promise.resolve(items.length);
-        },
-        find(filter) {
-          capture.filter = filter;
-          return createCursor(items, capture);
-        },
-        async findOne(filter, options) {
-          capture.detailFilter = filter;
-          capture.detailProjection = options.projection;
-          return items.find((item) => item.slug === filter.$or[0].slug) || null;
+        findOne() {
+          return Promise.resolve(null);
         },
       };
     },
