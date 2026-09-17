@@ -30,6 +30,7 @@ const _schema = {
 
 const ObjectId = require('mongodb').ObjectId;
 const { DBRef } = require('mongodb');
+const getDbRefId = require('../utils/dbRefId');
 
 module.exports = (db) => {
   const router = express.Router();
@@ -45,7 +46,7 @@ module.exports = (db) => {
   const userOwnsList = async (listId, userId) => {
     if (!ObjectId.isValid(listId)) return false;
     const list = await tricksCollection.findOne({ _id: new ObjectId(listId) });
-    const ownerId = list?.user?.oid ?? list?.user?.$id;
+    const ownerId = getDbRefId(list?.user);
     return !!ownerId && String(ownerId) === String(userId);
   };
 

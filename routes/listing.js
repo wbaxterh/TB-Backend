@@ -8,6 +8,7 @@ const _listingMapper = require('../mappers/listings');
 
 const ObjectId = require('mongodb').ObjectId;
 const { enqueueGraphEventBestEffort } = require('../services/graph/outbox');
+const getDbRefId = require('../utils/dbRefId');
 
 module.exports = (db) => {
   const router = express.Router();
@@ -25,12 +26,14 @@ module.exports = (db) => {
   const userOwnsTrickList = async (listId, userId) => {
     if (!ObjectId.isValid(listId)) return false;
     const list = await tricksCollection.findOne({ _id: new ObjectId(listId) });
-    return !!list && String(list.user?.$id) === String(userId);
+    const ownerId = getDbRefId(list?.user);
+    return !!ownerId && String(ownerId) === String(userId);
   };
   const userOwnsTrick = async (trickId, userId) => {
     if (!ObjectId.isValid(trickId)) return false;
     const list = await tricksCollection.findOne({ 'tricks._id': new ObjectId(trickId) });
-    return !!list && String(list.user?.$id) === String(userId);
+    const ownerId = getDbRefId(list?.user);
+    return !!ownerId && String(ownerId) === String(userId);
   };
 
   // Helper: populate spot data for tricks that have spotId
