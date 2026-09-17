@@ -24,15 +24,12 @@ const SPORT_CATEGORY_MAP = {
   wakeboarding: 'Wakeboarding',
 };
 
-const optionalUserId = (req) =>
-  verifyTokenWithGrace(req.header('x-auth-token'))?.userId || null;
+const optionalUserId = (req) => verifyTokenWithGrace(req.header('x-auth-token'))?.userId || null;
 
 async function personalizedOrder(db, tricks, userId) {
   if (!userId || !ObjectId.isValid(userId)) return tricks;
   const [user, recommendations] = await Promise.all([
-    db
-      .collection('users')
-      .findOne({ _id: new ObjectId(userId) }, { projection: { sports: 1 } }),
+    db.collection('users').findOne({ _id: new ObjectId(userId) }, { projection: { sports: 1 } }),
     mongoRecommendations(db, userId, '', 20),
   ]);
   const preferredCategories = new Set(
