@@ -1,7 +1,55 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const auth = require('../middleware/auth');
+const { verifyTokenWithGrace } = auth;
+const { mongoRecommendations } = require('../services/graph/recommendations');
 const escapeRegex = require('../utils/escapeRegex');
+
+const SPORT_CATEGORY_MAP = {
+  skateboard: 'Skateboarding',
+  skateboarding: 'Skateboarding',
+  snowboard: 'Snowboarding',
+  snowboarding: 'Snowboarding',
+  surf: 'Surfing',
+  surfing: 'Surfing',
+  bmx: 'BMX',
+  scooter: 'Scooter',
+  scootering: 'Scooter',
+  rollerblade: 'Inline Skating',
+  rollerblading: 'Inline Skating',
+  'inline skating': 'Inline Skating',
+  longboard: 'Longboarding',
+  longboarding: 'Longboarding',
+  wakeboard: 'Wakeboarding',
+  wakeboarding: 'Wakeboarding',
+};
+
+const optionalUserId = (req) =>
+  verifyTokenWithGrace(req.header('x-auth-token'))?.userId || null;
+
+async function personalizedOrder(db, tricks, userId) {
+  if (!userId || !ObjectId.isValid(userId)) return tricks;
+  const [user, recommendations] = await Promise.all([
+    db
+      .collection('users')
+      .findOne({ _id: new ObjectId(userId) }, { projection: { sports: 1 } }),
+    mongoRecommendations(db, userId, '', 20),
+  ]);
+  const preferredCategories = new Set(
+    (user?.sports || [])
+      .map((sport) => SPORT_CATEGORY_MAP[String(sport).toLowerCase()] || sport)
+      .filter(Boolean),
+  );
+  const recommendationScores = new Map(
+    recommendations.map((item) => [String(item.sourceId), Number(item.score || 1)]),
+  );
+  return [...tricks].sort((a, b) => {
+    const score = (trick) =>
+      (preferredCategories.has(trick.category) ? 100 : 0) +
+      (recommendationScores.get(String(trick._id)) || 0) * 10;
+    return score(b) - score(a) || a.name.localeCompare(b.name);
+  });
+}
 const { enqueueGraphEventBestEffort } = require('../services/graph/outbox');
 
 const EDGE_STATUSES = new Set(['draft', 'reviewed', 'published', 'disputed']);
@@ -215,12 +263,9 @@ module.exports = (db) => {
         query.$and = [...(query.$and || []), searchClause];
       }
 
-      const tricks = await trickipediaCollection
-        .find(query)
-        .sort({ name: 1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray();
+      let tricks = await trickipediaCollection.find(query).sort({ name: 1 }).toArray();
+      tricks = await personalizedOrder(db, tricks, optionalUserId(req));
+      tricks = tricks.slice(skip, skip + limit);
 
       res.json(tricks);
     } catch (error) {
