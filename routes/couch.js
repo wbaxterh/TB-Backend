@@ -147,7 +147,7 @@ module.exports = (db) => {
   // Get all videos (with optional filters)
   router.get('/videos', async (req, res) => {
     try {
-      const { sport, collection, type, sort = 'releaseYear', limit = 50, page = 1 } = req.query;
+      const { sport, collection, type, q, sort = 'releaseYear', limit = 50, page = 1 } = req.query;
       const query = { isPublished: true };
 
       if (sport && sport !== 'all') {
@@ -158,6 +158,18 @@ module.exports = (db) => {
       }
       if (type && type !== 'all') {
         query.type = type;
+      }
+      // Free-text search across the whole catalog (title/description/producer/riders/tags)
+      // so the mobile "Explore all" browser can find any video, not just films.
+      if (q && q.trim()) {
+        const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        query.$or = [
+          { title: { $regex: escaped, $options: 'i' } },
+          { description: { $regex: escaped, $options: 'i' } },
+          { producedBy: { $regex: escaped, $options: 'i' } },
+          { riders: { $regex: escaped, $options: 'i' } },
+          { tags: { $regex: escaped, $options: 'i' } },
+        ];
       }
 
       const sortOptions = {};
