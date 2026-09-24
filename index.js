@@ -140,6 +140,7 @@ async function startServer() {
   app.use('/api/spot-tricks', require('./routes/spotTrickHistory')(db));
   app.use('/api/stats', require('./routes/stats')(db));
   app.use('/api/analytics', require('./routes/analytics')(db));
+  app.use('/api/client', require('./routes/clientSystem')(db));
   app.use('/api/recommendations', require('./routes/recommendations')(db));
   // Public, read-only Streamable HTTP MCP endpoint for ChatGPT, Claude, and other agents.
   app.use('/mcp', require('./mcp/public-router')(db));
