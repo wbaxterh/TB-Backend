@@ -16,6 +16,7 @@ const reminderPlanner = require('./services/reminderPlanner');
 const receiptsPoller = require('./workers/receiptsPoller');
 const reminderSender = require('./workers/reminderSender');
 const graphProjector = require('./workers/graphProjector');
+const { applyCollectionSchemas, describeSummary } = require('./schemas/apply');
 
 const helmet = require('helmet');
 const compression = require('compression');
@@ -64,8 +65,10 @@ app.use(compression());
 app.use(bodyParser.json());
 
 // One-line request logger — keeps lock-screen/push debugging visible.
-// Skip noisy health checks. Safe to remove later if it gets too chatty.
+// Health probes are skipped so uptime checks do not flood the log.
+const HEALTH_PATHS = new Set(['/health', '/api/health']);
 app.use((req, res, next) => {
+  if (HEALTH_PATHS.has(req.path)) return next();
   const start = Date.now();
   res.on('finish', () => {
     const ms = Date.now() - start;
@@ -77,6 +80,9 @@ app.use((req, res, next) => {
 async function startServer() {
   // Connect to MongoDB FIRST — single shared connection
   const db = await connectToDatabase();
+
+  // Liveness/readiness probe: no auth, no rate limit, nothing sensitive in the body.
+  app.use(['/health', '/api/health'], require('./routes/health')(db));
 
   // Rate limiting for auth endpoints
   const authLimiter = rateLimit({
@@ -158,6 +164,12 @@ async function startServer() {
     console.log(`Server started on port ${port}...`);
     console.log(`Socket.IO listening for connections`);
   });
+
+  // Collection validators live in schemas/ and are pushed on every boot. The default
+  // action is warn (server-side log only); SCHEMA_VALIDATION_ACTION=error rejects writes.
+  applyCollectionSchemas(db)
+    .then((summary) => console.log(`[schema] ${describeSummary(summary)}`))
+    .catch((error) => console.error('[schema] validators not applied:', error.message));
 }
 
 // Graceful shutdown
