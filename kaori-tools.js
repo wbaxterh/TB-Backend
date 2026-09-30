@@ -10,6 +10,7 @@ const WEB_BASE = 'https://thetrickbook.com';
 const trickUrl = (t) =>
   t?.url ? `${WEB_BASE}/trickipedia/${(t.category || '').toLowerCase()}/${t.url}` : null;
 const filmUrl = (f) => (f?.slug ? `${WEB_BASE}/media/couch/${f.slug}` : null);
+const eventUrl = (event) => (event?.slug ? `${WEB_BASE}/events/${event.slug}` : null);
 
 // ============================================
 // TOOL DEFINITIONS (OpenAI-compatible format)
@@ -223,6 +224,29 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
+      name: 'search_events',
+      description:
+        "Search TrickBook's live event calendar. MUST be used whenever a user asks what events, contests, jams, premieres, or action-sports happenings they should attend, especially for relative dates like today, this weekend, or next week. Include the returned TrickBook links in the answer.",
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Optional event, organizer, or series keyword' },
+          sport: { type: 'string', description: 'Optional sport, such as skateboarding' },
+          city: { type: 'string', description: 'Optional city from the user context' },
+          region: { type: 'string', description: 'Optional state, province, or region' },
+          country: { type: 'string', description: 'Optional country' },
+          date_range: {
+            type: 'string',
+            enum: ['today', 'weekend', 'next_week', 'upcoming'],
+            description: 'Requested time window; default upcoming',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'lookup_boardsport_knowledge',
       description:
         'Look up boardsport culture info: magazines, Instagram accounts, events/competitions, key figures, and brands. Use when the user asks about the scene, media, or events.',
@@ -316,6 +340,79 @@ async function searchSpots(args, db) {
   } catch (err) {
     console.error('Tool search_spots error:', err.message);
     return { error: 'Could not search spots right now' };
+  }
+}
+
+function eventDateRange(kind = 'upcoming', now = new Date()) {
+  const today = new Date(now);
+  today.setUTCHours(0, 0, 0, 0);
+  const end = new Date(today);
+  if (kind === 'today') {
+    end.setUTCDate(end.getUTCDate() + 1);
+  } else if (kind === 'weekend') {
+    const day = today.getUTCDay();
+    const daysUntilSaturday = day === 0 ? 0 : (6 - day + 7) % 7;
+    end.setUTCDate(end.getUTCDate() + daysUntilSaturday + (day === 0 ? 1 : 2));
+  } else if (kind === 'next_week') {
+    end.setUTCDate(end.getUTCDate() + 7);
+  } else {
+    end.setUTCDate(end.getUTCDate() + 60);
+  }
+  return { start: now, end };
+}
+
+function safeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function searchEvents(args, db) {
+  try {
+    const { start, end } = eventDateRange(args.date_range);
+    const and = [
+      { status: { $in: ['scheduled', 'ongoing'] } },
+      { startAt: { $gte: start, $lt: end } },
+    ];
+    if (args.query) {
+      const rx = { $regex: safeRegex(args.query), $options: 'i' };
+      and.push({ $or: [{ title: rx }, { series: rx }, { 'organizer.name': rx }] });
+    }
+    if (args.sport) and.push({ sports: String(args.sport).toLowerCase() });
+    for (const field of ['city', 'region', 'country']) {
+      if (args[field]) {
+        and.push({ [`venue.${field}`]: { $regex: safeRegex(args[field]), $options: 'i' } });
+      }
+    }
+
+    const events = await db
+      .collection('events')
+      .find({ $and: and })
+      .sort({ startAt: 1, _id: 1 })
+      .limit(6)
+      .toArray();
+    return {
+      results: events.map((event) => ({
+        id: event._id.toString(),
+        title: event.title,
+        startsAt: event.startAt,
+        endsAt: event.endAt || null,
+        sports: event.sports || [],
+        eventKinds: event.eventKinds || [],
+        location: [event.venue?.name, event.venue?.city, event.venue?.region, event.venue?.country]
+          .filter(Boolean)
+          .join(', '),
+        registrationStatus: event.participation?.registrationStatus || 'unknown',
+        webUrl: eventUrl(event),
+      })),
+      total: events.length,
+      searchedRange: { start: start.toISOString(), end: end.toISOString() },
+      important:
+        events.length > 0
+          ? 'These are current records from the live TrickBook event calendar. Recommend the strongest matches and include each webUrl as a clickable TrickBook link. Never say you lack a live calendar.'
+          : 'The live TrickBook calendar has no matching events in this exact window. Say that clearly, then ask whether to broaden the location, sport, or date range.',
+    };
+  } catch (err) {
+    console.error('Tool search_events error:', err.message);
+    return { error: 'Could not search the TrickBook event calendar right now' };
   }
 }
 
@@ -843,6 +940,8 @@ async function executeToolCall(toolName, args, db, senderId) {
   switch (toolName) {
     case 'search_spots':
       return await searchSpots(args, db);
+    case 'search_events':
+      return await searchEvents(args, db);
     case 'search_trickipedia':
       return await searchTrickipedia(args, db);
     case 'search_films':
@@ -879,4 +978,4 @@ async function executeToolCall(toolName, args, db, senderId) {
   }
 }
 
-module.exports = { TOOL_DEFINITIONS, executeToolCall };
+module.exports = { TOOL_DEFINITIONS, eventDateRange, executeToolCall, searchEvents };

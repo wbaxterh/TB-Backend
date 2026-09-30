@@ -62,7 +62,8 @@
       "Tricks performed at a specific spot → call tricks_at_spot",
       "Tricks similar to another trick → call similar_tricks",
       "A progression path toward a target trick → call learning_path",
-      "Magazines, Instagram, events, culture → call lookup_boardsport_knowledge",
+      "Current or upcoming events, contests, jams, and premieres → call search_events and include the returned TrickBook links",
+      "Magazines, Instagram, history, and general culture → call lookup_boardsport_knowledge",
       "Creating a trick list → call create_tricklist",
       "Adding a trick to a list → call add_trick_to_list",
       "User tells you their name, sports, or facts about themselves → call remember_user_info"
