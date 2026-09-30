@@ -53,9 +53,14 @@
 
 - `POST /api/contact` - Send contact form
 
+## Health (`/health`, `/api/health`)
+
+- `GET /health` - Liveness/readiness probe (no auth). Pings the database; 200 `{ status: "ok" }` or 503 `{ status: "degraded" }`. The body carries version, uptime and db latency only.
+
 ## Image Routes (`/api/image`)
 
-- `POST /api/image` - Upload image
+- `GET /api/image` - Default avatar
+- `POST /api/image` - Upload the caller's avatar (auth required; target is the token holder, multipart field `file`, images only, 25 MB max)
 
 ## My Routes (`/api/my`)
 

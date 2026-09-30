@@ -14,6 +14,46 @@ const schema = {
   password: Joi.string().required().min(5),
 };
 
+// Finds or creates the account for a verified Apple payload. Returns { user } or a
+// { status, body } rejection. Only the token's own claims take part in the lookup.
+async function resolveAppleUser(usersCollection, applePayload, fullName) {
+  const appleUserId = applePayload.sub;
+  const tokenEmail = typeof applePayload.email === 'string' ? applePayload.email : null;
+  const emailVerified =
+    applePayload.email_verified === true || applePayload.email_verified === 'true';
+
+  const bySub = await usersCollection.findOne({ appleUserId });
+  if (bySub) return { user: bySub };
+
+  const byEmail = tokenEmail ? await usersCollection.findOne({ email: tokenEmail }) : null;
+  if (byEmail) {
+    // Linking (SSO ↔ SSO only) needs Apple's word on the address, never joins a
+    // password account, and never moves an email between two Apple identities.
+    const existingProvider = getAuthProvider(byEmail);
+    const claimable =
+      emailVerified && existingProvider !== PROVIDERS.PASSWORD && !byEmail.appleUserId;
+    if (!claimable) return { status: 409, body: providerMismatch(existingProvider) };
+    await usersCollection.updateOne({ _id: byEmail._id }, { $set: { appleUserId } });
+    return { user: { ...byEmail, appleUserId } };
+  }
+
+  if (!tokenEmail) {
+    return { status: 400, body: { error: 'Apple did not share an email for this account.' } };
+  }
+  const displayName = typeof fullName === 'string' ? fullName.trim().slice(0, 120) : '';
+  const newUser = {
+    name: displayName || 'Apple User',
+    email: tokenEmail,
+    appleUserId,
+    network: true,
+    homies: [],
+    homieRequests: { sent: [], received: [] },
+    createdAt: new Date(),
+  };
+  const result = await usersCollection.insertOne(newUser);
+  return { user: { _id: result.insertedId, ...newUser } };
+}
+
 module.exports = (db) => {
   const router = express.Router();
   const usersCollection = db.collection('users');
@@ -67,7 +107,6 @@ module.exports = (db) => {
   // Google SSO auth
   router.post('/google-auth', async (req, res) => {
     const { tokenId } = req.body;
-    console.log('request body to google auth == ', req.body);
     try {
       // Verify the token with Google
       // Accept tokens from web, iOS, and Android clients
@@ -150,10 +189,10 @@ module.exports = (db) => {
     }
   });
 
-  // Apple SSO auth
+  // Apple SSO auth. The identity token is the only trusted source of identity; the
+  // request body is never used to look up or link an account.
   router.post('/apple-auth', async (req, res) => {
-    const { identityToken, fullName, email } = req.body;
-    console.log('request body to apple auth == ', req.body);
+    const { identityToken, fullName } = req.body;
     try {
       // Verify the token with Apple — accept both iOS bundle ID and web Services ID
       const applePayload = await appleSignin.verifyIdToken(identityToken, {
@@ -161,41 +200,12 @@ module.exports = (db) => {
         ignoreExpiration: false,
       });
 
-      const appleUserId = applePayload.sub;
-      // Apple only provides email on first sign-in, use from token if available
-      const userEmail = email || applePayload.email;
-
-      let user = await usersCollection.findOne({
-        $or: [{ appleUserId: appleUserId }, { email: userEmail }],
-      });
-
-      if (!user) {
-        // Create new user if they don't exist
-        const newUser = {
-          name: fullName || 'Apple User',
-          email: userEmail,
-          appleUserId: appleUserId,
-          network: true,
-          homies: [],
-          homieRequests: { sent: [], received: [] },
-          createdAt: new Date(),
-        };
-        const result = await usersCollection.insertOne(newUser);
-        user = {
-          _id: result.insertedId,
-          ...newUser,
-        };
-      } else if (!user.appleUserId) {
-        // Account linking (SSO ↔ SSO only): link Apple to an existing Google
-        // account (Apple always verifies the email). Never auto-link into a
-        // password account.
-        const existingProvider = getAuthProvider(user);
-        if (existingProvider === PROVIDERS.PASSWORD) {
-          return res.status(409).send(providerMismatch(existingProvider));
-        }
-        await usersCollection.updateOne({ _id: user._id }, { $set: { appleUserId: appleUserId } });
-        user.appleUserId = appleUserId;
+      if (!applePayload?.sub) {
+        return res.status(400).send({ error: 'Invalid Apple identity token.' });
       }
+      const outcome = await resolveAppleUser(usersCollection, applePayload, fullName);
+      if (!outcome.user) return res.status(outcome.status).send(outcome.body);
+      const { user } = outcome;
 
       const token = jwt.sign(
         {

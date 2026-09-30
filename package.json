@@ -23,7 +23,9 @@
     "smoke": "node --check index.js",
     "graph:rebuild": "node scripts/rebuild-progression-graph.js --execute",
     "validate": "biome check . && npm test && npm run smoke",
-    "prepare": "husky"
+    "prepare": "husky",
+    "schema:report": "node scripts/schema-report.js",
+    "schema:apply": "node scripts/schema-apply.js"
   },
   "engines": {
     "node": ">=20.0"

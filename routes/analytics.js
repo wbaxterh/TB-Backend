@@ -2,16 +2,41 @@ const express = require('express');
 const { ObjectId } = require('mongodb');
 const { getIosDownloads, getAndroidDownloads } = require('../services/appStoreDownloads');
 const { verifyTokenWithGrace } = require('../middleware/auth');
+const { normalizeEvent } = require('../services/analyticsContracts');
 
 module.exports = (db) => {
   const router = express.Router();
   const eventsCollection = db.collection('analytics_events');
   const usersCollection = db.collection('users');
+  const meaningfulEvents = [
+    'trick_added',
+    'trick_attempt_logged',
+    'trick_landed',
+    'spot_saved',
+    'spot_directions_opened',
+    'event_saved',
+    'event_calendar_added',
+    'ai_session_completed',
+    'ai_response_completed',
+    'post_created',
+    'comment_created',
+    'rider_followed',
+    'homie_connected',
+  ];
 
   eventsCollection.createIndex({ event: 1, timestamp: -1 });
   eventsCollection.createIndex({ timestamp: -1 });
   eventsCollection.createIndex({ sessionId: 1 });
   eventsCollection.createIndex({ userId: 1 });
+  eventsCollection.createIndex({ eventId: 1 }, { unique: true, sparse: true });
+  eventsCollection.createIndex({ platform: 1, appVersion: 1, receivedAt: -1 });
+
+  function eventContext(req) {
+    return {
+      userId: verifyTokenWithGrace(req.header('x-auth-token'))?.userId || null,
+      userAgent: req.get('user-agent'),
+    };
+  }
 
   // Admin auth using the passed db connection
   async function requireAdmin(req, res, next) {
@@ -38,23 +63,21 @@ module.exports = (db) => {
   // ============================================
   router.post('/events', async (req, res) => {
     try {
-      const { event, properties, sessionId, userId, url, referrer, userAgent } = req.body;
-
-      if (!event) return res.status(400).json({ error: 'event is required' });
-
-      await eventsCollection.insertOne({
-        event,
-        properties: properties || {},
-        sessionId: sessionId || null,
-        userId: userId || null,
-        url: url || null,
-        referrer: referrer || null,
-        userAgent: userAgent || null,
-        timestamp: new Date(),
+      const doc = normalizeEvent(req.body, eventContext(req));
+      const result = await eventsCollection.updateOne(
+        { eventId: doc.eventId },
+        { $setOnInsert: doc },
+        { upsert: true },
+      );
+      res.status(result.upsertedCount ? 201 : 200).json({
+        ok: true,
+        accepted: result.upsertedCount,
+        duplicate: result.upsertedCount === 0,
       });
-
-      res.status(201).json({ ok: true });
     } catch (error) {
+      if (/^(invalid|event must|occurredAt)/.test(error.message)) {
+        return res.status(400).json({ error: error.message });
+      }
       console.error('Analytics insert error:', error.message);
       res.status(500).json({ error: 'Failed to store event' });
     }
@@ -64,24 +87,30 @@ module.exports = (db) => {
   router.post('/events/batch', async (req, res) => {
     try {
       const { events } = req.body;
-      if (!Array.isArray(events) || events.length === 0) {
+      if (!Array.isArray(events) || events.length === 0 || events.length > 100) {
         return res.status(400).json({ error: 'events array is required' });
       }
-
-      const docs = events.map((e) => ({
-        event: e.event,
-        properties: e.properties || {},
-        sessionId: e.sessionId || null,
-        userId: e.userId || null,
-        url: e.url || null,
-        referrer: e.referrer || null,
-        userAgent: e.userAgent || null,
-        timestamp: new Date(e.timestamp || Date.now()),
-      }));
-
-      await eventsCollection.insertMany(docs);
-      res.status(201).json({ ok: true, count: docs.length });
+      const context = eventContext(req);
+      const docs = events.map((event) => normalizeEvent(event, context));
+      const results = await Promise.all(
+        docs.map((doc) =>
+          eventsCollection.updateOne(
+            { eventId: doc.eventId },
+            { $setOnInsert: doc },
+            { upsert: true },
+          ),
+        ),
+      );
+      const accepted = results.reduce((sum, result) => sum + result.upsertedCount, 0);
+      res.status(accepted ? 201 : 200).json({
+        ok: true,
+        accepted,
+        duplicates: docs.length - accepted,
+      });
     } catch (error) {
+      if (/^(invalid|event must|occurredAt)/.test(error.message)) {
+        return res.status(400).json({ error: error.message });
+      }
       console.error('Analytics batch insert error:', error.message);
       res.status(500).json({ error: 'Failed to store events' });
     }
@@ -90,6 +119,145 @@ module.exports = (db) => {
   // ============================================
   // ADMIN: Dashboard aggregation endpoints
   // ============================================
+
+  router.get('/dashboard/retention', requireAdmin, async (req, res) => {
+    try {
+      const weeks = Math.min(Number.parseInt(req.query.weeks, 10) || 8, 26);
+      const since = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      const signups = await usersCollection
+        .find(
+          { createdAt: { $gte: since }, isBot: { $ne: true } },
+          { projection: { createdAt: 1 } },
+        )
+        .toArray();
+      const signupByUser = new Map(
+        signups.map((user) => [String(user._id), new Date(user.createdAt)]),
+      );
+      const actions = await eventsCollection
+        .find(
+          {
+            userId: { $in: [...signupByUser.keys()] },
+            event: { $in: meaningfulEvents },
+            timestamp: { $gte: since },
+          },
+          { projection: { userId: 1, event: 1, timestamp: 1 } },
+        )
+        .sort({ timestamp: 1 })
+        .toArray();
+
+      const byUser = new Map();
+      for (const action of actions) {
+        const key = String(action.userId);
+        if (!byUser.has(key)) byUser.set(key, []);
+        byUser.get(key).push(action);
+      }
+
+      const retainedWithin = (userId, start, minimumDay, maximumDay) =>
+        (byUser.get(userId) || []).some((action) => {
+          const day = (new Date(action.timestamp) - start) / (24 * 60 * 60 * 1000);
+          return day >= minimumDay && day < maximumDay;
+        });
+      const activated = signups.filter((user) =>
+        retainedWithin(String(user._id), new Date(user.createdAt), 0, 2),
+      ).length;
+      const retention = [1, 7, 14, 30].map((day) => ({
+        day,
+        eligible: signups.filter((user) => Date.now() - new Date(user.createdAt) >= day * 86400000)
+          .length,
+        retained: signups.filter(
+          (user) =>
+            Date.now() - new Date(user.createdAt) >= day * 86400000 &&
+            retainedWithin(String(user._id), new Date(user.createdAt), day, day + 1),
+        ).length,
+      }));
+      res.json({
+        since,
+        signups: signups.length,
+        activated,
+        activationRate: signups.length ? activated / signups.length : 0,
+        retention,
+        meaningfulEvents,
+      });
+    } catch (error) {
+      console.error('Retention dashboard error:', error.message);
+      res.status(500).json({ error: 'Failed to get retention metrics' });
+    }
+  });
+
+  router.get('/dashboard/feature-value', requireAdmin, async (req, res) => {
+    try {
+      const days = Math.min(Number.parseInt(req.query.days, 10) || 30, 180);
+      const since = new Date(Date.now() - days * 86400000);
+      const rows = await eventsCollection
+        .aggregate([
+          {
+            $match: {
+              event: { $in: meaningfulEvents },
+              userId: { $ne: null },
+              timestamp: { $gte: since },
+            },
+          },
+          {
+            $group: {
+              _id: '$event',
+              actions: { $sum: 1 },
+              riders: { $addToSet: '$userId' },
+              versions: { $addToSet: '$appVersion' },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              event: '$_id',
+              actions: 1,
+              riders: { $size: '$riders' },
+              versions: { $setDifference: ['$versions', [null]] },
+            },
+          },
+          { $sort: { riders: -1, actions: -1 } },
+        ])
+        .toArray();
+      res.json({ days, rows });
+    } catch (error) {
+      console.error('Feature value dashboard error:', error.message);
+      res.status(500).json({ error: 'Failed to get feature value metrics' });
+    }
+  });
+
+  router.get('/dashboard/ltv', requireAdmin, async (_req, res) => {
+    try {
+      const monthlyPriceCents =
+        Number.parseInt(process.env.PREMIUM_MONTHLY_PRICE_CENTS, 10) || 1000;
+      const assumedLifetimeMonths =
+        Number.parseInt(process.env.LTV_ASSUMED_LIFETIME_MONTHS, 10) || 12;
+      const [totalUsers, payingUsers] = await Promise.all([
+        usersCollection.countDocuments({ isBot: { $ne: true } }),
+        usersCollection.countDocuments({
+          isBot: { $ne: true },
+          'subscription.plan': 'premium',
+          'subscription.status': 'active',
+        }),
+      ]);
+      const estimatedMrrCents = payingUsers * monthlyPriceCents;
+      const monthlyArpuCents = totalUsers ? Math.round(estimatedMrrCents / totalUsers) : 0;
+      res.json({
+        totalUsers,
+        payingUsers,
+        paidConversionRate: totalUsers ? payingUsers / totalUsers : 0,
+        estimatedMrrCents,
+        monthlyArpuCents,
+        ltvProxyCents: monthlyArpuCents * assumedLifetimeMonths,
+        assumptions: {
+          monthlyPriceCents,
+          assumedLifetimeMonths,
+          method: 'active subscriber run-rate; excludes refunds, fees, and recognized revenue',
+        },
+      });
+    } catch (error) {
+      console.error('LTV dashboard error:', error.message);
+      res.status(500).json({ error: 'Failed to get LTV metrics' });
+    }
+  });
 
   // Overview stats for a date range
   router.get('/dashboard/overview', requireAdmin, async (req, res) => {
@@ -440,7 +608,7 @@ module.exports = (db) => {
     return new Set(sets.flat().filter(Boolean).map(String)).size;
   }
 
-  router.get('/dashboard/app-users', requireAdmin, async (req, res) => {
+  router.get('/dashboard/app-users', requireAdmin, async (_req, res) => {
     try {
       const day = 24 * 60 * 60 * 1000;
       const now = Date.now();
