@@ -22,6 +22,8 @@ const { ObjectId } = require('mongodb');
 const auth = require('../middleware/auth');
 const { createKaoriUsageService } = require('../services/kaoriUsage');
 
+let publicGreetingCache = null;
+
 const _STAGES = ['stranger', 'acquaintance', 'friend', 'close_friend', 'bestie'];
 
 function computeStage(interactionCount) {
@@ -146,6 +148,26 @@ function createRouter(db) {
     }
   });
 
+  // A shared model-written opener for signed-out surfaces. Cache it so the
+  // launcher never turns page views into unbounded model spend.
+  router.get('/kaori/greeting', async (_req, res) => {
+    try {
+      const now = Date.now();
+      if (!publicGreetingCache || publicGreetingCache.expiresAt <= now) {
+        const { generateKaoriGreeting } = require('../kaori-ai-response');
+        const greeting = await generateKaoriGreeting(db);
+        publicGreetingCache = {
+          greeting: greeting || "Yo, I'm Kaori. What are you working on today?",
+          expiresAt: now + 60 * 60 * 1000,
+        };
+      }
+      res.json({ greeting: publicGreetingCache.greeting });
+    } catch (error) {
+      console.error('Error generating public Kaori greeting:', error);
+      res.json({ greeting: "Yo, I'm Kaori. What are you working on today?" });
+    }
+  });
+
   // Ensure index
   profilesCollection.createIndex({ userId: 1, companionId: 1 }, { unique: true }).catch(() => {});
 
@@ -225,7 +247,10 @@ function createRouter(db) {
         /* name lookup is best-effort */
       }
 
-      const greeting = generateGreeting(profile, fallbackName);
+      const { generateKaoriGreeting } = require('../kaori-ai-response');
+      const greeting =
+        (await generateKaoriGreeting(db, userId, companionId)) ||
+        generateGreeting(profile, fallbackName).replace(/[—–]/g, ',');
 
       // If this came from the live 3D stage (x-kith-session header), speak the
       // greeting aloud via the Kith sidecar. Fire-and-forget AFTER the response
