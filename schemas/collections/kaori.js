@@ -10,7 +10,7 @@ module.exports = {
     writers: ['services/kaoriUsage.js'],
     jsonSchema: {
       bsonType: 'object',
-      required: ['_id', 'count', 'createdAt', 'expiresAt'],
+      required: ['count', 'createdAt', 'expiresAt'],
       properties: {
         _id: str,
         count: { bsonType: ['int', 'long', 'double'], minimum: 0 },
@@ -19,7 +19,9 @@ module.exports = {
         expiresAt: date,
       },
     },
-    notes: ['expiresAt has a TTL index; counter identifiers contain only user ids or hashed devices.'],
+    notes: [
+      'expiresAt has a TTL index; counter identifiers contain only user ids or hashed devices.',
+    ],
   },
 
   kaori_generation_leases: {
@@ -46,7 +48,16 @@ module.exports = {
     writers: ['services/kaoriUsage.js'],
     jsonSchema: {
       bsonType: 'object',
-      required: ['requestId', 'userId', 'surface', 'kind', 'tier', 'status', 'createdAt', 'updatedAt'],
+      required: [
+        'requestId',
+        'userId',
+        'surface',
+        'kind',
+        'tier',
+        'status',
+        'createdAt',
+        'updatedAt',
+      ],
       properties: {
         _id: { bsonType: 'objectId' },
         requestId: str,
@@ -65,6 +76,8 @@ module.exports = {
         refundedAt: date,
       },
     },
-    notes: ['requestId is unique; deviceKey is a one-way privacy hash rather than a raw device id.'],
+    notes: [
+      'requestId is unique; deviceKey is a one-way privacy hash rather than a raw device id.',
+    ],
   },
 };
