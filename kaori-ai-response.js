@@ -5,6 +5,15 @@ const { TOOL_DEFINITIONS, executeToolCall } = require('./kaori-tools');
 const kaoriCharacter = require('./kaori-character.json');
 const { getCompanion } = require('./companion-registry');
 
+function shouldForceEventSearch(messages) {
+  const latestUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user')?.content;
+  return /\b(event|events|contest|contests|competition|competitions|jam|jams|premiere|premieres|happening|happenings)\b/i.test(
+    String(latestUserMessage || ''),
+  );
+}
+
 // Compose the system prompt from the structured character file. To change
 // Kaori's persona, edit kaori-character.json — not a giant inline string. The
 // composed output is behavior-equivalent to the old inline prompt (same
@@ -225,6 +234,7 @@ ${ragContext}`;
 
   const fullMessages = [{ role: 'system', content: systemPrompt }, ...messages];
   const MAX_ITERATIONS = 3;
+  const forceEventSearch = shouldForceEventSearch(messages);
 
   console.log(
     '[Kaori] callOpenRouter called, senderId:',
@@ -243,7 +253,10 @@ ${ragContext}`;
           model: character.model || process.env.COMPANION_MODEL || 'google/gemini-3.5-flash',
           messages: fullMessages,
           tools: TOOL_DEFINITIONS,
-          tool_choice: 'auto',
+          tool_choice:
+            i === 0 && forceEventSearch
+              ? { type: 'function', function: { name: 'search_events' } }
+              : 'auto',
           max_tokens: 1000,
           temperature: 0.7,
         },
@@ -535,4 +548,5 @@ module.exports = {
   generateCompanionResponse,
   generateKaoriResponse,
   KAORI_SYSTEM_PROMPT,
+  shouldForceEventSearch,
 };
