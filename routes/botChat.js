@@ -1,11 +1,13 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const axios = require('axios');
+const { createKaoriUsageService } = require('../services/kaoriUsage');
 const { hasCompanion } = require('../companion-registry');
 require('dotenv').config();
 
 module.exports = (db) => {
   const router = express.Router();
+  const kaoriUsage = createKaoriUsageService(db);
 
   // History reads run on every message send — keep them indexed
   // (fire-and-forget, mirrors routes/companionProfile.js)
@@ -81,6 +83,8 @@ module.exports = (db) => {
 
   // POST /api/bot-chat/message - Send message to bot and get response
   router.post('/message', auth, async (req, res) => {
+    let usageReservation = null;
+    let voiceAllowed = false;
     try {
       const { botId, message } = req.body;
       const userId = req.user.userId;
@@ -91,6 +95,9 @@ module.exports = (db) => {
       if (!botId || !message) {
         return res.status(400).json({ error: 'botId and message are required' });
       }
+      if (typeof message !== 'string' || !message.trim() || message.trim().length > 4000) {
+        return res.status(400).json({ error: 'Message must be 1-4000 characters' });
+      }
 
       // Verify bot exists
       const bot = await db
@@ -98,6 +105,28 @@ module.exports = (db) => {
         .findOne({ _id: new (require('mongodb').ObjectId)(botId), isBot: true });
       if (!bot) {
         return res.status(404).json({ error: 'Bot not found' });
+      }
+
+      const characterId = bot.botCharacter || 'kaori';
+      const isRegisteredCompanion = hasCompanion(characterId);
+      const isKaori = characterId === 'kaori';
+      if (isKaori) {
+        usageReservation = await kaoriUsage.reserveText({
+          userId,
+          deviceKey: kaoriUsage.getDeviceKey(req),
+          surface: kithSessionId ? 'mobile_live' : 'mobile_chat',
+        });
+        if (!usageReservation.ok) {
+          return res.status(usageReservation.status).json({
+            error: usageReservation.code,
+            code: usageReservation.code,
+            retryAfter: usageReservation.retryAfter,
+            allowance: usageReservation.remaining,
+            limit: usageReservation.limit,
+            resetsAt: usageReservation.resetsAt,
+            upgradeRequired: usageReservation.upgradeRequired || false,
+          });
+        }
       }
 
       // Save user message
@@ -118,9 +147,6 @@ module.exports = (db) => {
       // ElizaOS hop always 401s and only added a wasted roundtrip + long
       // timeout); other bot characters keep the Eliza path so they aren't
       // silently rerouted through the Kaori persona + Kaori's history.
-      const characterId = bot.botCharacter || 'kaori';
-      const isRegisteredCompanion = hasCompanion(characterId);
-      const isKaori = characterId === 'kaori';
       let botResponse;
       if (!isRegisteredCompanion || process.env.BOTCHAT_USE_ELIZA === 'true') {
         try {
@@ -178,6 +204,23 @@ module.exports = (db) => {
       const botMessageResult = await db.collection('bot_chats').insertOne(botMessage);
       botMessage._id = botMessageResult.insertedId;
 
+      if (usageReservation?.ok) {
+        if (kithSessionId) {
+          const voiceUsage = await kaoriUsage.consumeVoice({
+            userId,
+            requestId: usageReservation.requestId,
+            responseChars: botResponse.length,
+            surface: 'mobile_live',
+          });
+          voiceAllowed = voiceUsage.ok;
+        }
+        await kaoriUsage.settle(usageReservation, {
+          responseChars: botResponse.length,
+          voiceRequested: Boolean(kithSessionId),
+        });
+        usageReservation = null;
+      }
+
       // Return both messages
       res.json({
         userMessage,
@@ -191,14 +234,24 @@ module.exports = (db) => {
       // KITH_VOICE_URL values. Runs after res.json, so it must never throw
       // into the outer catch (headers already sent).
       const isValidKithSession = /^[0-9a-f-]{36}$/i.test(kithSessionId);
-      if (isValidKithSession && process.env.KITH_VOICE_URL) {
+      if (isValidKithSession && voiceAllowed && process.env.KITH_VOICE_URL) {
         const base = process.env.KITH_VOICE_URL.replace(/\/$/, '');
         axios
-          .post(`${base}/speak/${kithSessionId}`, { text: botResponse }, { timeout: 5000 })
+          .post(
+            `${base}/speak/${kithSessionId}`,
+            { text: botResponse },
+            {
+              timeout: 5000,
+              headers: { 'x-kith-secret': process.env.KITH_INTERNAL_SECRET || '' },
+            },
+          )
           .catch((e) => console.error('[BotChat] Kith voice request error:', e.message));
       }
     } catch (error) {
       console.error('Error in bot chat:', error);
+      if (usageReservation?.ok) {
+        await kaoriUsage.refund(usageReservation, 'bot_chat_failed').catch(() => {});
+      }
       res.status(500).json({ error: 'Failed to process bot chat' });
     }
   });

@@ -43,10 +43,12 @@ const auth = require('../middleware/auth');
 const { ObjectId } = require('mongodb');
 const { emitNewMessageToRecipients, emitMessagesRead } = require('../socket/messageSocket');
 const notificationSender = require('../services/notificationSender');
+const { createKaoriUsageService } = require('../services/kaoriUsage');
 const _axios = require('axios');
 
 module.exports = (db) => {
   const router = express.Router();
+  const kaoriUsage = createKaoriUsageService(db);
   const conversationsCollection = db.collection('conversations');
   const messagesCollection = db.collection('dm_messages');
   const usersCollection = db.collection('users');
@@ -285,6 +287,7 @@ module.exports = (db) => {
 
   // Send a message (supports text and shared content)
   router.post('/conversations/:conversationId/messages', auth, async (req, res) => {
+    let usageReservation = null;
     try {
       const { conversationId } = req.params;
       const { content, sharedContent } = req.body;
@@ -293,6 +296,9 @@ module.exports = (db) => {
       // Validate: either content or sharedContent required
       if ((!content || !content.trim()) && !sharedContent) {
         return res.status(400).send({ error: 'Message content or shared content required' });
+      }
+      if (content && (typeof content !== 'string' || content.trim().length > 4000)) {
+        return res.status(400).send({ error: 'Message must be 1-4000 characters' });
       }
 
       // Validate shared content structure
@@ -314,6 +320,33 @@ module.exports = (db) => {
 
       if (!conversation) {
         return res.status(404).send({ error: 'Conversation not found' });
+      }
+
+      const botParticipantId = !conversation.isGroup
+        ? conversation.participants.find((participant) => participant !== senderId)
+        : null;
+      const botRecipient = botParticipantId
+        ? await usersCollection.findOne({ _id: new ObjectId(botParticipantId), isBot: true })
+        : null;
+      const isKaori = botRecipient && (botRecipient.botCharacter || 'kaori') === 'kaori';
+
+      if (isKaori) {
+        usageReservation = await kaoriUsage.reserveText({
+          userId: senderId,
+          deviceKey: kaoriUsage.getDeviceKey(req),
+          surface: req.headers['x-kith-session'] ? 'web_live' : 'web_widget',
+        });
+        if (!usageReservation.ok) {
+          return res.status(usageReservation.status).json({
+            error: usageReservation.code,
+            code: usageReservation.code,
+            retryAfter: usageReservation.retryAfter,
+            allowance: usageReservation.remaining,
+            limit: usageReservation.limit,
+            resetsAt: usageReservation.resetsAt,
+            upgradeRequired: usageReservation.upgradeRequired || false,
+          });
+        }
       }
 
       const message = {
@@ -439,12 +472,9 @@ module.exports = (db) => {
 
       // --- BOT RESPONSE LOGIC ---
       // Check if the other participant is a bot (1:1 only — bots aren't in groups)
-      const otherParticipantId = conversation.participants.find((p) => p !== senderId);
+      const otherParticipantId = botParticipantId;
       if (!conversation.isGroup && otherParticipantId) {
-        const otherUser = await usersCollection.findOne({
-          _id: new ObjectId(otherParticipantId),
-          isBot: true,
-        });
+        const otherUser = botRecipient;
 
         if (otherUser) {
           // Get io reference NOW (before async)
@@ -460,6 +490,8 @@ module.exports = (db) => {
 
           // Run bot response with typing delay
           (async () => {
+            let responsePersisted = false;
+            let botResponseText = '';
             try {
               const character = otherUser.botCharacter || 'kaori';
               const _greetings = otherUser.botConfig?.greetings || ['Hey! 🤙'];
@@ -478,7 +510,6 @@ module.exports = (db) => {
 
               // 2. Generate response (with minimum delay for realism)
               const startTime = Date.now();
-              let botResponseText;
 
               // Claude-powered Kaori AI response (with ElizaOS fallback)
               try {
@@ -584,6 +615,7 @@ module.exports = (db) => {
 
               const botResult = await messagesCollection.insertOne(botMessage);
               botMessage._id = botResult.insertedId.toString();
+              responsePersisted = true;
 
               // 6. Update conversation last message
               await conversationsCollection.updateOne(
@@ -633,7 +665,17 @@ module.exports = (db) => {
               }
 
               // 8. Fire-and-forget: send bot text to Kith voice service for TTS
-              if (kithSessionId && process.env.KITH_VOICE_URL) {
+              let voiceAllowed = false;
+              if (kithSessionId && usageReservation?.ok) {
+                const voiceUsage = await kaoriUsage.consumeVoice({
+                  userId: senderId,
+                  requestId: usageReservation.requestId,
+                  responseChars: botResponseText.length,
+                  surface: 'web_live',
+                });
+                voiceAllowed = voiceUsage.ok;
+              }
+              if (kithSessionId && voiceAllowed && process.env.KITH_VOICE_URL) {
                 const kithPayload = JSON.stringify({ text: botResponseText });
                 const kithUrl = new URL(`/speak/${kithSessionId}`, process.env.KITH_VOICE_URL);
                 const kithReq = http.request(kithUrl, {
@@ -641,6 +683,7 @@ module.exports = (db) => {
                   headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(kithPayload),
+                    'x-kith-secret': process.env.KITH_INTERNAL_SECRET || '',
                   },
                 });
                 kithReq.on('error', (e) =>
@@ -659,6 +702,20 @@ module.exports = (db) => {
                   userId: otherParticipantId,
                 });
               }
+            } finally {
+              if (usageReservation?.ok) {
+                if (responsePersisted) {
+                  await kaoriUsage
+                    .settle(usageReservation, {
+                      responseChars: botResponseText.length,
+                      voiceRequested: Boolean(kithSessionId),
+                    })
+                    .catch(() => {});
+                } else {
+                  await kaoriUsage.refund(usageReservation, 'dm_generation_failed').catch(() => {});
+                }
+                usageReservation = null;
+              }
             }
           })();
         }
@@ -666,6 +723,9 @@ module.exports = (db) => {
       // --- END BOT RESPONSE LOGIC ---
     } catch (error) {
       console.error('Error sending message:', error);
+      if (usageReservation?.ok) {
+        await kaoriUsage.refund(usageReservation, 'dm_send_failed').catch(() => {});
+      }
       res.status(500).send({ error: 'Failed to send message' });
     }
   });
