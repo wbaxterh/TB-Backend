@@ -20,6 +20,7 @@ const express = require('express');
 const axios = require('axios');
 const { ObjectId } = require('mongodb');
 const auth = require('../middleware/auth');
+const { createKaoriUsageService } = require('../services/kaoriUsage');
 
 const _STAGES = ['stranger', 'acquaintance', 'friend', 'close_friend', 'bestie'];
 
@@ -131,7 +132,19 @@ function generateGreeting(profile, fallbackName = '') {
 
 function createRouter(db) {
   const router = express.Router();
+  const kaoriUsage = createKaoriUsageService(db);
   const profilesCollection = db.collection('companion_profiles');
+
+  router.get('/kaori/usage', auth, async (req, res) => {
+    try {
+      const usage = await kaoriUsage.getStatus(req.user.userId);
+      if (!usage) return res.status(404).json({ error: 'User not found' });
+      res.json(usage);
+    } catch (error) {
+      console.error('Error fetching Kaori usage:', error);
+      res.status(500).json({ error: 'Failed to fetch Kaori usage' });
+    }
+  });
 
   // Ensure index
   profilesCollection.createIndex({ userId: 1, companionId: 1 }, { unique: true }).catch(() => {});
@@ -214,17 +227,35 @@ function createRouter(db) {
 
       const greeting = generateGreeting(profile, fallbackName);
 
-      res.json({ greeting, stage: profile.relationshipStage });
-
       // If this came from the live 3D stage (x-kith-session header), speak the
       // greeting aloud via the Kith sidecar. Fire-and-forget AFTER the response
       // — same pattern as botChat replies; must never throw (headers sent).
       const kithSessionId = req.headers['x-kith-session'] || '';
       const isValidKithSession = /^[0-9a-f-]{36}$/i.test(kithSessionId);
-      if (isValidKithSession && process.env.KITH_VOICE_URL) {
+      let voiceAllowed = false;
+      if (isValidKithSession) {
+        const voiceUsage = await kaoriUsage.consumeVoice({
+          userId,
+          requestId: `greeting:${kithSessionId}`,
+          responseChars: greeting.length,
+          surface: 'live_greeting',
+        });
+        voiceAllowed = voiceUsage.ok;
+      }
+
+      res.json({ greeting, stage: profile.relationshipStage, voiceAvailable: voiceAllowed });
+
+      if (isValidKithSession && voiceAllowed && process.env.KITH_VOICE_URL) {
         const base = process.env.KITH_VOICE_URL.replace(/\/$/, '');
         axios
-          .post(`${base}/speak/${kithSessionId}`, { text: greeting }, { timeout: 5000 })
+          .post(
+            `${base}/speak/${kithSessionId}`,
+            { text: greeting },
+            {
+              timeout: 5000,
+              headers: { 'x-kith-secret': process.env.KITH_INTERNAL_SECRET || '' },
+            },
+          )
           .catch((e) => console.error('[Companion] Kith greeting speak error:', e.message));
       }
       return;
