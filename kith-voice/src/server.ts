@@ -42,11 +42,20 @@ const PYTHON_VENV =
 const PYTHON_CWD = process.env.PIPECAT_PYTHON_CWD || path.resolve(ROOT, '../python-sidecar');
 
 const apiKey = process.env.ELEVENLABS_API_KEY;
+const internalSecret = process.env.KITH_INTERNAL_SECRET;
 const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'klHOJHbGA89BjwulA7MN';
 const modelId = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_v3';
+const MAX_SESSIONS = Number(process.env.KITH_MAX_SESSIONS ?? 20);
+const MAX_SESSIONS_PER_IP = Number(process.env.KITH_MAX_SESSIONS_PER_IP ?? 2);
+const MAX_SESSION_MS = Number(process.env.KITH_MAX_SESSION_MS ?? 15 * 60 * 1000);
+const MAX_TTS_CHARS = Number(process.env.KITH_MAX_TTS_CHARS ?? 4000);
 
 if (!apiKey) {
   console.error('ELEVENLABS_API_KEY must be set. See kith-voice/.env.example');
+  process.exit(2);
+}
+if (!internalSecret || internalSecret.length < 32) {
+  console.error('KITH_INTERNAL_SECRET must be set to at least 32 characters.');
   process.exit(2);
 }
 
@@ -64,10 +73,13 @@ interface Session {
   obs: InMemoryObservability;
   unsubscribe: () => void;
   ws: ServerWebSocket<WsData>;
+  ip: string;
+  hardTimeout: ReturnType<typeof setTimeout>;
 }
 
 interface WsData {
   sessionId: string;
+  ip: string;
 }
 
 const sessions = new Map<string, Session>();
@@ -132,13 +144,15 @@ async function createSession(sessionId: string, ws: ServerWebSocket<WsData>): Pr
     }
   });
 
-  return { runtime, voice, obs, unsubscribe, ws };
+  const hardTimeout = setTimeout(() => ws.close(1000, 'session time limit reached'), MAX_SESSION_MS);
+  return { runtime, voice, obs, unsubscribe, ws, ip: ws.data.ip, hardTimeout };
 }
 
 async function teardownSession(sessionId: string): Promise<void> {
   const session = sessions.get(sessionId);
   if (!session) return;
   sessions.delete(sessionId);
+  clearTimeout(session.hardTimeout);
   session.unsubscribe();
   session.voice.destroy();
   try {
@@ -156,14 +170,28 @@ const server = Bun.serve<WsData>({
 
     // WebSocket upgrade for browser clients
     if (url.pathname === '/ws') {
+      if (sessions.size >= MAX_SESSIONS) {
+        return new Response('Voice capacity reached', { status: 503, headers: { 'Retry-After': '60' } });
+      }
+      const ip =
+        req.headers.get('cf-connecting-ip') ||
+        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        'unknown';
+      const sessionsForIp = [...sessions.values()].filter((session) => session.ip === ip).length;
+      if (sessionsForIp >= MAX_SESSIONS_PER_IP) {
+        return new Response('Too many voice sessions', { status: 429, headers: { 'Retry-After': '60' } });
+      }
       const sessionId = crypto.randomUUID();
-      const ok = server.upgrade(req, { data: { sessionId } });
+      const ok = server.upgrade(req, { data: { sessionId, ip } });
       if (ok) return undefined;
       return new Response('WebSocket upgrade failed', { status: 500 });
     }
 
     // HTTP endpoint for Backend to trigger speech
     if (url.pathname.startsWith('/speak/') && req.method === 'POST') {
+      if (req.headers.get('x-kith-secret') !== internalSecret) {
+        return Response.json({ error: 'unauthorized' }, { status: 401 });
+      }
       const sessionId = url.pathname.slice('/speak/'.length);
       const session = sessions.get(sessionId);
       if (!session) {
@@ -172,7 +200,7 @@ const server = Bun.serve<WsData>({
 
       try {
         const body = (await req.json()) as { text: string };
-        if (!body.text || typeof body.text !== 'string') {
+        if (!body.text || typeof body.text !== 'string' || body.text.length > MAX_TTS_CHARS) {
           return Response.json({ error: 'text is required' }, { status: 400 });
         }
         // Fire-and-forget: speak runs async, we respond immediately
@@ -223,13 +251,8 @@ const server = Bun.serve<WsData>({
         return;
       }
 
-      if (msg.type === 'speak' && typeof msg.text === 'string') {
-        try {
-          await session.voice.speak(msg.text);
-        } catch (err) {
-          console.error(`[kith] speak failed session=${sessionId}:`, err);
-        }
-      } else if (msg.type === 'barge-in') {
+      // Speech can only be triggered by the authenticated Backend HTTP route.
+      if (msg.type === 'barge-in') {
         await session.runtime.bargeIn();
       }
     },
