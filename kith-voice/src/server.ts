@@ -144,7 +144,10 @@ async function createSession(sessionId: string, ws: ServerWebSocket<WsData>): Pr
     }
   });
 
-  const hardTimeout = setTimeout(() => ws.close(1000, 'session time limit reached'), MAX_SESSION_MS);
+  const hardTimeout = setTimeout(
+    () => ws.close(1000, 'session time limit reached'),
+    MAX_SESSION_MS,
+  );
   return { runtime, voice, obs, unsubscribe, ws, ip: ws.data.ip, hardTimeout };
 }
 
@@ -171,7 +174,10 @@ const server = Bun.serve<WsData>({
     // WebSocket upgrade for browser clients
     if (url.pathname === '/ws') {
       if (sessions.size >= MAX_SESSIONS) {
-        return new Response('Voice capacity reached', { status: 503, headers: { 'Retry-After': '60' } });
+        return new Response('Voice capacity reached', {
+          status: 503,
+          headers: { 'Retry-After': '60' },
+        });
       }
       const ip =
         req.headers.get('cf-connecting-ip') ||
@@ -179,7 +185,10 @@ const server = Bun.serve<WsData>({
         'unknown';
       const sessionsForIp = [...sessions.values()].filter((session) => session.ip === ip).length;
       if (sessionsForIp >= MAX_SESSIONS_PER_IP) {
-        return new Response('Too many voice sessions', { status: 429, headers: { 'Retry-After': '60' } });
+        return new Response('Too many voice sessions', {
+          status: 429,
+          headers: { 'Retry-After': '60' },
+        });
       }
       const sessionId = crypto.randomUUID();
       const ok = server.upgrade(req, { data: { sessionId, ip } });
