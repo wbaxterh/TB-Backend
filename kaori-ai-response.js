@@ -543,10 +543,46 @@ function generateKaoriResponse(userMessage, db, conversationId, senderId, option
   });
 }
 
+async function generateKaoriGreeting(db, senderId = '', companionId = '69c15e55c7ebe2c6884f1267') {
+  let relationshipProfile = null;
+  let accountFirstName = '';
+  if (senderId) {
+    relationshipProfile = await db
+      .collection('companion_profiles')
+      .findOne({ userId: senderId, companionId });
+    if (ObjectId.isValid(senderId)) {
+      const account = await db
+        .collection('users')
+        .findOne({ _id: new ObjectId(senderId) }, { projection: { name: 1 } });
+      accountFirstName = (account?.name || '').trim().split(/\s+/)[0] || '';
+    }
+  }
+
+  const response = await callOpenRouter(
+    [
+      {
+        role: 'user',
+        content:
+          "Write one short opening message for this chat. Greet me in Kaori's natural voice and invite one action-sports question. Use one or two sentences, no em dash or en dash, and do not mention being an AI.",
+      },
+    ],
+    '',
+    relationshipProfile,
+    db,
+    senderId,
+    '',
+    accountFirstName,
+    getCompanion('kaori'),
+    null,
+  );
+  return response?.replace(/[—–]/g, ',').trim() || null;
+}
+
 module.exports = {
   buildSystemPrompt,
   generateCompanionResponse,
   generateKaoriResponse,
+  generateKaoriGreeting,
   KAORI_SYSTEM_PROMPT,
   shouldForceEventSearch,
 };
