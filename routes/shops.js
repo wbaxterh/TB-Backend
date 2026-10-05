@@ -2,6 +2,7 @@ const express = require('express');
 const { ObjectId } = require('mongodb');
 const escapeRegex = require('../utils/escapeRegex');
 const auth = require('../middleware/auth');
+const { verifyTokenWithGrace } = require('../middleware/auth');
 const {
   fetchPublishedRiderSlugMap,
   enrichShopsTeamRiders,
@@ -26,6 +27,10 @@ const SPORTS = new Set([
 ]);
 const SERVICES = new Set(['gear', 'apparel', 'repairs', 'rentals', 'lessons', 'online']);
 
+const VALID_RATINGS = new Set([1, 2, 3, 4, 5]);
+
+const optionalUserId = (req) => verifyTokenWithGrace(req.header('x-auth-token'))?.userId || null;
+
 const PUBLIC_SHOP_PROJECTION = {
   name: 1,
   slug: 1,
@@ -39,6 +44,7 @@ const PUBLIC_SHOP_PROJECTION = {
   imageAlt: 1,
   imageSourceUrl: 1,
   reviewSummary: 1,
+  userRating: 1,
   faqs: 1,
   pressFeatures: 1,
   teamRiders: 1,
@@ -65,6 +71,7 @@ module.exports = (db) => {
   const router = express.Router();
   const shops = db.collection('shops');
   const shopComments = db.collection('shop_comments');
+  const shopRatings = db.collection('shop_ratings');
   const users = db.collection('users');
   const riders = db.collection('riders');
 
@@ -82,10 +89,62 @@ module.exports = (db) => {
   shopComments.createIndex({ parentCommentId: 1 }, { background: true }).catch(() => {});
   shopComments.createIndex({ userId: 1 }, { background: true }).catch(() => {});
 
+  // Shop ratings indexes - unique constraint ensures one rating per user per shop
+  shopRatings
+    .createIndex({ shopId: 1, userId: 1 }, { unique: true, background: true })
+    .catch(() => {});
+  shopRatings.createIndex({ shopId: 1 }, { background: true }).catch(() => {});
+
   async function resolveShop(slugOrId) {
     const or = [{ slug: slugOrId }];
     if (ObjectId.isValid(slugOrId)) or.push({ _id: new ObjectId(slugOrId) });
     return shops.findOne({ status: 'published', $or: or }, { projection: { _id: 1 } });
+  }
+
+  async function computeRatingSummary(shopId, userId = null) {
+    const ratings = await shopRatings.find({ shopId }).toArray();
+
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    let sum = 0;
+    let myRating = null;
+
+    for (const r of ratings) {
+      distribution[String(r.rating)]++;
+      sum += r.rating;
+      if (userId && r.userId === userId) {
+        myRating = r.rating;
+      }
+    }
+
+    const ratingCount = ratings.length;
+    const averageRating = ratingCount > 0 ? Math.round((sum / ratingCount) * 10) / 10 : null;
+
+    return { averageRating, ratingCount, distribution, myRating };
+  }
+
+  async function updateShopUserRating(shopId) {
+    const summary = await computeRatingSummary(shopId);
+    await shops.updateOne(
+      { _id: new ObjectId(shopId) },
+      {
+        $set: {
+          'userRating.averageRating': summary.averageRating,
+          'userRating.ratingCount': summary.ratingCount,
+        },
+      },
+    );
+  }
+
+  function ensureUserRating(shop) {
+    if (!shop) return shop;
+    if (!shop.userRating) {
+      shop.userRating = { averageRating: null, ratingCount: 0 };
+    }
+    return shop;
+  }
+
+  function ensureUserRatings(shops) {
+    return shops.map(ensureUserRating);
   }
 
   async function populateCommentUsers(comments) {
@@ -150,7 +209,7 @@ module.exports = (db) => {
           .toArray(),
         fetchPublishedRiderSlugMap(riders),
       ]);
-      const enrichedShops = enrichShopsTeamRiders(docs, riderSlugMap);
+      const enrichedShops = ensureUserRatings(enrichShopsTeamRiders(docs, riderSlugMap));
       const nextCursor =
         parsed.cursor + docs.length < totalCount ? String(parsed.cursor + docs.length) : null;
 
@@ -172,10 +231,91 @@ module.exports = (db) => {
         fetchPublishedRiderSlugMap(riders),
       ]);
       if (!shop) return res.status(404).json({ error: 'Shop not found' });
-      const enrichedShop = enrichShopTeamRiders(shop, riderSlugMap);
+      const enrichedShop = ensureUserRating(enrichShopTeamRiders(shop, riderSlugMap));
       res.json({ shop: enrichedShop });
     } catch (error) {
       console.error('Error fetching shop', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  // =============================================
+  // SHOP RATING ENDPOINTS
+  // =============================================
+
+  // GET /api/shops/:slugOrId/ratings - public, returns rating summary (myRating if authenticated)
+  router.get('/:slugOrId/ratings', async (req, res) => {
+    try {
+      const { slugOrId } = req.params;
+      const userId = optionalUserId(req);
+
+      const shop = await resolveShop(slugOrId);
+      if (!shop) return res.status(404).json({ error: 'Shop not found' });
+
+      const shopId = shop._id.toString();
+      const summary = await computeRatingSummary(shopId, userId);
+
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching shop ratings', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  // PUT /api/shops/:slugOrId/rating - auth required, upsert user's rating
+  router.put('/:slugOrId/rating', auth, async (req, res) => {
+    try {
+      const { slugOrId } = req.params;
+      const { rating } = req.body;
+      const userId = req.user.userId;
+
+      if (typeof rating !== 'number' || !VALID_RATINGS.has(rating)) {
+        return res.status(400).json({ error: 'Rating must be an integer from 1 to 5' });
+      }
+
+      const shop = await resolveShop(slugOrId);
+      if (!shop) return res.status(404).json({ error: 'Shop not found' });
+
+      const shopId = shop._id.toString();
+
+      await shopRatings.updateOne(
+        { shopId, userId },
+        {
+          $set: { rating, updatedAt: new Date() },
+          $setOnInsert: { shopId, userId, createdAt: new Date() },
+        },
+        { upsert: true },
+      );
+
+      await updateShopUserRating(shopId);
+
+      const summary = await computeRatingSummary(shopId, userId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Error updating shop rating', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  // DELETE /api/shops/:slugOrId/rating - auth required, remove user's rating
+  router.delete('/:slugOrId/rating', auth, async (req, res) => {
+    try {
+      const { slugOrId } = req.params;
+      const userId = req.user.userId;
+
+      const shop = await resolveShop(slugOrId);
+      if (!shop) return res.status(404).json({ error: 'Shop not found' });
+
+      const shopId = shop._id.toString();
+
+      await shopRatings.deleteOne({ shopId, userId });
+
+      await updateShopUserRating(shopId);
+
+      const summary = await computeRatingSummary(shopId, userId);
+      res.json(summary);
+    } catch (error) {
+      console.error('Error deleting shop rating', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
