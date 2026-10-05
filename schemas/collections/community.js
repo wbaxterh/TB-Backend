@@ -335,6 +335,13 @@ module.exports = {
         },
         hours: { bsonType: ['string', 'object'] },
         socialLinks: { bsonType: 'object' },
+        userRating: {
+          bsonType: 'object',
+          properties: {
+            averageRating: { bsonType: ['number', 'null'] },
+            ratingCount: { bsonType: 'int' },
+          },
+        },
         verified: { bsonType: 'bool' },
         featured: { bsonType: 'bool' },
         status: { bsonType: 'string', enum: ['draft', 'published'] },
@@ -344,13 +351,14 @@ module.exports = {
       },
     },
     notes: [
-      'Script-only writer: `npm run shops:import -- --file x.json --apply` bulk-upserts by slug ($set the normalized shop, $setOnInsert createdAt). routes/shops.js never writes shops.',
-      'Shape is the Joi schema in services/shops/normalizeShop.js with stripUnknown, so the required list is exactly the fields Joi defaults or requires; website, phone, imageUrl, imageAlt, imageSourceUrl, reviewSummary, hours and socialLinks are optional and absent when the import file omits them.',
+      'Script-only writer: `npm run shops:import -- --file x.json --apply` bulk-upserts by slug ($set the normalized shop, $setOnInsert createdAt). routes/shops.js never writes shops except for userRating updates.',
+      'Shape is the Joi schema in services/shops/normalizeShop.js with stripUnknown, so the required list is exactly the fields Joi defaults or requires; website, phone, imageUrl, imageAlt, imageSourceUrl, reviewSummary, hours, socialLinks and userRating are optional and absent when the import file omits them.',
       'address.location is a GeoJSON Point { type: "Point", coordinates: [lng, lat] } added only when both lat and lng are numbers; it backs the 2dsphere index.',
       'reviewSummary.asOf and pressFeatures[].publishedAt are Joi.date().iso() and arrive as real Dates because normalizeShop returns the converted value.',
       'teamRiders[].riderSlug is stored only when the import file supplies it. The riderSlug the API returns is computed at read time by services/shops/riderMatcher.js and is not written back.',
       'hours is Joi.alternatives(string, object) with no inner shape, so it is typed as either.',
       'socialLinks is a Joi pattern object (platform name -> http(s) url); keys are not enumerated.',
+      'userRating is the denormalized TrickBook community rating summary; written by routes/shops.js rating endpoints, distinct from the imported Google reviewSummary.',
     ],
   },
 
@@ -386,6 +394,31 @@ module.exports = {
       'replyCount is $inc +1/-1 on the parent by the create and delete routes, so it is int; it can go negative if a reply is deleted twice through a race because the delete route checks status before writing.',
       'DELETE never removes the document: it $sets status to deleted and updatedAt; readers filter status: active.',
       'The `user` object returned by the API is populated at read time from users and is not stored.',
+    ],
+  },
+
+  shop_ratings: {
+    description: 'One TrickBook user star rating (1-5) for a shop; unique on (shopId, userId).',
+    writers: ['routes/shops.js'],
+    jsonSchema: {
+      bsonType: 'object',
+      required: ['shopId', 'userId', 'rating', 'createdAt', 'updatedAt'],
+      properties: {
+        _id: { bsonType: 'objectId' },
+        shopId: { bsonType: 'string' },
+        userId: { bsonType: 'string' },
+        rating: { bsonType: 'int', minimum: 1, maximum: 5 },
+        createdAt: { bsonType: 'date' },
+        updatedAt: { bsonType: 'date' },
+      },
+    },
+    notes: [
+      'shopId is shop._id.toString() and userId is the JWT payload userId (users._id hex string). Target: objectId for both.',
+      'rating is always an integer from 1 to 5; validated by the route before insert/update.',
+      'PUT /rating upserts: $set rating and updatedAt, $setOnInsert shopId, userId, createdAt.',
+      'DELETE /rating removes the document entirely (hard delete).',
+      'A unique compound index (shopId, userId) enforces one rating per user per shop.',
+      'The denormalized userRating summary (averageRating, ratingCount) is written to the shops collection after each rating change.',
     ],
   },
 
