@@ -3,26 +3,41 @@ const { ObjectId } = require('mongodb');
 const { getIosDownloads, getAndroidDownloads } = require('../services/appStoreDownloads');
 const { verifyTokenWithGrace } = require('../middleware/auth');
 const { normalizeEvent } = require('../services/analyticsContracts');
+const {
+  EXCLUDED_USER_FILTER,
+  MEANINGFUL_EVENTS,
+  computeRetention,
+  computeWeeklyProgressingRiders,
+  excludedSummary,
+} = require('../services/retentionMetrics');
 
 module.exports = (db) => {
   const router = express.Router();
   const eventsCollection = db.collection('analytics_events');
   const usersCollection = db.collection('users');
-  const meaningfulEvents = [
-    'trick_added',
-    'trick_attempt_logged',
-    'trick_landed',
-    'spot_saved',
-    'spot_directions_opened',
-    'event_saved',
-    'event_calendar_added',
-    'ai_session_completed',
-    'ai_response_completed',
-    'post_created',
-    'comment_created',
-    'rider_followed',
-    'homie_connected',
-  ];
+  const meaningfulEvents = [...MEANINGFUL_EVENTS];
+
+  // Accounts excluded from every metric: staff, bots, flagged QA. Labelled, never deleted.
+  async function excludedUsers() {
+    const users = await usersCollection
+      .find(EXCLUDED_USER_FILTER, { projection: { role: 1, isBot: 1, analyticsExcluded: 1 } })
+      .toArray();
+    return { ids: new Set(users.map((user) => String(user._id))), summary: excludedSummary(users) };
+  }
+
+  async function meaningfulActionsSince(since, userIds) {
+    return eventsCollection
+      .find(
+        {
+          event: { $in: meaningfulEvents },
+          timestamp: { $gte: since },
+          userId: userIds ? { $in: userIds } : { $ne: null },
+        },
+        { projection: { userId: 1, event: 1, timestamp: 1 } },
+      )
+      .sort({ timestamp: 1 })
+      .toArray();
+  }
 
   eventsCollection.createIndex({ event: 1, timestamp: -1 });
   eventsCollection.createIndex({ timestamp: -1 });
@@ -124,63 +139,34 @@ module.exports = (db) => {
     try {
       const weeks = Math.min(Number.parseInt(req.query.weeks, 10) || 8, 26);
       const since = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      const excluded = await excludedUsers();
       const signups = await usersCollection
-        .find(
-          { createdAt: { $gte: since }, isBot: { $ne: true } },
-          { projection: { createdAt: 1 } },
-        )
+        .find({ createdAt: { $gte: since } }, { projection: { createdAt: 1 } })
         .toArray();
-      const signupByUser = new Map(
-        signups.map((user) => [String(user._id), new Date(user.createdAt)]),
-      );
-      const actions = await eventsCollection
-        .find(
-          {
-            userId: { $in: [...signupByUser.keys()] },
-            event: { $in: meaningfulEvents },
-            timestamp: { $gte: since },
-          },
-          { projection: { userId: 1, event: 1, timestamp: 1 } },
-        )
-        .sort({ timestamp: 1 })
-        .toArray();
-
-      const byUser = new Map();
-      for (const action of actions) {
-        const key = String(action.userId);
-        if (!byUser.has(key)) byUser.set(key, []);
-        byUser.get(key).push(action);
-      }
-
-      const retainedWithin = (userId, start, minimumDay, maximumDay) =>
-        (byUser.get(userId) || []).some((action) => {
-          const day = (new Date(action.timestamp) - start) / (24 * 60 * 60 * 1000);
-          return day >= minimumDay && day < maximumDay;
-        });
-      const activated = signups.filter((user) =>
-        retainedWithin(String(user._id), new Date(user.createdAt), 0, 2),
-      ).length;
-      const retention = [1, 7, 14, 30].map((day) => ({
-        day,
-        eligible: signups.filter((user) => Date.now() - new Date(user.createdAt) >= day * 86400000)
-          .length,
-        retained: signups.filter(
-          (user) =>
-            Date.now() - new Date(user.createdAt) >= day * 86400000 &&
-            retainedWithin(String(user._id), new Date(user.createdAt), day, day + 1),
-        ).length,
-      }));
-      res.json({
-        since,
-        signups: signups.length,
-        activated,
-        activationRate: signups.length ? activated / signups.length : 0,
-        retention,
-        meaningfulEvents,
-      });
+      const cohortIds = signups
+        .map((user) => String(user._id))
+        .filter((id) => !excluded.ids.has(id));
+      const actions = await meaningfulActionsSince(since, cohortIds);
+      const metrics = computeRetention({ signups, actions, excluded: excluded.ids });
+      res.json({ since, weeks, ...metrics, meaningfulEvents, excluded: excluded.summary });
     } catch (error) {
       console.error('Retention dashboard error:', error.message);
       res.status(500).json({ error: 'Failed to get retention metrics' });
+    }
+  });
+
+  // Weekly Progressing Riders: distinct riders with a meaningful action per rolling week.
+  router.get('/dashboard/wpr', requireAdmin, async (req, res) => {
+    try {
+      const weeks = Math.min(Math.max(Number.parseInt(req.query.weeks, 10) || 8, 1), 26);
+      const since = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      const excluded = await excludedUsers();
+      const actions = await meaningfulActionsSince(since);
+      const metrics = computeWeeklyProgressingRiders({ actions, weeks, excluded: excluded.ids });
+      res.json({ ...metrics, meaningfulEvents, excluded: excluded.summary });
+    } catch (error) {
+      console.error('WPR dashboard error:', error.message);
+      res.status(500).json({ error: 'Failed to get weekly progressing riders' });
     }
   });
 
@@ -188,12 +174,13 @@ module.exports = (db) => {
     try {
       const days = Math.min(Number.parseInt(req.query.days, 10) || 30, 180);
       const since = new Date(Date.now() - days * 86400000);
+      const excluded = await excludedUsers();
       const rows = await eventsCollection
         .aggregate([
           {
             $match: {
               event: { $in: meaningfulEvents },
-              userId: { $ne: null },
+              userId: { $ne: null, $nin: [...excluded.ids] },
               timestamp: { $gte: since },
             },
           },
@@ -605,7 +592,10 @@ module.exports = (db) => {
       db.collection('bot_chats').distinct('userId', { updatedAt: { $gte: since } }),
       eventsCollection.distinct('userId', { timestamp: { $gte: since }, userId: { $ne: null } }),
     ]);
-    return new Set(sets.flat().filter(Boolean).map(String)).size;
+    const excluded = await excludedUsers();
+    return [...new Set(sets.flat().filter(Boolean).map(String))].filter(
+      (id) => !excluded.ids.has(id),
+    ).length;
   }
 
   router.get('/dashboard/app-users', requireAdmin, async (_req, res) => {

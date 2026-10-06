@@ -5,6 +5,7 @@ const { OAuth2Client } = require('google-auth-library');
 const appleSignin = require('apple-signin-auth');
 const bcrypt = require('bcrypt');
 const validateWith = require('../middleware/validation');
+const { emitServerEvent } = require('../services/analyticsEmit');
 const { PROVIDERS, getAuthProvider, providerMismatch } = require('../services/authProvider');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -51,7 +52,7 @@ async function resolveAppleUser(usersCollection, applePayload, fullName) {
     createdAt: new Date(),
   };
   const result = await usersCollection.insertOne(newUser);
-  return { user: { _id: result.insertedId, ...newUser } };
+  return { user: { _id: result.insertedId, ...newUser }, created: true };
 }
 
 module.exports = (db) => {
@@ -136,11 +137,17 @@ module.exports = (db) => {
           createdAt: new Date(),
         };
         const result = await usersCollection.insertOne(newUser);
-        //console.log("New user inserted via google auth: ", result);
         user = {
           _id: result.insertedId,
           ...newUser,
         };
+        // Clients cannot tell a first sign-in from a returning one; the server can.
+        emitServerEvent(db, {
+          name: 'signup_completed',
+          userId: result.insertedId,
+          properties: { method: 'google' },
+          req,
+        });
       } else {
         // Account linking (SSO ↔ SSO only): if this email already has an
         // account under a different SSO provider (Apple), link Google to it
@@ -206,6 +213,14 @@ module.exports = (db) => {
       const outcome = await resolveAppleUser(usersCollection, applePayload, fullName);
       if (!outcome.user) return res.status(outcome.status).send(outcome.body);
       const { user } = outcome;
+      if (outcome.created) {
+        emitServerEvent(db, {
+          name: 'signup_completed',
+          userId: user._id,
+          properties: { method: 'apple' },
+          req,
+        });
+      }
 
       const token = jwt.sign(
         {

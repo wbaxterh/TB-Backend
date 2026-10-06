@@ -1,7 +1,20 @@
+require('dotenv').config();
+
+// Error tracking is opt-in: with no SENTRY_DSN the SDK is never loaded.
+const Sentry = process.env.SENTRY_DSN ? require('@sentry/node') : null;
+if (Sentry) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'production',
+    release: process.env.APP_VERSION || undefined,
+    tracesSampleRate: 0,
+    sendDefaultPii: false,
+  });
+}
+
 const express = require('express');
 const http = require('http');
 const app = express();
-require('dotenv').config();
 
 // Trust the first proxy hop (AWS LB / nginx / Cloudflare). Required for
 // express-rate-limit v7+ to correctly identify clients via X-Forwarded-For,
@@ -161,6 +174,19 @@ async function startServer() {
   receiptsPoller.start(db);
   reminderSender.start(db);
   await graphProjector.start(db);
+
+  // Final error handler: report to Sentry when configured, never leak a stack
+  // trace, and turn the CORS callback's rejection into a 403 instead of a 500.
+  if (Sentry) Sentry.setupExpressErrorHandler(app);
+  app.use((error, req, res, _next) => {
+    const corsRejected = error?.message === 'Not allowed by CORS';
+    const status = corsRejected ? 403 : error?.status || error?.statusCode || 500;
+    if (status >= 500) console.error(`[error] ${req.method} ${req.originalUrl}:`, error);
+    if (res.headersSent) return;
+    res.status(status).json({
+      error: status >= 500 ? 'Internal server error' : error?.message || 'Request failed',
+    });
+  });
 
   const port = process.env.PORT || config.get('port');
   server.listen(port, () => {

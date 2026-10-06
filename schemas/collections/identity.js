@@ -99,6 +99,7 @@ module.exports = {
         updatedAt: date,
         role: str,
         isBot: bool,
+        analyticsExcluded: bool,
         bio: str,
         location: { bsonType: ['string', 'object', 'null'] },
         botCharacter: str,
