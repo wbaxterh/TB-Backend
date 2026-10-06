@@ -59,6 +59,9 @@ app.use(
   }),
 );
 app.use(express.static(path.join(__dirname, 'public')));
+// Stripe signs the raw request body. The webhook must see bytes, not a parsed
+// object, so it gets its own body parser ahead of the JSON parser below.
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(helmet());
 app.use(compression());
