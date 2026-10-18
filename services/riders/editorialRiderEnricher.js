@@ -9,6 +9,7 @@ const {
   normalizeSourceEvidence,
   normalizeStringList,
   normalizeUrl,
+  requireUrl,
   safeArray,
 } = require('./editorialRider');
 
@@ -41,7 +42,8 @@ const SCALAR_FIELDS = new Set([
   'competitiveStatus',
 ]);
 
-const PROTECTED_FIELDS = new Set(['biography', 'canonicalName', 'primarySport', 'slug']);
+const PROTECTED_FIELDS = new Set(['biography', 'canonicalName', 'primarySport']);
+const LOOKUP_KEY = 'slug';
 
 function assertCanaryEvidence(canary) {
   if (!canary || canary.environment !== 'staging') {
@@ -112,6 +114,20 @@ function dedupeSocialLinks(existing, incoming) {
     }
   }
   return [...seen.values()];
+}
+
+function validateEnrichmentContestHistory(entries, now) {
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!entry.sourceUrl) {
+      throw new Error(`contestHistory[${i}].sourceUrl is required for enrichment`);
+    }
+    requireUrl(entry.sourceUrl, `contestHistory[${i}].sourceUrl`);
+    if (!entry.publisher || !String(entry.publisher).trim()) {
+      throw new Error(`contestHistory[${i}].publisher is required for enrichment`);
+    }
+  }
+  return normalizeContestHistory(entries, now);
 }
 
 function dedupeContestHistory(existing, incoming) {
@@ -226,7 +242,7 @@ function computeFieldChanges(existingRider, enrichment, overrides = {}, now = ne
         mergedArray = dedupeSocialLinks(existingArray, normalizedIncoming);
         break;
       case 'contestHistory':
-        normalizedIncoming = normalizeContestHistory(enrichment[field], now);
+        normalizedIncoming = validateEnrichmentContestHistory(enrichment[field], now);
         mergedArray = dedupeContestHistory(existingArray, normalizedIncoming);
         break;
       case 'notableResults':
@@ -333,7 +349,7 @@ function validateEnrichmentPayload(payload, now = new Date()) {
 
     const overrides = record.overrides || {};
     for (const field of Object.keys(overrides)) {
-      if (!SCALAR_FIELDS.has(field) && !PROTECTED_FIELDS.has(field)) {
+      if (!SCALAR_FIELDS.has(field) && !PROTECTED_FIELDS.has(field) && field !== LOOKUP_KEY) {
         throw new Error(`Invalid override field: ${field}`);
       }
     }
@@ -484,6 +500,7 @@ async function enrichEditorialRiderBatch({
 
 module.exports = {
   ARRAY_FIELDS,
+  LOOKUP_KEY,
   MAX_ENRICHMENT_BATCH_SIZE,
   MIN_ENRICHMENT_BATCH_SIZE,
   PRODUCTION_DATABASE,
@@ -504,5 +521,6 @@ module.exports = {
   dedupeVideoParts,
   enrichEditorialRiderBatch,
   payloadHash,
+  validateEnrichmentContestHistory,
   validateEnrichmentPayload,
 };

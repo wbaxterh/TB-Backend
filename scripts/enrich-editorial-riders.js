@@ -17,7 +17,7 @@ function readJson(file) {
 }
 
 function printUsage() {
-  console.log(`
+  console.error(`
 Usage: node scripts/enrich-editorial-riders.js --input=<batch.json> [options]
 
 Options:
@@ -49,7 +49,7 @@ Batch JSON format:
       {
         "slug": "tony-hawk-skateboarding",
         "competitiveStatus": "pro",
-        "contestHistory": [...],
+        "contestHistory": [...],   // sourceUrl and publisher required per entry
         "sponsors": ["Birdhouse", "Vans"],
         "overrides": { "competitiveStatus": true }  // optional: force overwrite
       }
@@ -59,7 +59,8 @@ Batch JSON format:
 Enrichment rules:
   - Scalar fields (nationality, homeRegion, etc.) are filled only when empty
   - Array fields (sponsors, contestHistory, etc.) are appended with deduplication
-  - Protected fields (biography, canonicalName, primarySport, slug) require explicit override
+  - Protected fields (biography, canonicalName, primarySport) require explicit override
+  - contestHistory entries require sourceUrl and publisher
   - Batch size limit: 15 riders per batch
 `);
 }

@@ -15,10 +15,21 @@
 
 const CAPS = { parts: 40, results: 35, social: 10, longevity: 10, evidence: 5 };
 
-function placementPoints(placement) {
+function placementPoints(placement, placementNumber) {
   const value = String(placement || '').toLowerCase();
+
   if (/(1st|winner|champion|gold|soty)/.test(value)) return 12;
   if (/(2nd|3rd|silver|bronze|runner)/.test(value)) return 8;
+  if (/([4-9]th|10th|top.?10|finalist)/.test(value)) return 6;
+
+  const num = placementNumber ?? Number.parseInt(value.match(/^\d+/)?.[0], 10);
+  if (Number.isFinite(num)) {
+    if (num === 1) return 12;
+    if (num >= 2 && num <= 3) return 8;
+    if (num >= 4 && num <= 10) return 6;
+    return 4;
+  }
+
   return 4;
 }
 
@@ -45,11 +56,8 @@ function computeResultsScore(rider) {
     const key = `${normalizeEventKey(entry.contest)}:${entry.year || ''}`;
     if (!seen.has(key)) {
       seen.add(key);
-      const placement =
-        entry.medal ||
-        entry.placementText ||
-        (entry.placementNumber ? `${entry.placementNumber}` : '');
-      total += placementPoints(placement);
+      const placement = entry.medal || entry.placementText || '';
+      total += placementPoints(placement, entry.placementNumber);
     }
   }
 

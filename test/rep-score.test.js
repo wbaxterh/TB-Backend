@@ -9,13 +9,35 @@ const {
 
 const NOW = new Date('2026-09-07T00:00:00.000Z');
 
-test('weights placements by finish', () => {
+test('weights placements by finish with graded points', () => {
   assert.equal(placementPoints('1st'), 12);
   assert.equal(placementPoints('Winner'), 12);
+  assert.equal(placementPoints('champion'), 12);
+  assert.equal(placementPoints('gold'), 12);
   assert.equal(placementPoints('2nd'), 8);
+  assert.equal(placementPoints('3rd'), 8);
   assert.equal(placementPoints('Runner-up'), 8);
+  assert.equal(placementPoints('silver'), 8);
+  assert.equal(placementPoints('bronze'), 8);
+  assert.equal(placementPoints('4th'), 6);
+  assert.equal(placementPoints('5th'), 6);
+  assert.equal(placementPoints('10th'), 6);
+  assert.equal(placementPoints('top 10'), 6);
+  assert.equal(placementPoints('finalist'), 6);
   assert.equal(placementPoints('11th'), 4);
+  assert.equal(placementPoints('20th'), 4);
   assert.equal(placementPoints(undefined), 4);
+});
+
+test('derives placement from placementNumber when text is absent', () => {
+  assert.equal(placementPoints(undefined, 1), 12);
+  assert.equal(placementPoints(undefined, 2), 8);
+  assert.equal(placementPoints(undefined, 3), 8);
+  assert.equal(placementPoints(undefined, 4), 6);
+  assert.equal(placementPoints(undefined, 10), 6);
+  assert.equal(placementPoints(undefined, 11), 4);
+  assert.equal(placementPoints('', 1), 12);
+  assert.equal(placementPoints('', 5), 6);
 });
 
 test('scores an empty profile at zero', () => {
@@ -76,7 +98,7 @@ test('includes contestHistory placements in results score', () => {
       { contest: 'Dew Tour', year: 2022, placementNumber: 5 },
     ],
   });
-  assert.equal(results, 12 + 8 + 4);
+  assert.equal(results, 12 + 8 + 6);
 });
 
 test('contestHistory medal values map to correct points', () => {
@@ -147,4 +169,16 @@ test('computeRepScore integrates contestHistory into total score', () => {
   );
   assert.equal(breakdown.results, 20);
   assert.equal(score, 20);
+});
+
+test('placementNumber alone scores correctly in contestHistory', () => {
+  const results = computeResultsScore({
+    contestHistory: [
+      { contest: 'Event A', year: 2020, placementNumber: 1 },
+      { contest: 'Event B', year: 2020, placementNumber: 3 },
+      { contest: 'Event C', year: 2020, placementNumber: 7 },
+      { contest: 'Event D', year: 2020, placementNumber: 15 },
+    ],
+  });
+  assert.equal(results, 12 + 8 + 6 + 4);
 });

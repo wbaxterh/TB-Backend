@@ -212,6 +212,10 @@ test('validates and normalizes contest history entries', () => {
   const tampa = entries[1];
   assert.equal(tampa.contest, 'Tampa Am');
   assert.equal(tampa.division, 'am');
+
+  assert.equal('series' in tampa, false, 'optional series should be omitted, not null');
+  assert.equal('sourceUrl' in tampa, false, 'optional sourceUrl should be omitted, not null');
+  assert.equal('medal' in tampa, false, 'optional medal should be omitted, not null');
 });
 
 test('rejects contest history without contest name', () => {
