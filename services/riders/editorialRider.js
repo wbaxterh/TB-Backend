@@ -164,6 +164,10 @@ function normalizeCouchCredits(value) {
   });
 }
 
+function omitUndefined(obj) {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
+
 function normalizeContestHistoryEntry(entry, index, now) {
   const contest = String(entry.contest || '').trim();
   if (!contest) throw new Error(`contestHistory[${index}].contest is required`);
@@ -196,7 +200,7 @@ function normalizeContestHistoryEntry(entry, index, now) {
         })()
     : undefined;
 
-  return {
+  return omitUndefined({
     contest,
     series: String(entry.series || '').trim() || undefined,
     edition: String(entry.edition || '').trim() || undefined,
@@ -219,7 +223,7 @@ function normalizeContestHistoryEntry(entry, index, now) {
     publisher: String(entry.publisher || '').trim() || undefined,
     accessedAt: entry.accessedAt ? new Date(entry.accessedAt) : now,
     eventId,
-  };
+  });
 }
 
 function normalizeContestHistory(value, now) {
@@ -377,5 +381,6 @@ module.exports = {
   normalizeSourceEvidence,
   normalizeStringList,
   normalizeUrl,
+  requireUrl,
   safeArray,
 };

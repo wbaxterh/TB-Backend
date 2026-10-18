@@ -204,7 +204,6 @@ test('protects biography and identity fields without explicit override', () => {
     biography: 'New biography text',
     canonicalName: 'Anthony Hawk',
     primarySport: 'snowboarding',
-    slug: 'new-slug',
   };
 
   const { skipped } = computeFieldChanges(rider, enrichment, {}, NOW);
@@ -212,7 +211,6 @@ test('protects biography and identity fields without explicit override', () => {
   assert.equal(skipped.biography, 'protected field');
   assert.equal(skipped.canonicalName, 'protected field');
   assert.equal(skipped.primarySport, 'protected field');
-  assert.equal(skipped.slug, 'protected field');
 });
 
 test('validates contest history entries', () => {
@@ -248,7 +246,14 @@ test('validates contest history entries', () => {
 test('rejects invalid contest history division', () => {
   const rider = existingRider();
   const enrichment = {
-    contestHistory: [{ contest: 'Test', division: 'invalid' }],
+    contestHistory: [
+      {
+        contest: 'Test',
+        division: 'invalid',
+        sourceUrl: 'https://example.com/results',
+        publisher: 'ESPN',
+      },
+    ],
   };
 
   assert.throws(() => computeFieldChanges(rider, enrichment, {}, NOW), /Invalid.*division/);
@@ -391,4 +396,66 @@ test('refuses database mismatch', async () => {
     }),
     /does not match the guarded target/,
   );
+});
+
+test('slug is the lookup key and does not appear in skipped warnings', () => {
+  const rider = existingRider();
+  const enrichment = {
+    slug: 'tony-hawk-skateboarding',
+    homeRegion: 'San Diego, CA',
+  };
+
+  const { skipped } = computeFieldChanges(rider, enrichment, {}, NOW);
+
+  assert.equal(skipped.slug, undefined);
+  assert.equal(skipped.biography, undefined);
+});
+
+test('contestHistory enrichment requires sourceUrl and publisher', () => {
+  const rider = existingRider();
+
+  assert.throws(
+    () =>
+      computeFieldChanges(
+        rider,
+        {
+          contestHistory: [{ contest: 'X Games', year: 2020, publisher: 'ESPN' }],
+        },
+        {},
+        NOW,
+      ),
+    /sourceUrl is required for enrichment/,
+  );
+
+  assert.throws(
+    () =>
+      computeFieldChanges(
+        rider,
+        {
+          contestHistory: [
+            { contest: 'X Games', year: 2020, sourceUrl: 'https://example.com/results' },
+          ],
+        },
+        {},
+        NOW,
+      ),
+    /publisher is required for enrichment/,
+  );
+
+  const { changes } = computeFieldChanges(
+    rider,
+    {
+      contestHistory: [
+        {
+          contest: 'X Games',
+          year: 2020,
+          sourceUrl: 'https://example.com/results',
+          publisher: 'ESPN',
+        },
+      ],
+    },
+    {},
+    NOW,
+  );
+  assert.equal(changes.contestHistory.added, 1);
 });
