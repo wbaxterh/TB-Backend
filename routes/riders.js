@@ -1,6 +1,10 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { PUBLIC_RIDER_PROJECTION, SUPPORTED_SPORTS } = require('../services/riders/editorialRider');
+const {
+  COMPETITIVE_STATUSES,
+  PUBLIC_RIDER_PROJECTION,
+  SUPPORTED_SPORTS,
+} = require('../services/riders/editorialRider');
 const { computeRepScore } = require('../services/riders/repScore');
 const escapeRegex = require('../utils/escapeRegex');
 
@@ -53,13 +57,22 @@ module.exports = (db) => {
         .trim()
         .toLowerCase()
         .slice(0, 40);
+      const status = String(req.query.status || '')
+        .trim()
+        .toLowerCase()
+        .slice(0, 20);
 
       if (sport && !SUPPORTED_SPORTS.has(sport)) {
         return res.status(400).send({ error: 'Invalid sport' });
       }
 
+      if (status && !COMPETITIVE_STATUSES.has(status)) {
+        return res.status(400).send({ error: 'Invalid status' });
+      }
+
       const filter = { reviewStatus: 'published' };
       if (sport) filter.primarySport = sport;
+      if (status) filter.competitiveStatus = status;
       if (query) {
         const safeQuery = { $regex: escapeRegex(query), $options: 'i' };
         filter.$or = [
