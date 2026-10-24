@@ -1,0 +1,93 @@
+{
+  "batchId": "sample-enrichment-2026-10",
+  "riders": [
+    {
+      "slug": "nyjah-huston-skateboarding",
+      "competitiveStatus": "pro",
+      "contestHistory": [
+        {
+          "contest": "Street League Skateboarding Super Crown World Championship",
+          "series": "SLS",
+          "year": 2023,
+          "location": "Sao Paulo, Brazil",
+          "sport": "skateboarding",
+          "discipline": "street",
+          "division": "pro",
+          "placementNumber": 1,
+          "placementText": "1st Place",
+          "medal": "gold",
+          "sourceUrl": "https://streetleague.com/results/2023-super-crown",
+          "publisher": "Street League Skateboarding"
+        }
+      ],
+      "sponsors": ["Nike SB", "Monster Energy", "Diamond Supply Co"],
+      "socialLinks": [
+        { "platform": "instagram", "url": "https://instagram.com/nyjah" },
+        { "platform": "twitter", "url": "https://twitter.com/naborhood" }
+      ]
+    },
+    {
+      "slug": "rayssa-leal-skateboarding",
+      "competitiveStatus": "pro",
+      "contestHistory": [
+        {
+          "contest": "Tokyo 2020 Olympics",
+          "series": "Summer Olympics",
+          "edition": "XXXII",
+          "year": 2021,
+          "date": "2021-07-26",
+          "location": "Tokyo, Japan",
+          "sport": "skateboarding",
+          "discipline": "street",
+          "division": "women",
+          "placementNumber": 2,
+          "placementText": "Silver Medal",
+          "medal": "silver",
+          "sourceUrl": "https://olympics.com/en/olympic-games/tokyo-2020/results/skateboarding/women-s-street",
+          "publisher": "International Olympic Committee"
+        },
+        {
+          "contest": "Paris 2024 Olympics",
+          "series": "Summer Olympics",
+          "edition": "XXXIII",
+          "year": 2024,
+          "date": "2024-07-28",
+          "location": "Paris, France",
+          "sport": "skateboarding",
+          "discipline": "street",
+          "division": "women",
+          "placementNumber": 3,
+          "placementText": "Bronze Medal",
+          "medal": "bronze",
+          "sourceUrl": "https://olympics.com/en/olympic-games/paris-2024/results/skateboarding/women-s-street",
+          "publisher": "International Olympic Committee"
+        }
+      ],
+      "sponsors": ["Nike SB", "Monster Energy"],
+      "nationality": "Brazilian",
+      "homeRegion": "Imperatriz, Maranhao"
+    },
+    {
+      "slug": "jagger-eaton-skateboarding",
+      "competitiveStatus": "pro",
+      "contestHistory": [
+        {
+          "contest": "Tokyo 2020 Olympics",
+          "series": "Summer Olympics",
+          "year": 2021,
+          "location": "Tokyo, Japan",
+          "sport": "skateboarding",
+          "discipline": "street",
+          "division": "men",
+          "placementNumber": 3,
+          "placementText": "Bronze Medal",
+          "medal": "bronze",
+          "sourceUrl": "https://olympics.com/en/olympic-games/tokyo-2020/results/skateboarding/men-s-street",
+          "publisher": "International Olympic Committee"
+        }
+      ],
+      "notableResults": [{ "event": "X Games Minneapolis", "year": 2019, "placement": "1st" }],
+      "socialLinks": [{ "platform": "instagram", "url": "https://instagram.com/jaborhood" }]
+    }
+  ]
+}

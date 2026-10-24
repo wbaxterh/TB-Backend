@@ -15,6 +15,19 @@ const PROFILE_TYPES = new Set(['member', 'editorial', 'claimed']);
 const CLAIM_STATUSES = new Set(['unclaimed', 'pending', 'claimed']);
 const REVIEW_STATUSES = new Set(['draft', 'reviewed', 'published', 'rejected']);
 const HERO_IMAGE_RIGHTS = new Set(['controlled', 'licensed', 'reuse_permitted']);
+const COMPETITIVE_STATUSES = new Set(['pro', 'am', 'retired', 'unknown']);
+const CONTEST_DIVISIONS = new Set([
+  'pro',
+  'am',
+  'open',
+  'women',
+  'men',
+  'junior',
+  'masters',
+  'adaptive',
+  'other',
+]);
+const MEDAL_TYPES = new Set(['gold', 'silver', 'bronze', 'none']);
 
 const PUBLIC_RIDER_PROJECTION = Object.freeze({
   canonicalName: 1,
@@ -43,6 +56,7 @@ const PUBLIC_RIDER_PROJECTION = Object.freeze({
   sourceEvidence: 1,
   profileType: 1,
   claimStatus: 1,
+  competitiveStatus: 1,
   createdAt: 1,
   updatedAt: 1,
 });
@@ -150,6 +164,89 @@ function normalizeCouchCredits(value) {
   });
 }
 
+function omitUndefined(obj) {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
+
+function normalizeContestHistoryEntry(entry, index, now) {
+  const contest = String(entry.contest || '').trim();
+  if (!contest) throw new Error(`contestHistory[${index}].contest is required`);
+
+  const division = entry.division
+    ? requireEnum(
+        String(entry.division).trim().toLowerCase(),
+        CONTEST_DIVISIONS,
+        `contestHistory[${index}].division`,
+      )
+    : undefined;
+
+  const medal = entry.medal
+    ? requireEnum(
+        String(entry.medal).trim().toLowerCase(),
+        MEDAL_TYPES,
+        `contestHistory[${index}].medal`,
+      )
+    : undefined;
+
+  const sourceUrl = entry.sourceUrl
+    ? requireUrl(entry.sourceUrl, `contestHistory[${index}].sourceUrl`)
+    : undefined;
+
+  const eventId = entry.eventId
+    ? ObjectId.isValid(entry.eventId)
+      ? String(entry.eventId)
+      : (() => {
+          throw new Error(`contestHistory[${index}].eventId is invalid`);
+        })()
+    : undefined;
+
+  return omitUndefined({
+    contest,
+    series: String(entry.series || '').trim() || undefined,
+    edition: String(entry.edition || '').trim() || undefined,
+    year: entry.year ? Number(entry.year) : undefined,
+    date: entry.date ? new Date(entry.date) : undefined,
+    location: String(entry.location || '').trim() || undefined,
+    sport: entry.sport
+      ? requireEnum(
+          String(entry.sport).trim().toLowerCase(),
+          SUPPORTED_SPORTS,
+          `contestHistory[${index}].sport`,
+        )
+      : undefined,
+    discipline: String(entry.discipline || '').trim() || undefined,
+    division,
+    placementNumber: entry.placementNumber ? Number(entry.placementNumber) : undefined,
+    placementText: String(entry.placementText || '').trim() || undefined,
+    medal,
+    sourceUrl,
+    publisher: String(entry.publisher || '').trim() || undefined,
+    accessedAt: entry.accessedAt ? new Date(entry.accessedAt) : now,
+    eventId,
+  });
+}
+
+function normalizeContestHistory(value, now) {
+  if (!Array.isArray(value)) return [];
+  const entries = value.map((entry, index) => normalizeContestHistoryEntry(entry, index, now));
+  const seen = new Set();
+  return entries.filter((entry) => {
+    const key = `${entry.contest}:${entry.year || ''}:${entry.division || ''}:${entry.placementNumber || entry.placementText || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeCompetitiveStatus(value) {
+  if (!value) return 'unknown';
+  const status = String(value).trim().toLowerCase();
+  if (!COMPETITIVE_STATUSES.has(status)) {
+    throw new Error(`Invalid competitiveStatus: ${value}`);
+  }
+  return status;
+}
+
 function normalizeAccountId(value) {
   if (!value) return undefined;
   if (value instanceof ObjectId) return value;
@@ -233,7 +330,8 @@ function buildEditorialRider(input, now = new Date()) {
     stance: String(input.stance || '').trim(),
     ridingStyle: String(input.ridingStyle || '').trim(),
     notableResults: safeArray(input.notableResults),
-    contestHistory: safeArray(input.contestHistory),
+    contestHistory: normalizeContestHistory(input.contestHistory, now),
+    competitiveStatus: normalizeCompetitiveStatus(input.competitiveStatus),
     signatureTricks: normalizeStringList(input.signatureTricks),
     contributions: normalizeStringList(input.contributions),
     videoParts: safeArray(input.videoParts),
@@ -266,10 +364,23 @@ async function ensureEditorialRiderIndexes(collection) {
 }
 
 module.exports = {
+  COMPETITIVE_STATUSES,
+  CONTEST_DIVISIONS,
+  MEDAL_TYPES,
   PUBLIC_RIDER_PROJECTION,
   SUPPORTED_SPORTS,
   buildEditorialRider,
   buildIdentityKey,
   ensureEditorialRiderIndexes,
+  normalizeCompetitiveStatus,
+  normalizeContestHistory,
+  normalizeCouchCredits,
+  normalizeHeroImage,
   normalizeIdentityPart,
+  normalizeSocialLinks,
+  normalizeSourceEvidence,
+  normalizeStringList,
+  normalizeUrl,
+  requireUrl,
+  safeArray,
 };

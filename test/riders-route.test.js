@@ -138,6 +138,53 @@ test('editorial list rejects unsupported sports before querying the database', a
   assert.equal(capture.filter, undefined);
 });
 
+test('editorial list filters by competitive status', async () => {
+  const capture = {};
+  const db = createDb(
+    [
+      {
+        _id: 'rider-1',
+        canonicalName: 'Pro Rider',
+        slug: 'pro-rider-skateboarding',
+        primarySport: 'skateboarding',
+        reviewStatus: 'published',
+        competitiveStatus: 'pro',
+      },
+      {
+        _id: 'rider-2',
+        canonicalName: 'Am Rider',
+        slug: 'am-rider-skateboarding',
+        primarySport: 'skateboarding',
+        reviewStatus: 'published',
+        competitiveStatus: 'am',
+      },
+    ],
+    capture,
+  );
+
+  await withServer(db, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/riders/editorial?status=pro`);
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.items.length, 2);
+  });
+
+  assert.equal(capture.filter.competitiveStatus, 'pro');
+});
+
+test('editorial list rejects invalid competitive status', async () => {
+  const capture = {};
+  const db = createDb([], capture);
+
+  await withServer(db, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/riders/editorial?status=legend`);
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { error: 'Invalid status' });
+  });
+
+  assert.equal(capture.filter, undefined);
+});
+
 test('editorial detail requires a published slug and never projects workflow fields', async () => {
   const capture = {};
   const db = createDb(

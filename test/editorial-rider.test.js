@@ -2,10 +2,14 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { ObjectId } = require('mongodb');
 const {
+  COMPETITIVE_STATUSES,
+  CONTEST_DIVISIONS,
   PUBLIC_RIDER_PROJECTION,
   buildEditorialRider,
   buildIdentityKey,
   ensureEditorialRiderIndexes,
+  normalizeCompetitiveStatus,
+  normalizeContestHistory,
 } = require('../services/riders/editorialRider');
 
 const NOW = new Date('2026-09-05T06:52:00.000Z');
@@ -163,4 +167,179 @@ test('creates unique identity, slug, and account indexes', async () => {
   assert.equal(definitions.find((index) => index.name === 'rider_identity_unique').unique, true);
   assert.equal(definitions.find((index) => index.name === 'rider_slug_unique').unique, true);
   assert.equal(definitions.find((index) => index.name === 'rider_account_unique').sparse, true);
+});
+
+test('validates and normalizes contest history entries', () => {
+  const entries = normalizeContestHistory(
+    [
+      {
+        contest: 'X Games',
+        series: 'Summer X Games',
+        edition: 'XXV',
+        year: 2020,
+        date: '2020-08-01',
+        location: 'Minneapolis, MN',
+        sport: 'skateboarding',
+        discipline: 'vert',
+        division: 'PRO',
+        placementNumber: 1,
+        placementText: '1st Place',
+        medal: 'GOLD',
+        sourceUrl: 'https://xgames.com/results/2020',
+        publisher: 'ESPN',
+      },
+      {
+        contest: 'Tampa Am',
+        year: 2019,
+        division: 'am',
+        placementNumber: 5,
+      },
+    ],
+    NOW,
+  );
+
+  assert.equal(entries.length, 2);
+
+  const xgames = entries[0];
+  assert.equal(xgames.contest, 'X Games');
+  assert.equal(xgames.series, 'Summer X Games');
+  assert.equal(xgames.division, 'pro');
+  assert.equal(xgames.medal, 'gold');
+  assert.equal(xgames.placementNumber, 1);
+  assert.ok(xgames.date instanceof Date);
+  assert.ok(xgames.accessedAt instanceof Date);
+
+  const tampa = entries[1];
+  assert.equal(tampa.contest, 'Tampa Am');
+  assert.equal(tampa.division, 'am');
+
+  assert.equal('series' in tampa, false, 'optional series should be omitted, not null');
+  assert.equal('sourceUrl' in tampa, false, 'optional sourceUrl should be omitted, not null');
+  assert.equal('medal' in tampa, false, 'optional medal should be omitted, not null');
+});
+
+test('rejects contest history without contest name', () => {
+  assert.throws(
+    () => normalizeContestHistory([{ year: 2020, division: 'pro' }], NOW),
+    /contestHistory\[0\].contest is required/,
+  );
+});
+
+test('rejects invalid contest history division', () => {
+  assert.throws(
+    () => normalizeContestHistory([{ contest: 'Test', division: 'invalid' }], NOW),
+    /Invalid contestHistory\[0\].division/,
+  );
+});
+
+test('rejects invalid contest history medal', () => {
+  assert.throws(
+    () => normalizeContestHistory([{ contest: 'Test', medal: 'platinum' }], NOW),
+    /Invalid contestHistory\[0\].medal/,
+  );
+});
+
+test('rejects invalid contest history sport', () => {
+  assert.throws(
+    () => normalizeContestHistory([{ contest: 'Test', sport: 'motocross' }], NOW),
+    /Invalid contestHistory\[0\].sport/,
+  );
+});
+
+test('deduplicates contest history entries', () => {
+  const entries = normalizeContestHistory(
+    [
+      { contest: 'X Games', year: 2020, division: 'pro', placementNumber: 1 },
+      { contest: 'X Games', year: 2020, division: 'pro', placementNumber: 1 },
+      { contest: 'X Games', year: 2021, division: 'pro', placementNumber: 2 },
+    ],
+    NOW,
+  );
+  assert.equal(entries.length, 2);
+});
+
+test('validates optional event ID link', () => {
+  const validId = new ObjectId().toString();
+  const entries = normalizeContestHistory([{ contest: 'Test', eventId: validId }], NOW);
+  assert.equal(entries[0].eventId, validId);
+
+  assert.throws(
+    () => normalizeContestHistory([{ contest: 'Test', eventId: 'invalid' }], NOW),
+    /contestHistory\[0\].eventId is invalid/,
+  );
+});
+
+test('normalizes competitive status with valid values', () => {
+  assert.equal(normalizeCompetitiveStatus('pro'), 'pro');
+  assert.equal(normalizeCompetitiveStatus('PRO'), 'pro');
+  assert.equal(normalizeCompetitiveStatus('am'), 'am');
+  assert.equal(normalizeCompetitiveStatus('retired'), 'retired');
+  assert.equal(normalizeCompetitiveStatus('unknown'), 'unknown');
+  assert.equal(normalizeCompetitiveStatus(undefined), 'unknown');
+  assert.equal(normalizeCompetitiveStatus(null), 'unknown');
+  assert.equal(normalizeCompetitiveStatus(''), 'unknown');
+});
+
+test('rejects invalid competitive status', () => {
+  assert.throws(() => normalizeCompetitiveStatus('legend'), /Invalid competitiveStatus/);
+  assert.throws(() => normalizeCompetitiveStatus('amateur'), /Invalid competitiveStatus/);
+});
+
+test('includes competitiveStatus in public projection', () => {
+  assert.equal(PUBLIC_RIDER_PROJECTION.competitiveStatus, 1);
+});
+
+test('buildEditorialRider includes competitiveStatus with default unknown', () => {
+  const rider = buildEditorialRider(
+    {
+      canonicalName: 'Test Rider',
+      primarySport: 'skateboarding',
+    },
+    NOW,
+  );
+  assert.equal(rider.competitiveStatus, 'unknown');
+
+  const proRider = buildEditorialRider(
+    {
+      canonicalName: 'Pro Rider',
+      primarySport: 'skateboarding',
+      competitiveStatus: 'pro',
+    },
+    NOW,
+  );
+  assert.equal(proRider.competitiveStatus, 'pro');
+});
+
+test('buildEditorialRider validates contest history', () => {
+  const rider = buildEditorialRider(
+    {
+      canonicalName: 'Contest Rider',
+      primarySport: 'skateboarding',
+      contestHistory: [
+        {
+          contest: 'SLS',
+          year: 2023,
+          division: 'pro',
+          placementNumber: 3,
+          medal: 'bronze',
+        },
+      ],
+    },
+    NOW,
+  );
+  assert.equal(rider.contestHistory.length, 1);
+  assert.equal(rider.contestHistory[0].contest, 'SLS');
+  assert.equal(rider.contestHistory[0].division, 'pro');
+});
+
+test('COMPETITIVE_STATUSES and CONTEST_DIVISIONS are exported', () => {
+  assert.ok(COMPETITIVE_STATUSES.has('pro'));
+  assert.ok(COMPETITIVE_STATUSES.has('am'));
+  assert.ok(COMPETITIVE_STATUSES.has('retired'));
+  assert.ok(COMPETITIVE_STATUSES.has('unknown'));
+
+  assert.ok(CONTEST_DIVISIONS.has('pro'));
+  assert.ok(CONTEST_DIVISIONS.has('am'));
+  assert.ok(CONTEST_DIVISIONS.has('women'));
+  assert.ok(CONTEST_DIVISIONS.has('junior'));
 });
