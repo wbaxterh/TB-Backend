@@ -12,8 +12,11 @@ function frontendUrl() {
   return process.env.FRONTEND_URL || 'https://thetrickbook.com';
 }
 
+// Stripe API 2025-03-31.basil+ moved current_period_end from the subscription
+// onto each subscription item; read the item first, fall back for older payloads.
 function periodEnd(subscription) {
-  const seconds = subscription?.current_period_end;
+  const seconds =
+    subscription?.items?.data?.[0]?.current_period_end ?? subscription?.current_period_end;
   return typeof seconds === 'number' ? new Date(seconds * 1000) : null;
 }
 
