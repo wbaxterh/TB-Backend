@@ -16,6 +16,13 @@ const multer = require('multer');
 const googlePlaces = require('../services/googlePlaces');
 const s3Upload = require('../services/s3Upload');
 const { verifyTokenWithGrace } = require('../middleware/auth');
+const {
+  MAP_CLUSTER_LIMIT,
+  MAP_PIN_LIMIT,
+  clusterCellSize,
+  longitudeCondition,
+  parseMapRequest,
+} = require('../utils/spotsMap');
 
 // Configure multer for memory storage (for S3 upload)
 const upload = multer({
@@ -444,43 +451,22 @@ module.exports = (db) => {
   // Lightweight endpoint for map pins — coordinates only, trimmed projection.
   // Supports bounding-box query (minLat, maxLat, minLng, maxLng) plus sportType/category filters.
   router.get('/map-pins', async (req, res) => {
+    const startedAt = Date.now();
     try {
-      const { minLat, maxLat, minLng, maxLng, sportType, category } = req.query;
+      const { sportType, category, country } = req.query;
+      const mapRequest = parseMapRequest(req.query);
 
       const query = { approvalStatus: 'approved' };
       const andConditions = [];
 
-      const hasBounds =
-        minLat !== undefined &&
-        maxLat !== undefined &&
-        minLng !== undefined &&
-        maxLng !== undefined;
-
-      if (hasBounds) {
-        const minLatNum = parseFloat(minLat);
-        const maxLatNum = parseFloat(maxLat);
-        const minLngNum = parseFloat(minLng);
-        const maxLngNum = parseFloat(maxLng);
-
-        if (
-          Number.isNaN(minLatNum) ||
-          Number.isNaN(maxLatNum) ||
-          Number.isNaN(minLngNum) ||
-          Number.isNaN(maxLngNum)
-        ) {
-          return res.status(400).json({ error: 'Invalid bounding box parameters' });
-        }
-
-        query.latitude = { $gte: minLatNum, $lte: maxLatNum };
-
-        // Handle antimeridian crossing (e.g. min=170, max=-170 wraps the date line)
-        if (minLngNum <= maxLngNum) {
-          query.longitude = { $gte: minLngNum, $lte: maxLngNum };
-        } else {
-          andConditions.push({
-            $or: [{ longitude: { $gte: minLngNum } }, { longitude: { $lte: maxLngNum } }],
-          });
-        }
+      if (mapRequest.bounds) {
+        query.latitude = {
+          $gte: mapRequest.bounds.minLat,
+          $lte: mapRequest.bounds.maxLat,
+        };
+        const lngCondition = longitudeCondition(mapRequest.bounds.minLng, mapRequest.bounds.maxLng);
+        if (lngCondition.longitude) query.longitude = lngCondition.longitude;
+        else andConditions.push(lngCondition);
       } else {
         query.latitude = { $exists: true };
         query.longitude = { $exists: true };
@@ -490,10 +476,66 @@ module.exports = (db) => {
         query.sportTypes = sportType;
       }
 
+      if (country && country !== 'all') query.country = country;
+
       andConditions.push(...categoryConditions(category));
 
       if (andConditions.length) {
         query.$and = andConditions;
+      }
+
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+
+      if (mapRequest.aggregate && mapRequest.version === 2) {
+        const cellSize = clusterCellSize(mapRequest.zoom);
+        const clusters = await spotsCollection
+          .aggregate(
+            [
+              { $match: query },
+              {
+                $group: {
+                  _id: {
+                    lat: { $floor: { $divide: [{ $add: ['$latitude', 90] }, cellSize] } },
+                    lng: { $floor: { $divide: [{ $add: ['$longitude', 180] }, cellSize] } },
+                  },
+                  latitude: { $avg: '$latitude' },
+                  longitude: { $avg: '$longitude' },
+                  count: { $sum: 1 },
+                },
+              },
+              { $sort: { count: -1 } },
+              { $limit: MAP_CLUSTER_LIMIT },
+              {
+                $project: {
+                  _id: 0,
+                  id: {
+                    $concat: [
+                      'cluster-',
+                      { $toString: '$_id.lat' },
+                      '-',
+                      { $toString: '$_id.lng' },
+                    ],
+                  },
+                  latitude: 1,
+                  longitude: 1,
+                  count: 1,
+                },
+              },
+            ],
+            { maxTimeMS: 3000 },
+          )
+          .toArray();
+        console.info('[SpotsMap]', {
+          type: 'clusters',
+          count: clusters.length,
+          zoom: mapRequest.zoom,
+          durationMs: Date.now() - startedAt,
+        });
+        return res.json({
+          type: 'clusters',
+          dataVersion: new Date().toISOString(),
+          items: clusters,
+        });
       }
 
       const pins = await spotsCollection
@@ -504,19 +546,61 @@ module.exports = (db) => {
             longitude: 1,
             category: 1,
             sportTypes: 1,
-            rating: 1,
-            imageURL: 1,
             city: 1,
             state: 1,
             country: 1,
-            description: 1,
           },
+          maxTimeMS: 3000,
         })
+        .limit(MAP_PIN_LIMIT)
         .toArray();
 
-      res.json(pins);
+      console.info('[SpotsMap]', {
+        type: 'pins',
+        count: pins.length,
+        zoom: mapRequest.zoom,
+        durationMs: Date.now() - startedAt,
+      });
+      if (mapRequest.version === 1) return res.json(pins);
+      return res.json({ type: 'pins', dataVersion: new Date().toISOString(), items: pins });
     } catch (error) {
+      if (error.status === 400) return res.status(400).json({ error: error.message });
       console.error('Error retrieving map pins', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
+  // Compact country/state counts for the root list view. This intentionally
+  // avoids sending thousands of full spot records just to render browse cards.
+  router.get('/browse-summary', async (req, res) => {
+    try {
+      const { sportType, category, country } = req.query;
+      const query = { approvalStatus: 'approved' };
+      if (sportType && sportType !== 'all') query.sportTypes = sportType;
+      if (country && country !== 'all') query.country = country;
+      const conditions = categoryConditions(category);
+      if (conditions.length) query.$and = conditions;
+
+      const groups = await spotsCollection
+        .aggregate(
+          [
+            { $match: query },
+            {
+              $group: {
+                _id: { state: { $ifNull: ['$state', 'Unknown'] } },
+                count: { $sum: 1 },
+              },
+            },
+            { $project: { _id: 0, state: '$_id.state', count: 1 } },
+            { $sort: { count: -1 } },
+          ],
+          { maxTimeMS: 3000 },
+        )
+        .toArray();
+      res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+      res.json({ groups });
+    } catch (error) {
+      console.error('Error retrieving spots browse summary', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
