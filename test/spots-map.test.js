@@ -41,3 +41,11 @@ test('cluster cells become more precise as zoom increases', () => {
   assert.ok(clusterCellSize(3) > clusterCellSize(7));
   assert.equal(clusterCellSize(22), 0.25);
 });
+
+test('map parameters reject blank, repeated and nonnumeric input', () => {
+  for (const zoom of ['', ' ', ['3', '4'], {}, 'NaN', 'Infinity', '-1', '23']) {
+    assert.throws(() => parseMapRequest({ zoom }), /Invalid zoom/);
+  }
+  assert.equal(parseMapRequest({}).version, 1);
+  assert.equal(parseMapRequest({ v: '2', zoom: '12' }).aggregate, false);
+});

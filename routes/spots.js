@@ -478,6 +478,11 @@ module.exports = (db) => {
 
       if (country && country !== 'all') query.country = country;
 
+      if (mapRequest.version === 2) {
+        query.latitude = { ...query.latitude, $type: 'number' };
+        query.longitude = { ...query.longitude, $type: 'number' };
+      }
+
       andConditions.push(...categoryConditions(category));
 
       if (andConditions.length) {
@@ -549,10 +554,11 @@ module.exports = (db) => {
             city: 1,
             state: 1,
             country: 1,
+            ...(mapRequest.version === 1 ? { rating: 1, imageURL: 1, description: 1 } : {}),
           },
           maxTimeMS: 3000,
         })
-        .limit(MAP_PIN_LIMIT)
+        .limit(mapRequest.version === 2 ? MAP_PIN_LIMIT : 0)
         .toArray();
 
       console.info('[SpotsMap]', {

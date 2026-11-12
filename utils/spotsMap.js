@@ -3,7 +3,8 @@ const MAP_CLUSTER_LIMIT = 500;
 const CLUSTER_MAX_ZOOM = 7;
 
 function numberParam(value, name, min, max) {
-  const parsed = Number(value);
+  const scalar = typeof value === 'string' && value.trim() !== '';
+  const parsed = scalar ? Number(value) : NaN;
   if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
     const error = new Error(`Invalid ${name}`);
     error.status = 400;
